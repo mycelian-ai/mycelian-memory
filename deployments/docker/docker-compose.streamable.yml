@@ -1,0 +1,28 @@
+name: mycelian-mcp-streamable
+
+services:
+  synapse-mcp-server:
+    build:
+      context: ../../clients/go
+      dockerfile: Dockerfile
+    container_name: mycelian-memory-mcp-server
+    image: synapse-mcp-server:dev
+    environment:
+      - MEMORY_SERVICE_URL=http://host.docker.internal:8080
+      - MCP_HTTP=true                    # Force HTTP mode for Cursor streamable endpoint
+      - LOG_LEVEL=info
+      - MCP_SERVER_NAME=synapse-mcp-server
+      - MCP_SERVER_VERSION=0.2.0
+    ports:
+      - "11546:11546"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11546/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  default:
+    driver: bridge 

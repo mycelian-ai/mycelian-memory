@@ -1,0 +1,27 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Continuous integration guardrails and dependency hygiene
+alwaysApply: true
+---
+
+# Continuous Integration Requirements
+
+Every pull request **must** pass these automated checks:
+
+1. `go fmt ./...` – code formatted.
+2. `go vet ./...` – static analysis clean.
+3. `go test -race ./...` – all tests pass with race detector.
+4. `golangci-lint run` – linter passes with configured rules.
+5. `govulncheck ./...` – no known vulnerabilities in dependencies.
+6. Build in `-tags=production` mode (if tags used).
+
+The CI pipeline should fail fast if any step above is non-zero.
+
+# Dependency Hygiene
+
+* Run `go list -m -u all` weekly; open PRs for outdated critical deps.
+* Remove superseded packages (e.g., `pkg/memoryclient`) in the same PR once migration is validated.

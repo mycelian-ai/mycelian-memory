@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Log of recurring agent mistakes and resolutions
+alwaysApply: true
+---
+
+# Known Failures & Fixes
+
+_Add entries in reverse-chronological order._
+
+## TEMPLATE – YYYY-MM-DD
+- Issue: …
+- Resolution / Guidance: …
+
+## 2025-07-27
+- Issue: Spinning up host-level debug instances of `memory-service` (e.g., `./memory-service-debug-tmp`) to speed up debugging creates duplicate endpoints, mismatched environment variables, and makes the test/dev setup harder to reason about.
+- Resolution / Guidance: **Do not use this pattern going forward.** Always run the service via docker-compose (`memory-service` container on port 8080) so there is exactly one authoritative endpoint. For interactive debugging, use `docker compose run --service-ports` with the container or attach your debugger to the running container instead of compiling a separate host binary.

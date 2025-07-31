@@ -1,0 +1,32 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Guidelines for authoring project rules
+alwaysApply: true
+---
+# Cursor Rule Authoring Conventions
+
+• Start every rule file with a YAML header enclosed by `---` delimiters containing at least:
+  • `description`: short summary.
+  • `alwaysApply: true|false` (omit or set false for Agent-Requested rules).
+  • Optional `globs:` for Auto-Attached rules.
+
+• Keep each rule focused and ≤500 lines. Split large concepts into multiple files.
+
+• Choose the appropriate rule type:
+  1. **Always** – `alwaysApply: true`.
+  2. **Auto-Attached** – add `globs:` patterns to trigger on path matches.
+  3. **Agent-Requested** – `alwaysApply: false`; AI decides when to load.
+  4. **Manual** – mentioned explicitly with `@ruleName`.
+
+• Place domain-specific rules in nested `.cursor/rules/` directories close to code they govern.
+
+• Reference example snippets or templates with `@filename.ext` when helpful; Cursor will attach them automatically.
+
+• Update or supersede rules instead of editing history – keep provenance clear.
+
+• Keep structure shallow: H1 title, H2 primary sections; avoid deeper headings.
+• No decorative emojis; use ✅ ⏳ ❌ only when conveying status.

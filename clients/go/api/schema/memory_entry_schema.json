@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title":  "MemoryEntrySchema",
+  "type":   "object",
+  "additionalProperties": false,
+
+
+  "required": ["rawEntry", "summary"],
+
+  "properties": {
+    "rawEntry": {
+      "type": "string",
+      "description": "Verbatim text of the message you want indexed for retrieval."
+    },
+
+    "summary": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "1‑2 sentences summarising rawEntry, followed by the fenced META block."
+    },
+
+    "tags": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Opaque workflow labels; ignored by MCP."
+    },
+
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Immutable provenance supplied by the caller (e.g., memory_id, generated_by)."
+    },
+
+    "timestamp_iso": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Added by MCP on ingestion; do NOT send from the client."
+    }
+  }
+}
