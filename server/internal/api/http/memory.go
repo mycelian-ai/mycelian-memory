@@ -1,0 +1,513 @@
+package http
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"time"
+
+	"memory-backend/internal/api/validate"
+	"memory-backend/internal/core/memory"
+	"memory-backend/internal/core/vault"
+	platformHttp "memory-backend/internal/platform/http"
+	"memory-backend/internal/storage"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+)
+
+// MemoryHandler handles memory-related HTTP requests (thin transport layer)
+type MemoryHandler struct {
+	memoryService *memory.Service
+	vaultService  *vault.Service
+}
+
+// NewMemoryHandler creates a new memory handler
+func NewMemoryHandler(memoryService *memory.Service, vaultService *vault.Service) *MemoryHandler {
+	return &MemoryHandler{
+		memoryService: memoryService,
+		vaultService:  vaultService,
+	}
+}
+
+// CreateUser handles POST /api/users
+func (h *MemoryHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserID      string  `json:"userId"`
+		Email       string  `json:"email"`
+		DisplayName *string `json:"displayName,omitempty"`
+		TimeZone    string  `json:"timeZone"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		platformHttp.WriteBadRequest(w, "Invalid JSON")
+		return
+	}
+
+	// Validation
+	if err := validate.CreateUser(req.UserID, req.Email, req.DisplayName); err != nil {
+		platformHttp.WriteBadRequest(w, err.Error())
+		return
+	}
+
+	// Convert to domain request
+	createReq := memory.CreateUserRequest{
+		UserID:      req.UserID,
+		Email:       req.Email,
+		DisplayName: req.DisplayName,
+		TimeZone:    req.TimeZone,
+	}
+
+	user, err := h.memoryService.CreateUser(r.Context(), createReq)
+	if err != nil {
+		if memory.IsValidationError(err) {
+			platformHttp.WriteBadRequest(w, err.Error())
+		} else if memory.IsConflictError(err) {
+			platformHttp.WriteError(w, http.StatusConflict, err.Error())
+		} else {
+			platformHttp.WriteInternalError(w, err.Error())
+		}
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusCreated, user)
+}
+
+// GetUser handles GET /api/users/{userId}
+func (h *MemoryHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+
+	user, err := h.memoryService.GetUser(r.Context(), userID)
+	if err != nil {
+		platformHttp.WriteNotFound(w, err.Error())
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusOK, user)
+}
+
+// CreateMemory handles POST /api/users/{userId}/memories
+func (h *MemoryHandler) CreateMemory(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+
+	var req struct {
+		MemoryType  string  `json:"memoryType"`
+		Title       string  `json:"title"`
+		Description *string `json:"description,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		platformHttp.WriteBadRequest(w, "Invalid JSON")
+		return
+	}
+
+	// Validate input
+	if err := validate.CreateMemory(req.MemoryType, req.Title, req.Description); err != nil {
+		platformHttp.WriteBadRequest(w, err.Error())
+		return
+	}
+
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+
+	// Convert to domain request
+	createReq := memory.CreateMemoryRequest{
+		UserID:      userID,
+		VaultID:     vaultID,
+		MemoryType:  req.MemoryType,
+		Title:       req.Title,
+		Description: req.Description,
+	}
+
+	mem, err := h.memoryService.CreateMemory(r.Context(), createReq)
+	if err != nil {
+		if memory.IsValidationError(err) {
+			platformHttp.WriteBadRequest(w, err.Error())
+		} else {
+			platformHttp.WriteInternalError(w, err.Error())
+		}
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusCreated, mem)
+}
+
+// GetMemory handles GET /api/users/{userId}/memories/{memoryId}
+func (h *MemoryHandler) GetMemory(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+
+	mem, err := h.memoryService.GetMemory(r.Context(), userID, vaultID, memoryID)
+	if err != nil {
+		platformHttp.WriteNotFound(w, err.Error())
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusOK, mem)
+}
+
+// ListMemories handles GET /api/users/{userId}/memories
+func (h *MemoryHandler) ListMemories(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+
+	memories, err := h.memoryService.ListMemories(r.Context(), userID, vaultID)
+	if err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+
+	// Ensure memories is never nil - return empty slice instead
+	if memories == nil {
+		memories = []*storage.Memory{}
+	}
+
+	response := map[string]interface{}{
+		"memories": memories,
+		"count":    len(memories),
+	}
+
+	platformHttp.WriteJSON(w, http.StatusOK, response)
+}
+
+// UpdateMemoryEntryTags handles PATCH /api/users/{userId}/memories/{memoryId}/entries/{creationTime}/tags
+func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+	creationTimeStr := vars["creationTime"]
+
+	// Parse creation time (try RFC3339Nano first, then RFC3339 for backwards compatibility)
+	creationTime, err := time.Parse(time.RFC3339Nano, creationTimeStr)
+	if err != nil {
+		// Fallback to RFC3339
+		creationTime, err = time.Parse(time.RFC3339, creationTimeStr)
+		if err != nil {
+			platformHttp.WriteBadRequest(w, "Invalid creationTime format, use RFC3339 or RFC3339Nano")
+			return
+		}
+	}
+
+	var req struct {
+		Tags map[string]interface{} `json:"tags"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		platformHttp.WriteBadRequest(w, "Invalid JSON")
+		return
+	}
+
+	// Basic validation on tags object
+	if req.Tags == nil {
+		platformHttp.WriteBadRequest(w, "tags field is required")
+		return
+	}
+	if err := validate.IsJSONObject(req.Tags); err != nil {
+		platformHttp.WriteBadRequest(w, err.Error())
+		return
+	}
+
+	// Convert to domain request
+	updateReq := memory.UpdateMemoryEntryTagsRequest{
+		UserID:       userID,
+		VaultID:      vaultID,
+		MemoryID:     memoryID,
+		CreationTime: creationTime,
+		Tags:         req.Tags,
+	}
+
+	entry, err := h.memoryService.UpdateMemoryEntryTags(r.Context(), updateReq)
+	if err != nil {
+		if memory.IsValidationError(err) {
+			platformHttp.WriteBadRequest(w, err.Error())
+		} else {
+			platformHttp.WriteInternalError(w, err.Error())
+		}
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusOK, entry)
+}
+
+// DeleteMemory handles DELETE /api/users/{userId}/memories/{memoryId}
+func (h *MemoryHandler) DeleteMemory(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+
+	err = h.memoryService.DeleteMemory(r.Context(), userID, vaultID, memoryID)
+	if err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// CreateMemoryEntry handles POST /api/users/{userId}/memories/{memoryId}/entries
+func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+
+	var req struct {
+		RawEntry       string                 `json:"rawEntry"`
+		Summary        *string                `json:"summary,omitempty"`
+		Metadata       map[string]interface{} `json:"metadata,omitempty"`
+		Tags           map[string]interface{} `json:"tags,omitempty"`
+		ExpirationTime *time.Time             `json:"expirationTime,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		platformHttp.WriteBadRequest(w, "Invalid JSON")
+		return
+	}
+
+	// Validate
+	if err := validate.CreateMemoryEntry(req.RawEntry, req.Summary, req.Metadata, req.Tags); err != nil {
+		platformHttp.WriteBadRequest(w, err.Error())
+		return
+	}
+
+	// Convert to domain request
+	createReq := memory.CreateMemoryEntryRequest{
+		UserID:         userID,
+		VaultID:        vaultID,
+		MemoryID:       memoryID,
+		RawEntry:       req.RawEntry,
+		Summary:        req.Summary,
+		Metadata:       req.Metadata,
+		Tags:           req.Tags,
+		ExpirationTime: req.ExpirationTime,
+	}
+
+	entry, err := h.memoryService.CreateMemoryEntry(r.Context(), createReq)
+	if err != nil {
+		if memory.IsValidationError(err) {
+			platformHttp.WriteBadRequest(w, err.Error())
+		} else {
+			platformHttp.WriteInternalError(w, err.Error())
+		}
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusCreated, entry)
+}
+
+// ListMemoryEntries handles GET /api/users/{userId}/memories/{memoryId}/entries
+func (h *MemoryHandler) ListMemoryEntries(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	memoryID := vars["memoryId"]
+
+	// Parse query parameters
+	query := r.URL.Query()
+
+	req := memory.ListMemoryEntriesRequest{
+		UserID:   userID,
+		MemoryID: memoryID,
+	}
+
+	// Parse limit
+	if limitStr := query.Get("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
+			req.Limit = limit
+		}
+	}
+
+	// Parse before timestamp
+	if beforeStr := query.Get("before"); beforeStr != "" {
+		if before, err := time.Parse(time.RFC3339, beforeStr); err == nil {
+			req.Before = &before
+		}
+	}
+
+	// Parse after timestamp
+	if afterStr := query.Get("after"); afterStr != "" {
+		if after, err := time.Parse(time.RFC3339, afterStr); err == nil {
+			req.After = &after
+		}
+	}
+
+	// add vaultId parse
+	vaultIDStr := vars["vaultId"]
+	vaultID, err2 := uuid.Parse(vaultIDStr)
+	if err2 != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+
+	req.VaultID = vaultID
+
+	entries, err := h.memoryService.ListMemoryEntries(r.Context(), req)
+	if err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+
+	// Ensure entries is never nil - return empty slice instead
+	if entries == nil {
+		entries = []*storage.MemoryEntry{}
+	}
+
+	response := map[string]interface{}{
+		"entries": entries,
+		"count":   len(entries),
+	}
+
+	platformHttp.WriteJSON(w, http.StatusOK, response)
+}
+
+// PutMemoryContext handles PUT /api/users/{userId}/memories/{memoryId}/contexts
+func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+
+	// Parse request body
+	var body struct {
+		Context map[string]interface{} `json:"context"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		platformHttp.WriteBadRequest(w, "Invalid JSON")
+		return
+	}
+	if err := validate.ContextFragments(body.Context); err != nil {
+		platformHttp.WriteBadRequest(w, err.Error())
+		return
+	}
+
+	// Marshal the context object back to raw JSON for pass-through
+	raw, err := json.Marshal(body.Context)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "context must be a valid JSON object")
+		return
+	}
+
+	// Build domain request
+	createReq := memory.CreateMemoryContextRequest{
+		UserID:   userID,
+		VaultID:  vaultID,
+		MemoryID: memoryID,
+		Context:  raw,
+	}
+
+	ctxObj, err := h.memoryService.CreateMemoryContext(r.Context(), createReq)
+	if err != nil {
+		if memory.IsValidationError(err) {
+			platformHttp.WriteBadRequest(w, err.Error())
+		} else {
+			platformHttp.WriteInternalError(w, err.Error())
+		}
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusCreated, ctxObj)
+}
+
+// GetLatestMemoryContext handles GET /api/users/{userId}/memories/{memoryId}/contexts
+func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+
+	ctxObj, err := h.memoryService.GetLatestMemoryContext(r.Context(), userID, vaultID, memoryID)
+	if err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+
+	platformHttp.WriteJSON(w, http.StatusOK, ctxObj)
+}
+
+// --- Title-based endpoints ---
+
+// ListMemoriesByVaultTitle GET /api/users/{userId}/vaults/{vaultTitle}/memories
+func (h *MemoryHandler) ListMemoriesByVaultTitle(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultTitle := vars["vaultTitle"]
+
+	v, err := h.vaultService.GetVaultByTitle(r.Context(), userID, vaultTitle)
+	if err != nil {
+		platformHttp.WriteNotFound(w, err.Error())
+		return
+	}
+
+	memories, err := h.memoryService.ListMemories(r.Context(), userID, v.VaultID)
+	if err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+	platformHttp.WriteJSON(w, http.StatusOK, map[string]interface{}{"memories": memories, "count": len(memories)})
+}
+
+// GetMemoryByTitle GET /api/users/{userId}/vaults/{vaultTitle}/memories/{memoryTitle}
+func (h *MemoryHandler) GetMemoryByTitle(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultTitle := vars["vaultTitle"]
+	memTitle := vars["memoryTitle"]
+
+	v, err := h.vaultService.GetVaultByTitle(r.Context(), userID, vaultTitle)
+	if err != nil {
+		platformHttp.WriteNotFound(w, err.Error())
+		return
+	}
+
+	m, err := h.memoryService.GetMemoryByTitle(r.Context(), userID, v.VaultID, memTitle)
+	if err != nil {
+		platformHttp.WriteNotFound(w, err.Error())
+		return
+	}
+	platformHttp.WriteJSON(w, http.StatusOK, m)
+}

@@ -1,0 +1,7 @@
+2025-07-27 05:25:45 INF Application configuration loaded context_data_dir=./data/context log_level=info memory_service_url=http://localhost:8080
+2025-07-27 05:25:45 INF Starting Synapse MCP server
+2025-07-27 05:25:45 INF MCP server shutting down
+2025-07-27 05:25:45 INF Shutting down Synapse client
+2025/07/27 05:25:45 shardqueue: stopping executor, draining 4 shards
+2025/07/27 05:25:45 shardqueue: executor stopped, all queues drained
+2025-07-27 05:25:45 INF Synapse client shutdown complete

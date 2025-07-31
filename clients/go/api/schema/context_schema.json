@@ -1,0 +1,16 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title":  "MycilianContextSnapshot",
+    "type":   "object",
+    "additionalProperties": false,
+  
+    "required": ["activeContext"],
+  
+    "properties": {
+      "activeContext": {
+        "type": "string",
+        "description":
+          "The entire seed‑context for re‑hydrating a future session. Keep it concise (≤1 500 tokens) and up‑to‑date."
+      }
+    }
+  }
