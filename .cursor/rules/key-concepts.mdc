@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Key Architecture Concepts – Synapse Client Stack
+
+Status: alwaysApply
+
+---
+
+• MCP server (outermost)
+  – Listens on stdio for JSON tool calls from the LLM agent.  
+  – Resolves prompts via Go SDK (`prompt.Load`).  
+  – Delegates **all** memory operations to the Go Client SDK.  
+  – Never imports or calls the backend HTTP client directly.
+
+• Go Client SDK (`client/`)
+  – Pure Go library that wraps REST endpoints of the Memory service (`CreateMemory`, `AddEntry`, …).  
+  – Owns prompt-resolution logic (filesystem override → embedded default).  
+  – Provides thin helpers used by both MCP server and traditional Go apps.
+
+• Memory Service Backend (HTTP + Spanner)
+  – Stateless CRUD service for users, memories, entries.  
+  – No prompt, search, or inference logic.  
+  – Future search queries may hit an external Weaviate service.
+
+Flow diagram
+```
+Agent (LLM)
+    │ (tool call)
+    ▼
+MCP server ──► Go Client SDK ──► Memory HTTP service
+```
+
+Invariant: SDK **does not** depend on MCP; MCP **always** depends on SDK.
+
+Prompt guideline: each prompt file ≤ 200 words (~150-180 tokens) for LLM efficiency.
+
+---
+
+End of rule

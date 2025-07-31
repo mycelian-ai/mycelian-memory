@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# On-Demand External Documentation (generic)
+
+To bring a large reference file into the prompt **only when it is needed**:
+
+1. Mention it with the tag  
+   `@docs/<relative-path>.md`  
+   Example: `@docs/reference/api-documentation.md`
+
+2. The agent will attach that file (or the relevant section) to the conversation context.
+
+Guidelines
+• Use the tag **exactly**; no wildcard fetching.  
+• Prefer section-level links (e.g., `@docs/reference/api-documentation.md#rate-limits`) when you only need part of a big file.  
+• Keep reference files lean—split very large docs into smaller ones (<300 lines) if possible.
