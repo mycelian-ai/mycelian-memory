@@ -1,0 +1,1 @@
+Provide a one-line summary: `<file>: <intent>` (≤ 20 words). Use lowercase file paths and function names. 

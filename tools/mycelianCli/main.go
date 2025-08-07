@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mycelian/mycelian-memory/clients/go/client"
+	"github.com/mycelian/mycelian-memory/client"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -523,7 +523,7 @@ func newPutContextCmd() *cobra.Command {
 				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
-				Str("context_id", ack.ContextID).
+				Str("status", ack.Status).
 				Dur("elapsed", elapsed).
 				Msg("put context completed")
 

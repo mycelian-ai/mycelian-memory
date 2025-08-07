@@ -3,8 +3,8 @@ name: mycelian-mcp-streamable
 services:
   synapse-mcp-server:
     build:
-      context: ../../clients/go
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: cmd/mycelian-mcp-server/Dockerfile
     container_name: mycelian-memory-mcp-server
     image: synapse-mcp-server:dev
     environment:

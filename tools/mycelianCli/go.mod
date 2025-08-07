@@ -3,7 +3,7 @@ module github.com/mycelian/mycelian-memory/tools/mycelianCli
 go 1.24.5
 
 require (
-	github.com/mycelian/mycelian-memory/clients/go v0.0.0
+	github.com/mycelian/mycelian-memory/client v0.0.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1
 )
@@ -27,4 +27,4 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 )
 
-replace github.com/mycelian/mycelian-memory/clients/go => ../../clients/go
+replace github.com/mycelian/mycelian-memory/client => ../../client

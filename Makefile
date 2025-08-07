@@ -42,7 +42,7 @@ build-mycelian-cli: bin
 
 # Build MCP server to deterministic path  
 build-mcp-server: bin
-	cd clients/go && go build -o ../../bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
+	go build -o bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
 
 # Build all binaries
 build-all: build-mycelian-cli build-mcp-server
@@ -73,6 +73,9 @@ help:
 	@echo "  backend-down           Stop backend stack containers"
 	@echo "  backend-status         Show backend container status"
 	@echo "  backend-logs           Tail backend container logs"
+	@echo ""
+	@echo "Test Commands:"
+	@echo "  client-coverage-check  Run client tests and assert >= 78% coverage"
 
 mcp-streamable-up:
 	docker compose -f $(MCP_COMPOSE_FILE) up -d --build --force-recreate
@@ -81,3 +84,7 @@ mcp-streamable-down:
 	docker compose -f $(MCP_COMPOSE_FILE) down
 
 mcp-streamable-restart: mcp-streamable-down mcp-streamable-up 
+
+.PHONY: client-coverage-check
+client-coverage-check:
+	cd client && bash scripts/coverage_check.sh 78.0
