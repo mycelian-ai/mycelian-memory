@@ -1207,7 +1207,12 @@ func newListMemoriesCmd() *cobra.Command {
 			if vaultID != "" {
 				mems, err = c.ListMemories(ctx, userID, vaultID)
 			} else {
-				mems, err = c.ListMemoriesByVaultTitle(ctx, userID, vaultTitle)
+				// Get vault by title to obtain vault ID
+				vault, err := c.GetVaultByTitle(ctx, userID, vaultTitle)
+				if err != nil {
+					return fmt.Errorf("failed to get vault by title '%s': %w", vaultTitle, err)
+				}
+				mems, err = c.ListMemories(ctx, userID, vault.VaultID)
 			}
 			if err != nil {
 				return err
