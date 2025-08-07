@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Build the MCP server binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o synapse-mcp-server ./cmd/synapse-mcp-server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mycelian-mcp-server ./cmd/mycelian-mcp-server
 
 # Build the Synapse CLI binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o synapse ./cmd/synapse
@@ -35,11 +35,11 @@ RUN addgroup -g 1001 -S synapse && \
 WORKDIR /app
 
 # Copy binaries from builder stage
-COPY --from=builder /app/synapse-mcp-server .
+COPY --from=builder /app/mycelian-mcp-server .
 COPY --from=builder /app/synapse .
 
 # Change ownership to non-root user
-RUN chown synapse:synapse synapse-mcp-server
+RUN chown synapse:synapse mycelian-mcp-server
 
 # Switch to non-root user
 USER synapse
@@ -55,4 +55,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 ENV MEMORY_SERVICE_URL=http://localhost:8080
 
 # Run the binary
-ENTRYPOINT ["./synapse-mcp-server"] 
+ENTRYPOINT ["./mycelian-mcp-server"] 

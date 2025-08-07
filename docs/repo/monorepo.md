@@ -27,7 +27,12 @@ mycelian/
   clients/                # all language SDKs (one sub-dir per language)
     go/
       go.mod
-      mycelian/           # public Go API
+      client/             # public Go client SDK
+      mcp/                # MCP server functionality
+        handlers/         # MCP tool handlers
+        server.go         # MCP server implementation
+      cmd/                # binary entry points
+        mycelian-mcp-server/
       internal/           # helpers not exported
     python/
       pyproject.toml
@@ -76,7 +81,7 @@ This guarantees contract coherence across languages.
 
 - Public API changes begin with updates to the contracts in `api/`.
 - Generated SDK code lives under `clients/generated/<lang>` (if used) and is committed so CI can diff changes.
-- Hand-written helpers or ergonomic layers live in the same language folder (e.g. `clients/python/src/mycelian/`).
+- Hand-written helpers or ergonomic layers live in the same language folder (e.g. `clients/go/client/`, `clients/python/src/mycelian/`).
 - Promote shared functionality out of `internal/` only after a design review.
 
 ## Staying tidy

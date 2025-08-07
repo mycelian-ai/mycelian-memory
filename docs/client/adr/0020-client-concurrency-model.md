@@ -21,9 +21,9 @@ Adopt a **three-class** client concurrency model:
 
 | Class | API Verbs | Ordering Guarantee | Execution Path |
 |-------|-----------|--------------------|----------------|
-| Ordered (SQ) | `add_entry`, `delete_entry`, `await_consistency`, `Get*/List*` with `Consistent=true` | FIFO per memory | Sharded Queue → 4 worker goroutines |
-| Eventual Reads (Direct) | `get_entry`, `list_entries`, `search_entries` without `Consistent=true` | None (eventual) | Direct gRPC/HTTP |
-| Admin Strong (Direct) | `create_user`, `create_memory`, metadata updates, list APIs | Strong (backend enforced) | Direct gRPC/HTTP |
+| Ordered (SQ) | `add_entry`, `delete_entry`, `put_context`, `await_consistency` | FIFO per memory | Sharded Queue → 4 worker goroutines |
+| Eventual Reads (Direct) | `get_entry`, `list_entries`, `search_entries`, `get_context` | None (eventual) | Direct gRPC/HTTP |
+| Admin Strong (Direct) | `create_user`, `create_memory`, `create_vault`, `delete_*`, `update_*`, `list_*` (metadata ops) | Strong (backend enforced) | Direct gRPC/HTTP |
 
 Key points:
 
@@ -31,6 +31,7 @@ Key points:
 2. **Offline resilience** – queued writes are retried when connectivity returns.
 3. **Back-pressure** – queue length and worker count bound local resources; no unbounded goroutine storm.
 4. **Stateless servers** – backend does not need a sequencer; Spanner provides global external consistency.
+5. **Explicit consistency** – users must call `await_consistency()` for read-after-write guarantees; no `Consistent=true` flags.
 
 See `docs/design/client_concurrency_model.md` for detailed rationale and comparison with Mem0s.
 

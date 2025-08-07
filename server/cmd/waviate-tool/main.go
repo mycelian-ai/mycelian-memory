@@ -12,7 +12,7 @@ import (
 	filters "github.com/weaviate/weaviate-go-client/v5/weaviate/filters"
 	gql "github.com/weaviate/weaviate-go-client/v5/weaviate/graphql"
 
-	"memory-backend/internal/indexer-prototype"
+	"github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
 )
 
 func main() {

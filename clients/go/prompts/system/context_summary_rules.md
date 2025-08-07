@@ -10,7 +10,7 @@
 * **put_context** – write/overwrite the context document.
 * **await_consistency** – wait until previous writes are durably visible.
 * **get_user** – fetch the user profile object (name, email, quotas).
-* **search_memories** – search across all memories, returning ranked hits.
+* **search_memories** – search within a specific memory, returning ranked entries, best and latest context.
 
 **Tool Scoping** – If several tool-specific instruction blocks exist in the prompt window, obey **only** the block whose `### TOOL:` label matches the function you are currently executing; ignore all other blocks.
 

@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"memory-backend/internal/storage/sqlite"
+	"github.com/mycelian/mycelian-memory/server/internal/storage/sqlite"
 )
 
 func TestCheckStorageHealth_SQLite(t *testing.T) {

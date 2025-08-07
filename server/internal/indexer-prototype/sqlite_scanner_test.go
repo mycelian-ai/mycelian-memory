@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"memory-backend/internal/localstate"
-	sqlstorage "memory-backend/internal/storage/sqlite"
+	"github.com/mycelian/mycelian-memory/server/internal/localstate"
+	sqlstorage "github.com/mycelian/mycelian-memory/server/internal/storage/sqlite"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"

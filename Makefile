@@ -27,9 +27,44 @@ backend-status:
 backend-logs:
 	$(MAKE) -C server docker-logs
 
+# ------------------------------------------------------------------------------
+# Binary building
+# ------------------------------------------------------------------------------
+.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin
+
+# Create bin directory
+bin:
+	mkdir -p bin
+
+# Build mycelianCli tool to deterministic path
+build-mycelian-cli: bin
+	cd tools/mycelianCli && go build -o ../../bin/mycelianCli .
+
+# Build MCP server to deterministic path  
+build-mcp-server: bin
+	cd clients/go && go build -o ../../bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
+
+# Build all binaries
+build-all: build-mycelian-cli build-mcp-server
+
+# Alias for build-all
+build: build-all
+
+# Clean built binaries
+clean-bin:
+	rm -rf bin/
+
 # Update help output
 help:
 	@echo "Synapse Monorepo Makefile — available commands:"
+	@echo ""
+	@echo "Build Commands:"
+	@echo "  build                  Build all binaries to bin/ directory"
+	@echo "  build-mycelian-cli     Build mycelianCli to bin/mycelianCli"
+	@echo "  build-mcp-server       Build MCP server to bin/mycelian-mcp-server"
+	@echo "  clean-bin              Remove all built binaries"
+	@echo ""
+	@echo "Service Commands:"
 	@echo "  mcp-streamable-up      Start (or rebuild) the Synapse MCP server container (streamable HTTP for Cursor)"
 	@echo "  mcp-streamable-down    Stop and remove the Synapse MCP server container"
 	@echo "  mcp-streamable-restart Shortcut for mcp-streamable-down then mcp-streamable-up"

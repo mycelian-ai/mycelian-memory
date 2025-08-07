@@ -24,7 +24,7 @@ services:
     extra_hosts:
       - "localhost:host-gateway"
     volumes:
-      - memory-sqlite-data:/root/.synapse-memory
+      - ../../data/sqllitedb:/root/.synapse-memory
 
   weaviate:
     container_name: weaviate
@@ -60,7 +60,7 @@ services:
     networks:
       - memory-network
     volumes:
-      - memory-sqlite-data:/root/.synapse-memory
+      - ../../data/sqllitedb:/root/.synapse-memory
     depends_on:
       weaviate:
         condition: service_healthy
@@ -77,13 +77,14 @@ services:
     networks:
       - memory-network
     restart: "no"
+    entrypoint: ["sh", "-c"]
     command: >
-      sh -c "
+      "
         until curl -s http://memory-service:8080/api/health | grep 'UP'; do
           echo 'waiting for memory-service...';
           sleep 2;
         done;
-        ./memoryctl users create --userId local_user --email dev@localhost --name 'Local User' --api http://memory-service:8080 || true
+        ./memoryctl users create --userId local_user --email local.user@example.com --name 'Local User' --api http://memory-service:8080 || true
       "
 
 networks:
@@ -91,5 +92,4 @@ networks:
     driver: bridge
     name: synapse-memory-network 
 
-volumes:
-  memory-sqlite-data: 
+ 

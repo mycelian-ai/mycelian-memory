@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"memory-backend/internal/storage/sqlite"
+	"github.com/mycelian/mycelian-memory/server/internal/storage/sqlite"
 
 	"github.com/rs/zerolog"
 )

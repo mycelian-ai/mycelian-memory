@@ -8,8 +8,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	indexer "memory-backend/internal/indexer-prototype"
-	platformlogger "memory-backend/internal/platform/logger"
+	indexer "github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
+	platformlogger "github.com/mycelian/mycelian-memory/server/internal/platform/logger"
 )
 
 func main() {
@@ -40,7 +40,7 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to init scanner")
 	}
-	uploader, err := indexer.NewUploader(cfg.WeaviateURL, logger)
+	uploader, err := indexer.NewUploader(cfg.WaviateURL, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to init uploader")
 	}

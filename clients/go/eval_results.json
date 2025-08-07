@@ -1,9 +1,0 @@
-[
-  {
-    "question": "Hey, remember that time we talked about music? What was the artist you mentioned you could get into?",
-    "expected": "Taylor Swift!",
-    "answer": "Based on the memory context provided, the artist you mentioned you could get into was **Taylor Swift**. You said \"A little bit. I can get into taylor swift\" when we were discussing country music. We even joked later that between both of our troubles, we could probably get a country song written about our distresses and perhaps Taylor Swift could perform it.",
-    "is_correct": true,
-    "question_type": "cross_session"
-  }
-]

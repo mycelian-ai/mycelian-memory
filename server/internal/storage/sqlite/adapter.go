@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"memory-backend/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // SqliteStorage implements storage.Storage using SQLite driver.
@@ -97,7 +97,7 @@ func (s *SqliteStorage) CreateMemory(ctx context.Context, req storage.CreateMemo
 	// Insert default context so every memory has at least one snapshot (parity with cloud-dev)
 	ctxID := uuid.New().String()
 	defaultCtx := `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
-	_, err = s.db.ExecContext(ctx, `INSERT INTO MemoryContexts (UserId, VaultId, MemoryId, ContextId, Context, CreationTime) VALUES (?,?,?,?,?,?)`, req.UserID, req.VaultID.String(), memID, ctxID, defaultCtx, now)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO MemoryContexts (UserId, VaultId, MemoryId, Title, ContextId, Context, CreationTime) VALUES (?,?,?,?,?,?,?)`, req.UserID, req.VaultID.String(), memID, req.Title, ctxID, defaultCtx, now)
 	if err != nil {
 		return nil, err
 	}
@@ -168,9 +168,9 @@ func (s *SqliteStorage) CreateMemoryEntry(ctx context.Context, req storage.Creat
 	tagsJSON, _ := json.Marshal(req.Tags)
 
 	_, err := s.db.ExecContext(ctx, `INSERT INTO MemoryEntries (
-		UserId, VaultId, MemoryId, CreationTime, EntryId, RawEntry, Summary, Metadata, Tags)
-		VALUES (?,?,?,?,?,?,?,?,?)`,
-		req.UserID, req.VaultID.String(), req.MemoryID, now, entryID, req.RawEntry, req.Summary, string(metaJSON), string(tagsJSON))
+		UserId, VaultId, MemoryId, Title, CreationTime, EntryId, RawEntry, Summary, Metadata, Tags)
+		VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		req.UserID, req.VaultID.String(), req.MemoryID, "", now, entryID, req.RawEntry, req.Summary, string(metaJSON), string(tagsJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -264,8 +264,8 @@ func (s *SqliteStorage) CreateMemoryContext(ctx context.Context, req storage.Cre
 		id := uuid.New().String()
 		ctxID = &id
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO MemoryContexts (UserId, VaultId, MemoryId, ContextId, Context, CreationTime) VALUES (?,?,?,?,?,?)`,
-		req.UserID, req.VaultID.String(), req.MemoryID, *ctxID, string(req.Context), now)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO MemoryContexts (UserId, VaultId, MemoryId, Title, ContextId, Context, CreationTime) VALUES (?,?,?,?,?,?,?)`,
+		req.UserID, req.VaultID.String(), req.MemoryID, "", *ctxID, string(req.Context), now)
 	if err != nil {
 		return nil, err
 	}

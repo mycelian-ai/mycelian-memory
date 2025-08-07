@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
-	memcore "memory-backend/internal/core/memory"
-	"memory-backend/internal/storage"
+	memcore "github.com/mycelian/mycelian-memory/server/internal/core/memory"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // Service contains the core business logic for vault operations.

@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"memory-backend/internal/localstate"
-	"memory-backend/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/localstate"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
 	"github.com/google/uuid"
 )

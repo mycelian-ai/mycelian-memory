@@ -1,6 +1,6 @@
 package search
 
-import idx "memory-backend/internal/indexer-prototype"
+import idx "github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
 
 // Embedder exposes text embedding capability for the search service.
 // It is an alias to the Embedder interface used by the indexer so that

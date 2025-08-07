@@ -2,7 +2,8 @@ package search
 
 import (
 	"fmt"
-	idx "memory-backend/internal/indexer-prototype"
+
+	idx "github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
 )
 
 // NewProvider returns an Embedder for the given provider/model using the

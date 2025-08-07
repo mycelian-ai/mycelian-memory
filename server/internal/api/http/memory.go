@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"time"
 
-	"memory-backend/internal/api/validate"
-	"memory-backend/internal/core/memory"
-	"memory-backend/internal/core/vault"
-	platformHttp "memory-backend/internal/platform/http"
-	"memory-backend/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/api/validate"
+	"github.com/mycelian/mycelian-memory/server/internal/core/memory"
+	"github.com/mycelian/mycelian-memory/server/internal/core/vault"
+	platformHttp "github.com/mycelian/mycelian-memory/server/internal/platform/http"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"

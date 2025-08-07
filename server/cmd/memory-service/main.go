@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"memory-backend/internal/api"
-	httpHandlers "memory-backend/internal/api/http"
-	"memory-backend/internal/config"
-	"memory-backend/internal/platform/factory"
-	"memory-backend/internal/platform/logger"
+	"github.com/mycelian/mycelian-memory/server/internal/api"
+	httpHandlers "github.com/mycelian/mycelian-memory/server/internal/api/http"
+	"github.com/mycelian/mycelian-memory/server/internal/config"
+	"github.com/mycelian/mycelian-memory/server/internal/platform/factory"
+	"github.com/mycelian/mycelian-memory/server/internal/platform/logger"
 )
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	// -------- Health monitor ---------------
-	httpHandlers.StartHealthMonitor(ctx, storageLayer, cfg.WeaviateURL, cfg.EmbedProvider, cfg.EmbedModel, 30*time.Second)
+	httpHandlers.StartHealthMonitor(ctx, storageLayer, cfg.WaviateURL, cfg.EmbedProvider, cfg.EmbedModel, 30*time.Second)
 
 	// -------- Router & Server --------------
 	router := api.NewRouter(storageLayer)

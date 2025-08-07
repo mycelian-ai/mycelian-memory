@@ -1,4 +1,4 @@
-module github.com/synapse/synapse-mcp-server
+module github.com/mycelian/mycelian-memory/clients/go
 
 go 1.24.5
 
@@ -9,7 +9,6 @@ require (
 	github.com/mark3labs/mcp-go v0.36.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rs/zerolog v1.34.0
-	github.com/spf13/cobra v1.9.1
 )
 
 require (
@@ -19,7 +18,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -32,7 +30,6 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/sys v0.33.0 // indirect

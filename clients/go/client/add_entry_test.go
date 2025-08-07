@@ -32,34 +32,34 @@ func TestClient_AddEntry(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "500 error (async, expect no client error)",
+			name:      "500 internal server error (enqueued successfully)",
 			serverRes: resp{status: http.StatusInternalServerError, body: map[string]string{"error": "failure"}},
-			wantErr:   false,
+			wantErr:   false, // Job enqueues successfully, HTTP error happens later
 		},
 		{
-			name:      "400 bad request (async)",
+			name:      "400 bad request (enqueued successfully)",
 			serverRes: resp{status: http.StatusBadRequest, body: map[string]string{"error": "bad"}},
-			wantErr:   false,
+			wantErr:   false, // Job enqueues successfully, HTTP error happens later
 		},
 		{
-			name:      "404 not found (async)",
+			name:      "404 not found (enqueued successfully)",
 			serverRes: resp{status: http.StatusNotFound, body: map[string]string{"error": "nf"}},
-			wantErr:   false,
+			wantErr:   false, // Job enqueues successfully, HTTP error happens later
 		},
 		{
-			name:      "503 service unavailable (async)",
+			name:      "503 service unavailable (enqueued successfully)",
 			serverRes: resp{status: http.StatusServiceUnavailable, body: map[string]string{"error": "svc"}},
-			wantErr:   false,
+			wantErr:   false, // Job enqueues successfully, HTTP error happens later
 		},
 		{
-			name:      "413 payload too large (async)",
+			name:      "413 payload too large (enqueued successfully)",
 			serverRes: resp{status: http.StatusRequestEntityTooLarge, body: map[string]string{"error": "large"}},
-			wantErr:   false,
+			wantErr:   false, // Job enqueues successfully, HTTP error happens later
 		},
 		{
-			name:      "429 rate limited (async)",
+			name:      "429 rate limited (enqueued successfully)",
 			serverRes: resp{status: http.StatusTooManyRequests, body: map[string]string{"error": "limit"}},
-			wantErr:   false,
+			wantErr:   false, // Job enqueues successfully, HTTP error happens later
 		},
 		{
 			name: "context cancelled (pre-enqueue)",
@@ -70,9 +70,9 @@ func TestClient_AddEntry(t *testing.T) {
 			cancelCtx: true,
 		},
 		{
-			name:        "deadline exceeded (async, expect no client error)",
+			name:        "deadline exceeded (enqueued successfully)",
 			serverRes:   resp{status: http.StatusCreated, body: map[string]string{"message": "ok"}},
-			wantErr:     false,
+			wantErr:     false, // Job enqueues successfully, timeout happens later during execution
 			setTimeout:  50 * time.Millisecond,
 			serverDelay: 100 * time.Millisecond,
 		},
@@ -105,7 +105,7 @@ func TestClient_AddEntry(t *testing.T) {
 				defer cancel()
 			}
 
-			_, err := c.AddEntry(ctx, "user-1", "mem-1", AddEntryRequest{RawEntry: "hello"})
+			_, err := c.AddEntry(ctx, "user-1", "vlt-1", "mem-1", AddEntryRequest{RawEntry: "hello"})
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}

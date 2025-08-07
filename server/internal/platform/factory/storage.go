@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"memory-backend/internal/config"
-	"memory-backend/internal/localstate"
-	"memory-backend/internal/platform/database"
-	"memory-backend/internal/storage"
-	"memory-backend/internal/storage/sqlite"
+	"github.com/mycelian/mycelian-memory/server/internal/config"
+	"github.com/mycelian/mycelian-memory/server/internal/localstate"
+	"github.com/mycelian/mycelian-memory/server/internal/platform/database"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/storage/sqlite"
 )
 
 // NewStorage selects the correct storage adapter based on cfg.DBDriver.

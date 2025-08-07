@@ -2,7 +2,7 @@
 
 package sqlite
 
-import "memory-backend/internal/events"
+import "github.com/mycelian/mycelian-memory/server/internal/events"
 
 func publishMemoryCreated(userID, memoryID string) {
 	events.Publish(events.Event{

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	platformdb "memory-backend/internal/platform/database"
+	platformdb "github.com/mycelian/mycelian-memory/server/internal/platform/database"
 
 	"cloud.google.com/go/spanner"
 	"github.com/rs/zerolog"

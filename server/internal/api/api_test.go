@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"memory-backend/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"

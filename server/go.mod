@@ -1,4 +1,4 @@
-module memory-backend
+module github.com/mycelian/mycelian-memory/server
 
 go 1.24.5
 

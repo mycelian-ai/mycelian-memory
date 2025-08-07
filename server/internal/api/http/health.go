@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	platformHttp "memory-backend/internal/platform/http"
-	"memory-backend/internal/storage"
+	platformHttp "github.com/mycelian/mycelian-memory/server/internal/platform/http"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // HealthHandler handles health check endpoints

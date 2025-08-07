@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
-	"memory-backend/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // Service contains the core business logic for memory operations

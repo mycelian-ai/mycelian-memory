@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
-	indexer "memory-backend/internal/indexer-prototype"
+	indexer "github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
 
 	weaviate "github.com/weaviate/weaviate-go-client/v5/weaviate"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate/filters"

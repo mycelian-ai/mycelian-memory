@@ -1,6 +1,6 @@
-# Developing Synapse Memory Backend
+# Developing Mycelian Memory Backend
 
-- [Developing Synapse Memory Backend](#developing-synapse-memory-backend)
+- [Developing Mycelian Memory Backend](#developing-mycelian-memory-backend)
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [System Requirements](#system-requirements)
@@ -44,7 +44,7 @@
 
 ## Getting Started
 
-Thank you for your interest in contributing to Synapse Memory Backend! This document will guide you through setting up your development environment and understanding our codebase.
+Thank you for your interest in contributing to Mycelian Memory Backend! This document will guide you through setting up your development environment and understanding our codebase.
 
 ### Prerequisites
 
@@ -132,7 +132,7 @@ The system supports multiple storage backends:
    ```
 3. Add upstream remote:
    ```bash
-   git remote add upstream https://github.com/synapse/memory-backend.git
+   git remote add upstream https://github.com/mycelian/mycelian-memory.git
    ```
 
 ### Install Dependencies
@@ -167,7 +167,7 @@ make --version
    DB_ENGINE=sqlite  # or 'spanner'
    
    # SQLite Configuration
-   SQLITE_PATH=~/.synapse-memory/memory.db
+   SQLITE_PATH=~/.mycelian-memory/memory.db
    
    # Spanner Configuration (if using)
    SPANNER_PROJECT=test-project
@@ -553,7 +553,7 @@ echo "$SEARCH_RESPONSE" | jq .
 
 ```bash
 # Connect to database
-sqlite3 ~/.synapse-memory/memory.db
+sqlite3 ~/.mycelian-memory/memory.db
 
 # Useful queries
 .tables
@@ -677,9 +677,9 @@ docker stats
 
 1. **SQLite**: Check file permissions
    ```bash
-   ls -la ~/.synapse-memory/
-   chmod 755 ~/.synapse-memory
-   chmod 644 ~/.synapse-memory/memory.db
+   ls -la ~/.mycelian-memory/
+   chmod 755 ~/.mycelian-memory
+   chmod 644 ~/.mycelian-memory/memory.db
    ```
 
 2. **Spanner**: Verify emulator is running

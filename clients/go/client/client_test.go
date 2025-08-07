@@ -72,7 +72,7 @@ func TestClient_CreateMemory(t *testing.T) {
 	expTime, _ := time.Parse(time.RFC3339, "2025-01-01T00:00:00Z")
 
 	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/users/u123/memories" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/users/u123/vaults/default-vault/memories" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -92,7 +92,7 @@ func TestClient_CreateMemory(t *testing.T) {
 	c := New(hs.URL)
 	ctx := context.Background()
 	memReq := CreateMemoryRequest{Title: "Project Alpha", Description: "Alpha description", MemoryType: "PROJECT"}
-	memory, err := c.CreateMemory(ctx, "u123", memReq)
+	memory, err := c.CreateMemory(ctx, "u123", "default-vault", memReq)
 	if err != nil {
 		t.Fatalf("CreateMemory returned error: %v", err)
 	}

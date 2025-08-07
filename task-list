@@ -1,0 +1,100 @@
+# Go Client Idiomatic Cleanup Task List
+
+## Phase 1: Code Organization (files & layout) ✅ **COMPLETED**
+- [x] **Review current file organization** - ✅ Analyzed and implemented namespaced resource structure
+- [x] **Consolidate related types** - ✅ Moved to `types_alias.go` and `namespaces_alias.go`
+- [x] **Group related methods** - ✅ Organized into `internal/resource/` packages by domain
+- [x] **Create core client file** - ✅ Core Client struct in `client.go` with namespace fields
+- [x] **Implement namespaced API** - ✅ `cli.Users.*`, `cli.Memories.*`, `cli.Vaults.*`, etc.
+- [x] **Update all tests** - ✅ All unit tests migrated to new namespaced API
+- [x] **Add missing functionality** - ✅ Implemented `Users.Delete` and `Memories.Delete`
+- [x] **Quality validation** - ✅ `go vet`, `go build`, and tests pass
+
+## Phase 2: Error Handling & Messages ⏳
+- [ ] **Fix error message formatting** - Convert all `fmt.Errorf("failed to...")` to lowercase, concise messages
+  - [ ] Update `sdk.go` error messages (lines 241, 298, 335, 363, etc.)
+  - [ ] Update `memory_service.go` error messages  
+  - [ ] Update `context_api.go` error messages
+  - [ ] Update `vault.go` error messages
+  - [ ] Update `search.go` error messages
+- [ ] **Standardize error prefixes** - Use consistent operation names (e.g., "create user", "get memory")
+- [ ] **Add sentinel errors** - Create package-level error constants for common cases
+- [ ] **Remove redundant error wrapping** - Only wrap when adding context
+
+## Phase 3: Interface Design ⏳  
+- [ ] **Break down large interfaces** - Split `executor` interface if it grows beyond 5 methods
+- [ ] **Review interface composition** - Ensure interfaces follow "accept interfaces, return structs"
+- [ ] **Add interface documentation** - Document purpose and usage of each interface
+
+## Phase 4: Struct & JSON Handling ⏳
+- [ ] **Standardize JSON tags** - Ensure consistent use of `omitempty` across all structs
+- [ ] **Add validation tags** - Add `validate` tags to request structs where appropriate
+- [ ] **Review manual JSON handling** - Replace manual marshaling with struct tags where possible
+- [ ] **Add struct documentation** - Document all exported structs and their fields
+
+## Phase 5: Testing Improvements ⏳
+- [ ] **Convert to table-driven tests** - Update existing tests to use table-driven patterns
+- [ ] **Add test helpers** - Create reusable test fixtures and helpers
+- [ ] **Improve test names** - Follow Go naming conventions (TestFunctionName_Scenario)
+- [ ] **Add integration test helpers** - Create helpers for common test scenarios
+
+## Phase 6: Configuration & Options ⏳
+- [ ] **Review functional options** - Ensure all options follow consistent patterns
+- [ ] **Add option validation** - Validate option parameters in option functions
+- [ ] **Add option documentation** - Document each option's purpose and effects
+- [ ] **Consider builder pattern** - Evaluate if builder pattern would be clearer for complex configs
+
+## Phase 7: Concurrency & Context ⏳
+- [ ] **Review context usage** - Ensure consistent context propagation
+- [ ] **Add context timeouts** - Add appropriate timeouts for all HTTP operations
+- [ ] **Review goroutine safety** - Ensure all methods are thread-safe
+- [ ] **Add context documentation** - Document context requirements for each method
+
+## Phase 8: Documentation & Examples ⏳
+- [ ] **Add method documentation** - Document all exported methods with examples
+- [ ] **Add usage examples** - Create comprehensive usage examples
+- [ ] **Update README** - Ensure README reflects current API and usage patterns
+- [ ] **Add migration guide** - If breaking changes are needed
+
+## Phase 9: Performance & Observability ⏳
+- [ ] **Review metrics collection** - Ensure consistent metric naming and collection
+- [ ] **Add performance benchmarks** - Add benchmarks for critical operations
+- [ ] **Review logging** - Ensure structured logging is used consistently
+- [ ] **Add tracing** - Consider adding OpenTelemetry tracing support
+
+## Phase 10: Final Validation ⏳
+- [ ] **Run all linters** - `golangci-lint run`
+- [ ] **Run all tests** - `go test -race ./...`
+- [ ] **Check formatting** - `go fmt ./...`
+- [ ] **Verify builds** - `go build ./...`
+- [ ] **Update CI** - Ensure CI catches all issues
+
+## Priority Order:
+1. ~~**Phase 1** (Code Organization)~~ - ✅ **COMPLETED** - Foundation for all other improvements
+2. **Phase 2** (Error handling) - ⏳ **NEXT** - High impact, low risk
+3. **Phase 5** (Testing) - Improves reliability  
+4. **Phase 3** (Interfaces) - Improves design
+5. **Phase 4** (Structs) - Improves data handling
+6. **Phase 7** (Concurrency) - Improves safety
+7. **Phase 6** (Configuration) - Improves usability
+8. **Phase 8** (Documentation) - Improves developer experience
+9. **Phase 9** (Performance) - Improves monitoring
+10. **Phase 10** (Validation) - Ensures quality
+
+## Phase 1 Completion Summary (2025-01-20):
+
+**✅ Successfully implemented modern namespaced API design:**
+- New API pattern: `client.Users.Create()`, `client.Memories.Delete()`, `client.Vaults.List()`, etc.
+- All HTTP operations organized into domain-specific resource namespaces
+- Backward compatibility maintained through type aliases
+- Complete CRUD operations for Users (Create, Get, Delete) and Memories (Create, Get, Delete)
+- All tests migrated and passing
+- Static analysis clean (`go vet`) and builds successfully
+
+**Ready for Phase 2** - Error handling improvements can now build upon this solid foundation.
+
+## Notes:
+- Each phase should be completed before moving to the next
+- Run `go fmt ./... && go vet ./... && go test -race ./...` after each phase
+- Create separate PRs for each phase to keep changes manageable
+- Update this task list as items are completed

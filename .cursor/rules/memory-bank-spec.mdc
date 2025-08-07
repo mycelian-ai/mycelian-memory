@@ -1,201 +1,119 @@
 ---
-description: 
-globs: 
-alwaysApply: true
----
----
-description: Detailed specification for Memory Bank structure and protocols
 alwaysApply: true
 ---
 
-# Cursor's Memory Bank (Performance Optimized)
+# Cline's Memory Bank
 
-_Revised for high-fidelity / zero-fluff._
-
-• The agent resets between conversations; the Memory Bank is its only persistent context.
-• Always start by reading `activeContext.md` (≤150 lines) then other files on demand.
-
-## Formatting Principles
-- Use **H1** for the file title, **H2** for major sections. Avoid deeper levels.
-- Keep sentences concise; prefer bullet lists or tables.
-- Status icons: ✅ accepted, ⏳ in-progress, ❌ superseded. No decorative emojis.
-- Flat bullet nesting (≤2 levels). Replace deep nesting with tables.
+I am Cline, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
 
 ## Memory Bank Structure
 
-The Memory Bank consists of core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy with **visual diagrams** for immediate orientation and **strict size limits** for fast recovery:
+The Memory Bank consists of core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy:
 
-### Core File Hierarchy (With Performance Limits)
-```mermaid
 flowchart TD
-    %% Core File Structure with Size Limits
-    PB[projectbrief.md<br/>< 300 lines] --> PC[productContext.md<br/>< 250 lines]
-    PB --> SP[systemPatterns.md<br/>< 250 lines]
-    PB --> TC[techContext.md<br/>< 200 lines]
+    PB[projectbrief.md] --> PC[productContext.md]
+    PB --> SP[systemPatterns.md]
+    PB --> TC[techContext.md]
 
-    PC --> AC[activeContext.md<br/>CENTRAL HUB<br/>< 150 lines]
+    PC --> AC[activeContext.md]
     SP --> AC
     TC --> AC
 
-    AC --> P[progress.md<br/>< 100 lines]
+    AC --> P[progress.md]
 
-    %% Optional Context Files with limits
-    subgraph "Optional Context Files (size-limited)"
-        direction LR
-        OCF1[decisionLog.md<br/>< 150 lines]
-        OCF2[commands.md<br/>< 200 lines]
-        OCF_etc[feature_X_details.md<br/>< 150 lines]
-    end
+### Core Files (Required)
+1. `projectbrief.md`
+   - Foundation document that shapes all other files
+   - Created at project start if it doesn't exist
+   - Defines core requirements and goals
+   - Source of truth for project scope
 
-    %% Archive Structure
-    subgraph "Archive (unlimited)"
-        direction LR
-        ARCH1[completed-phases/]
-        ARCH2[detailed-context/]
-    end
+2. `productContext.md`
+   - Why this project exists
+   - Problems it solves
+   - How it should work
+   - User experience goals
 
-    %% Core files can be supplemented by optional context files
-    AC -. "references/details in" .-> OCF1
-    AC -. "references/details in" .-> OCF2
-    AC -. "archived details in" .-> ARCH1
-    AC -. "archived details in" .-> ARCH2
+3. `activeContext.md`
+   - Current work focus
+   - Recent changes
+   - Next steps
+   - Active decisions and considerations
+   - Important patterns and preferences
+   - Learnings and project insights
 
-    style AC fill:#e1f5fe,stroke:#01579b,stroke-width:3px,color:#000
-    style P fill:#ff6b6b,stroke:#d63031,stroke-width:2px,color:#fff
-    style OCF1 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
-    style ARCH1 fill:#f8f8f8,stroke:#999,stroke-width:1px,color:#666
-```
+4. `systemPatterns.md`
+   - System architecture
+   - Key technical decisions
+   - Design patterns in use
+   - Component relationships
+   - Critical implementation paths
 
-### Core Files (Required - With Size Limits)
+5. `techContext.md`
+   - Technologies used
+   - Development setup
+   - Technical constraints
+   - Dependencies
+   - Tool usage patterns
 
-#### **🔥 High Frequency (Read First)**
-1. `activeContext.md` ⭐ **CENTRAL HUB** (< 150 lines)
-   - **PRIMARY ENTRY POINT after memory reset**
-   - Current work focus and active implementation progress
-   - Visual navigation diagram showing current status
-   - Cross-references to detailed context when needed
-   - **ARCHIVE COMPLETED WORK IMMEDIATELY**
+6. `progress.md`
+   - What works
+   - What's left to build
+   - Current status
+   - Known issues
+   - Evolution of project decisions
 
-2. `progress.md` (< 100 lines)
-   - Current phase and active steps only
-   - What's left to build in current phase
-   - **Archive completed phases to archive/completed-phases/**
-
-#### **⚡ Medium Frequency (Task-Dependent)**
-3. `systemPatterns.md` (< 250 lines)
-   - Key patterns currently in use
-   - Essential architecture diagrams
-   - Current technical decisions
-   - **Archive detailed implementation patterns**
-
-4. `techContext.md` (< 200 lines)
-   - Current technologies in use
-   - Active development setup
-   - Current technical constraints
-   - **Archive obsolete setup information**
-
-5. `decisionLog.md` (< 150 lines)
-   - Recent architectural decisions with rationale
-   - **Archive old decisions when superseded**
-
-#### **📚 Low Frequency (Reference)**
-6. `projectbrief.md` (< 300 lines)
-   - Foundation document and project scope
-   - Core requirements and goals
-
-7. `productContext.md` (< 250 lines)
-   - Product vision and user experience goals
-   - Problems solved and how it works
-
-### Archive Strategy (Mandatory)
-```
-memory-bank/
-└── archive/
-    ├── completed-phases/     # Phase 1, 2, 3, etc. details
-    └── detailed-context/     # Full implementation history
-```
-
-**Archive immediately when:**
-- Phases/features are completed
-- Files approach size limits
-- Implementation details become historical
-
-## Performance Requirements
-
-### **Recovery Time Targets**
-- **Primary Recovery**: < 15 seconds (activeContext.md only)
-- **Full Context**: < 30 seconds (all active files)
-- **Total Active Reading**: < 600 lines maximum
-
-### **Optimization Checkpoints**
-- **Start**: Verify activeContext.md has current state
-- **End**: Update current status, archive completed work
-- **Periodic**: Validate cross-references, enforce size limits
-
-## Visual Diagram Requirements
-
-**All Memory Bank files should include visual diagrams when helpful:**
-- **Mermaid diagrams** for architecture, workflows, and relationships
-- **Status indicators** (✅ ⏳ ❌) for progress tracking
-- **Cross-reference arrows** showing file relationships
-- **Archive references** clearly indicated
-
-**Key Visual Elements:**
-- `activeContext.md` MUST contain a navigation diagram showing current status
-- `systemPatterns.md` MUST contain essential architecture diagrams
-- **Current implementation progress** should be visually tracked
-- File relationships should be diagrammatically clear
+### Additional Context
+Create additional files/folders within memory-bank/ when they help organize:
+- Complex feature documentation
+- Integration specifications
+- API documentation
+- Testing strategies
+- Deployment procedures
 
 ## Core Workflows
 
-### Ask Mode (User Questions & Information Requests)
-```mermaid
+### Plan Mode
 flowchart TD
-    Start[User Question] --> ReadActive[Read activeContext.md<br/>< 150 lines]
-    ReadActive --> CheckContext{Need More Context?}
+    Start[Start] --> ReadFiles[Read Memory Bank]
+    ReadFiles --> CheckFiles{Files Complete?}
 
-    CheckContext -->|No| Answer[Provide Answer]
-    CheckContext -->|Yes| ReadSpecific[Read Specific Files<br/>Task-dependent]
-    ReadSpecific --> Answer
-    Answer --> Update[Update Memory Bank if needed]
-```
+    CheckFiles -->|No| Plan[Create Plan]
+    Plan --> Document[Document in Chat]
 
-### Agent Mode (Task Execution & Implementation)
-```mermaid
+    CheckFiles -->|Yes| Verify[Verify Context]
+    Verify --> Strategy[Develop Strategy]
+    Strategy --> Present[Present Approach]
+
+### Act Mode
 flowchart TD
-    Start[Task Assignment] --> Context[Check activeContext.md<br/>+ visual diagram]
-    Context --> Execute[Execute Task]
-    Execute --> Archive[Archive Completed Work]
-    Archive --> Update[Update Current Status]
-    Update --> Document[Document Changes & Next Steps]
-```
-
-## Fast Recovery Protocol
-
-**After each memory reset, follow this sequence:**
-1. **Read `activeContext.md` ONLY** (< 150 lines, < 15 seconds)
-2. **Review the visual diagram** - understand current position immediately
-3. **Verify current work status** - what's active vs. next steps
-4. **Follow cross-references** - read additional files ONLY if task requires
-5. **Lazy load archives** - access detailed information only when needed
+    Start[Start] --> Context[Check Memory Bank]
+    Context --> Update[Update Documentation]
+    Update --> Execute[Execute Task]
+    Execute --> Document[Document Changes]
 
 ## Documentation Updates
 
 Memory Bank updates occur when:
-1. After implementing significant changes
-2. When user requests **update memory bank** (focus on active files)
-3. When files approach size limits (archive immediately)
+1. Discovering new project patterns
+2. After implementing significant changes
+3. When user requests with **update memory bank** (MUST review ALL files)
 4. When context needs clarification
 
-### Update Protocol (UMB)
-When triggered by **update memory bank**:
-1. **Review ACTIVE files only** (not archived files)
-2. **Archive completed work** that's cluttering active files
-3. **Enforce size limits** - move excess detail to archives
-4. **Update visual diagrams** to reflect current status only
-5. **Verify cross-references** between active and archived content
+flowchart TD
+    Start[Update Process]
 
-**Priority**: activeContext.md and progress.md are most critical for recovery.
+    subgraph Process
+        P1[Review ALL Files]
+        P2[Document Current State]
+        P3[Clarify Next Steps]
+        P4[Document Insights & Patterns]
 
-**The visual diagrams are CRITICAL for fast recovery after memory resets.**
-REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision, clarity, and **performance** as my effectiveness depends entirely on its accuracy and speed of access.
+        P1 --> P2 --> P3 --> P4
+    end
+
+    Start --> Process
+
+Note: When triggered by **update memory bank**, I MUST review every memory bank file, even if some don't require updates. Focus particularly on activeContext.md and progress.md as they track current state.
+
+REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.

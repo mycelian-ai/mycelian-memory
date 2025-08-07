@@ -1,13 +1,13 @@
 package api
 
 import (
-	httpHandlers "memory-backend/internal/api/http"
-	"memory-backend/internal/api/recovery"
-	"memory-backend/internal/config"
-	"memory-backend/internal/core/memory"
-	vaultcore "memory-backend/internal/core/vault"
-	"memory-backend/internal/search"
-	"memory-backend/internal/storage"
+	httpHandlers "github.com/mycelian/mycelian-memory/server/internal/api/http"
+	"github.com/mycelian/mycelian-memory/server/internal/api/recovery"
+	"github.com/mycelian/mycelian-memory/server/internal/config"
+	"github.com/mycelian/mycelian-memory/server/internal/core/memory"
+	vaultcore "github.com/mycelian/mycelian-memory/server/internal/core/vault"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
 	"github.com/gorilla/mux"
 )

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"memory-backend/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // TestAPI_TitleBasedAccess verifies listing memories by vault title and fetching memory by title.

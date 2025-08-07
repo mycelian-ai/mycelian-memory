@@ -10,7 +10,7 @@ import (
 )
 
 func TestVaultEndpoints(t *testing.T) {
-	userID := "user-123"
+	userID := "user123"
 	vaultID := "vault-456"
 	vaultTitle := "work-projects"
 
@@ -45,7 +45,7 @@ func TestVaultEndpoints(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(&m)
 		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
 			_ = json.NewEncoder(w).Encode(&memListRes)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultTitle+"/memories/planning":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memoryID:
 			_ = json.NewEncoder(w).Encode(&m)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -85,7 +85,7 @@ func TestVaultEndpoints(t *testing.T) {
 	}
 
 	// CreateMemoryInVault
-	mem, err := c.CreateMemoryInVault(ctx, userID, vaultID, CreateMemoryRequest{Title: "planning", MemoryType: "conversation"})
+	mem, err := c.CreateMemory(ctx, userID, vaultID, CreateMemoryRequest{Title: "planning", MemoryType: "conversation"})
 	if err != nil {
 		t.Fatalf("CreateMemoryInVault error: %v", err)
 	}
@@ -102,10 +102,10 @@ func TestVaultEndpoints(t *testing.T) {
 		t.Fatalf("unexpected memory list %#v", ml)
 	}
 
-	// GetMemoryByTitle
-	mByTitle, err := c.GetMemoryByTitle(ctx, userID, vaultTitle, "planning")
+	// GetMemory
+	mByTitle, err := c.GetMemory(ctx, userID, vaultID, mem.ID)
 	if err != nil {
-		t.Fatalf("GetMemoryByTitle error: %v", err)
+		t.Fatalf("GetMemory error: %v", err)
 	}
 	if mByTitle.ID != memoryID {
 		t.Fatalf("memory id mismatch by title")

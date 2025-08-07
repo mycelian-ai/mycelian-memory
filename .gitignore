@@ -67,6 +67,12 @@ venv/
 .venv/
 clients/go/venv/
 
+# Python cache directories and files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
 # Configuration files with secrets (keep example files)
 configs/config.local.yaml
 configs/config.development.yaml
@@ -106,3 +112,9 @@ memory-bank
 # Test coverage
 coverage.out
 coverage.html
+
+# Data
+data/
+
+# Claude.ai generated files
+CLAUDE.md

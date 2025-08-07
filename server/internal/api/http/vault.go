@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
-	memcore "memory-backend/internal/core/memory"
-	"memory-backend/internal/core/vault"
-	platformHttp "memory-backend/internal/platform/http"
+	memcore "github.com/mycelian/mycelian-memory/server/internal/core/memory"
+	"github.com/mycelian/mycelian-memory/server/internal/core/vault"
+	platformHttp "github.com/mycelian/mycelian-memory/server/internal/platform/http"
 )
 
 // VaultHandler provides HTTP transport for Vault operations.

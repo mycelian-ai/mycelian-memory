@@ -9,7 +9,7 @@ import (
 
 func TestDeleteMemory(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/users/u1/memories/m1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/users/u1/vaults/v1/memories/m1", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("expected DELETE, got %s", r.Method)
 		}
@@ -19,7 +19,7 @@ func TestDeleteMemory(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL)
-	if err := c.DeleteMemory(context.Background(), "u1", "m1"); err != nil {
+	if err := c.DeleteMemory(context.Background(), "u1", "v1", "m1"); err != nil {
 		t.Fatalf("delete memory: %v", err)
 	}
 }

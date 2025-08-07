@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/mycelian/mycelian-memory/clients/go/client/internal/job"
 )
 
 func TestAwaitConsistency(t *testing.T) {
@@ -14,7 +16,7 @@ func TestAwaitConsistency(t *testing.T) {
 	var ranFirst int32
 
 	// enqueue a dummy job then barrier
-	if err := c.exec.Submit(context.Background(), memID, jobFunc(func(ctx context.Context) error {
+	if err := c.exec.Submit(context.Background(), memID, job.New(func(ctx context.Context) error {
 		time.Sleep(30 * time.Millisecond)
 		atomic.StoreInt32(&ranFirst, 1)
 		return nil

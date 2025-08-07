@@ -1,19 +1,20 @@
-# Client Concurrency Model (MVP – Two Classes of APIs)
+# Client Concurrency Model (MVP – Three Classes of APIs)
 
 _Updated: 2025-06-19 – supersedes previous version after removal of SQLite mirror and adoption of Cloud-Run fan-out backend._
 
 ## 1. Overview
-We divide all client-side operations into **two concurrency classes**:
+We divide all client-side operations into **three concurrency classes**:
 
 | Class       | API Verbs                                                                                                                                | Ordering Guarantee                                                                                     | Execution Path                                                                               | Concurrency Limiter                                |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| **Ordered (SQ)** | `add_entry`, `delete_entry`, `await_consistency`, `Get*` / `List*` **with** `Consistent=true`                                            | FIFO **per memory**                                                                                    | Enqueued into **Sharded Queue (SQ)** → one of *N* worker goroutines (default **4**) | SQ worker count (configurable)                    |
-| **Eventual Reads (Direct)** | `get_entry`, `list_entries`, `search_entries` **without** `Consistent=true` | None (eventual) | Caller goroutine → direct gRPC/HTTP | Go runtime + gRPC multiplexing; optional semaphore |
-| **Admin Strong (Direct)** | `create_user`, `create_memory`, `update_*` metadata, `list_users`, `list_memories` | Strong (backend-enforced) | Caller goroutine → direct gRPC/HTTP | Go runtime + gRPC multiplexing |
+| **Ordered (SQ)** | `add_entry`, `delete_entry`, `put_context`, `await_consistency`                                            | FIFO **per memory**                                                                                    | Enqueued into **Sharded Queue (SQ)** → one of *N* worker goroutines (default **4**) | SQ worker count (configurable)                    |
+| **Eventual Reads (Direct)** | `get_entry`, `list_entries`, `search_entries`, `get_context` | None (eventual) | Caller goroutine → direct gRPC/HTTP | Go runtime + gRPC multiplexing; optional semaphore |
+| **Admin Strong (Direct)** | `create_user`, `create_memory`, `create_vault`, `delete_*`, `update_*`, `list_*` (metadata ops) | Strong (backend-enforced) | Caller goroutine → direct gRPC/HTTP | Go runtime + gRPC multiplexing |
 
-### Why only two classes?
-* Only ordered verbs require sequencing to preserve _read-your-write_ semantics.
-* Everything else can run in parallel; backend autoscaling (Cloud Run + Spanner) absorbs the load.
+### Why three classes?
+* **Ordered verbs** require sequencing to preserve _read-your-write_ semantics per memory.
+* **Eventual reads** can run in parallel with no consistency guarantees - users call `await_consistency()` explicitly when needed.
+* **Admin operations** are strongly consistent but don't need per-memory ordering; backend autoscaling (Cloud Run + Spanner) absorbs the load.
 
 ## 2. Design Rationale
 
@@ -34,8 +35,8 @@ flowchart LR
 ### 2.2 Direct Path (Unordered)
 Direct path splits into two distinct concurrency classes:
 
-1. **Eventual Reads (Direct)** – unqueued entry reads; may show write-lag across devices.
-2. **Admin Strong (Direct)** – user & memory CRUD / metadata operations; globally consistent once the call returns.
+1. **Eventual Reads (Direct)** – unqueued entry/context reads; may show write-lag across devices until `await_consistency()` called.
+2. **Admin Strong (Direct)** – user, vault & memory CRUD / metadata operations; globally consistent once the call returns.
 
 * **Execution**: Caller goroutine issues a unary gRPC (or HTTP) request immediately—no queue hop.
 * **Consistency**: Eventual reads may lag; admin strong ops are committed atomically by Spanner and visible across all clients once the RPC completes.

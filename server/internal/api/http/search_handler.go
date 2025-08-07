@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	platformHttp "memory-backend/internal/platform/http"
-	"memory-backend/internal/search"
+	platformHttp "github.com/mycelian/mycelian-memory/server/internal/platform/http"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
 
 	"github.com/rs/zerolog/log"
 

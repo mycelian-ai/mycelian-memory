@@ -1,8 +1,8 @@
 package factory
 
 import (
-	"memory-backend/internal/config"
-	"memory-backend/internal/search"
+	"github.com/mycelian/mycelian-memory/server/internal/config"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
 )
 
 // NewVectorStore selects the appropriate search adapter based on cfg.VectorStore.

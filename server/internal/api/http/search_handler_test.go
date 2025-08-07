@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"memory-backend/internal/search"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
 )
 
 type mockEmbedder struct {

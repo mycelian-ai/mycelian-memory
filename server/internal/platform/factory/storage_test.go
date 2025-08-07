@@ -3,7 +3,7 @@ package factory
 import (
 	"testing"
 
-	"memory-backend/internal/config"
+	"github.com/mycelian/mycelian-memory/server/internal/config"
 )
 
 func TestNewStorage_SQLite(t *testing.T) {
