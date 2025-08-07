@@ -105,7 +105,8 @@ func TestClient_AddEntry(t *testing.T) {
 				defer cancel()
 			}
 
-			_, err := c.AddEntry(ctx, "user-1", "vlt-1", "mem-1", AddEntryRequest{RawEntry: "hello"})
+                        // use a valid user ID to satisfy validation
+                        _, err := c.AddEntry(ctx, "user1", "vlt-1", "mem-1", AddEntryRequest{RawEntry: "hello"})
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}

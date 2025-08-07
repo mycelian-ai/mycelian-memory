@@ -16,10 +16,10 @@ func TestVaultEndpoints(t *testing.T) {
 
 	// Prepare canned responses
 	v := Vault{UserID: userID, VaultID: vaultID, Title: vaultTitle}
-	vaultListRes := struct {
-		Vaults []Vault `json:"vaults"`
-		Count  int     `json:"count"`
-	}{Vaults: []Vault{v}, Count: 1}
+       vaultListRes := struct {
+               Vaults []Vault `json:"vaults"`
+               Count  int     `json:"count"`
+       }{Vaults: []Vault{v}, Count: 1}
 
 	memoryID := "mem-789"
 	m := Memory{ID: memoryID, VaultID: vaultID, UserID: userID, Title: "planning", MemoryType: "conversation"}
@@ -32,19 +32,23 @@ func TestVaultEndpoints(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/users/"+userID+"/vaults":
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults":
-			_ = json.NewEncoder(w).Encode(&vaultListRes)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultTitle:
-			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodPost && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(&m)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
-			_ = json.NewEncoder(w).Encode(&memListRes)
+               switch {
+               case r.Method == http.MethodPost && r.URL.Path == "/api/users/"+userID+"/vaults":
+                       w.WriteHeader(http.StatusCreated)
+                       _ = json.NewEncoder(w).Encode(&v)
+               case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults":
+                       _ = json.NewEncoder(w).Encode(&vaultListRes)
+               case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultTitle:
+                       _ = json.NewEncoder(w).Encode(&v)
+               case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID:
+                       _ = json.NewEncoder(w).Encode(&v)
+               case r.Method == http.MethodDelete && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID:
+                       w.WriteHeader(http.StatusNoContent)
+               case r.Method == http.MethodPost && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
+                       w.WriteHeader(http.StatusCreated)
+                       _ = json.NewEncoder(w).Encode(&m)
+               case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
+                       _ = json.NewEncoder(w).Encode(&memListRes)
 		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memoryID:
 			_ = json.NewEncoder(w).Encode(&m)
 		default:
@@ -107,7 +111,21 @@ func TestVaultEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetMemory error: %v", err)
 	}
-	if mByTitle.ID != memoryID {
-		t.Fatalf("memory id mismatch by title")
-	}
+       if mByTitle.ID != memoryID {
+               t.Fatalf("memory id mismatch by title")
+       }
+
+       // GetVault
+       gv, err := c.GetVault(ctx, userID, vaultID)
+       if err != nil {
+               t.Fatalf("GetVault error: %v", err)
+       }
+       if gv.VaultID != vaultID {
+               t.Fatalf("vault id mismatch")
+       }
+
+       // DeleteVault
+       if err := c.DeleteVault(ctx, userID, vaultID); err != nil {
+               t.Fatalf("DeleteVault error: %v", err)
+       }
 }
