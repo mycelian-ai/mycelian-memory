@@ -72,6 +72,9 @@ func NewRouter(storage storage.Storage) *mux.Router {
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}", vaultHandler.GetVault).Methods("GET")
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}", vaultHandler.DeleteVault).Methods("DELETE")
 
+	// Cross-vault: attach/move memory to a target vault (no request body)
+	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/attach", memoryHandler.AttachMemoryToVault).Methods("POST")
+
 	// Title-based memory access routes (registered after UUID routes, rely on UUID regex to disambiguate)
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultTitle}/memories/{memoryTitle}", memoryHandler.GetMemoryByTitle).Methods("GET")
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultTitle}/memories", memoryHandler.ListMemoriesByVaultTitle).Methods("GET")

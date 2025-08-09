@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mycelian/mycelian-memory/server/internal/api/validate"
@@ -55,6 +56,11 @@ func (h *MemoryHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Allow email-only user creation in dev flows by deriving a valid userId when omitted
+	if req.UserID == "" && req.Email != "" {
+		req.UserID = deriveUserIDFromEmail(req.Email)
+	}
+
 	// Validation
 	if err := validate.CreateUser(req.UserID, req.Email, req.DisplayName); err != nil {
 		platformHttp.WriteBadRequest(w, err.Error())
@@ -82,6 +88,67 @@ func (h *MemoryHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	platformHttp.WriteJSON(w, http.StatusCreated, user)
+}
+
+// deriveUserIDFromEmail creates a valid userId from an email address using the
+// allowed character set [a-z0-9_] and max length 20. If derivation fails, it
+// falls back to a short UUID-based id.
+func deriveUserIDFromEmail(email string) string {
+	local := email
+	if i := strings.IndexByte(email, '@'); i >= 0 {
+		local = email[:i]
+	}
+	local = strings.ToLower(local)
+	// map invalid characters to underscore
+	b := make([]byte, 0, len(local))
+	for i := 0; i < len(local) && len(b) < 20; i++ {
+		c := local[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+			b = append(b, c)
+		} else if c == '-' || c == '.' {
+			b = append(b, '_')
+		} else {
+			b = append(b, '_')
+		}
+	}
+	// collapse multiple underscores and trim leading/trailing underscores
+	// without importing regexp for lightweight processing
+	// First collapse
+	collapsed := make([]byte, 0, len(b))
+	var prevUnderscore bool
+	for _, c := range b {
+		if c == '_' {
+			if prevUnderscore {
+				continue
+			}
+			prevUnderscore = true
+			collapsed = append(collapsed, c)
+			continue
+		}
+		prevUnderscore = false
+		collapsed = append(collapsed, c)
+	}
+	// Trim leading/trailing underscores
+	start, end := 0, len(collapsed)
+	for start < end && collapsed[start] == '_' {
+		start++
+	}
+	for end > start && collapsed[end-1] == '_' {
+		end--
+	}
+	if end > start {
+		id := string(collapsed[start:end])
+		if len(id) > 20 {
+			id = id[:20]
+		}
+		return id
+	}
+	// fallback
+	uid := strings.ReplaceAll(uuid.New().String(), "-", "")
+	if len(uid) > 12 {
+		uid = uid[:12]
+	}
+	return "user_" + uid
 }
 
 // GetUser handles GET /api/users/{userId}
@@ -593,4 +660,48 @@ func (h *MemoryHandler) GetMemoryEntryByID(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	platformHttp.WriteJSON(w, http.StatusOK, entry)
+}
+
+// AttachMemoryToVault handles POST /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/attach
+// This operation moves the memory (and its entries/contexts) to the target vault.
+// No request body is expected; parameters are taken from the path.
+func (h *MemoryHandler) AttachMemoryToVault(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	memoryID := vars["memoryId"]
+
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	if userID == "" || memoryID == "" {
+		platformHttp.WriteBadRequest(w, "userId and memoryId are required")
+		return
+	}
+
+	req := vault.AddMemoryToVaultRequest{
+		UserID:   userID,
+		VaultID:  vaultID,
+		MemoryID: memoryID,
+	}
+	if err := h.vaultService.AddMemoryToVault(r.Context(), req); err != nil {
+		// Map expected domain/storage errors to HTTP
+		switch {
+		case memory.IsValidationError(err):
+			platformHttp.WriteBadRequest(w, err.Error())
+		default:
+			// Treat conflict and not found explicitly by substring match (thin mapping)
+			if strings.Contains(err.Error(), "VAULT_NOT_FOUND") || strings.Contains(err.Error(), "MEMORY_NOT_FOUND") {
+				platformHttp.WriteNotFound(w, err.Error())
+			} else if strings.Contains(err.Error(), "MEMORY_TITLE_CONFLICT") {
+				platformHttp.WriteError(w, http.StatusConflict, err.Error())
+			} else {
+				platformHttp.WriteInternalError(w, err.Error())
+			}
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

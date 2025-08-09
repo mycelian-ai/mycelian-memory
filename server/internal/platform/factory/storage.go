@@ -8,6 +8,7 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/localstate"
 	"github.com/mycelian/mycelian-memory/server/internal/platform/database"
 	"github.com/mycelian/mycelian-memory/server/internal/storage"
+	pgadapter "github.com/mycelian/mycelian-memory/server/internal/storage/postgres"
 	"github.com/mycelian/mycelian-memory/server/internal/storage/sqlite"
 )
 
@@ -29,7 +30,16 @@ func NewStorage(cfg *config.Config) (storage.Storage, error) {
 		}
 		return storage.NewSpannerStorage(client), nil
 	case "postgres":
-		return nil, fmt.Errorf("TODO: postgres adapter not implemented")
+		// Expect DSN in MEMORY_BACKEND_POSTGRES_DSN
+		dsn := cfg.PostgresDSN
+		if dsn == "" {
+			return nil, fmt.Errorf("MEMORY_BACKEND_POSTGRES_DSN is required when DB_DRIVER=postgres")
+		}
+		db, err := pgadapter.Open(dsn)
+		if err != nil {
+			return nil, err
+		}
+		return pgadapter.NewPostgresStorageWithDB(db)
 	case "sqlite":
 		db, err := sqlite.Open(cfg.SQLitePath)
 		if err != nil {

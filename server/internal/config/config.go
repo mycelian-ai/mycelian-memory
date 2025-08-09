@@ -42,6 +42,9 @@ type Config struct {
 	SpannerDatabaseID   string `envconfig:"SPANNER_DATABASE_ID" default:"memories"`
 	SpannerEmulatorHost string `envconfig:"SPANNER_EMULATOR_HOST" default:"localhost:9010"`
 
+	// Postgres Configuration
+	PostgresDSN string `envconfig:"POSTGRES_DSN" default:""`
+
 	// Embedding / Search Configuration
 	EmbedProvider string  `envconfig:"EMBED_PROVIDER" default:"ollama"`
 	EmbedModel    string  `envconfig:"EMBED_MODEL" default:"mxbai-embed-large"`
@@ -121,6 +124,12 @@ func New() (*Config, error) {
 		Str("embed_model", cfg.EmbedModel).
 		Float32("search_alpha", cfg.SearchAlpha).
 		Str("sqlite_path", cfg.SQLitePath).
+		Str("postgres_dsn_present", func() string {
+			if cfg.PostgresDSN != "" {
+				return "true"
+			}
+			return "false"
+		}()).
 		Str("waviate_url", cfg.WaviateURL).
 		Msg("Configuration loaded")
 

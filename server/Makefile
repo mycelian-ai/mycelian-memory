@@ -189,10 +189,12 @@ docker-run:
 	docker-compose up -d --build --force-recreate
 
 docker-stop:
-	# Stop sqlite-based local stack (memory-service + weaviate + indexer + bootstrap)
-	docker compose -f ../deployments/docker/docker-compose.sqlite.yml down --remove-orphans -v || true
-	# Also stop legacy spanner stack if running (best-effort)
-	docker compose -f ../deployments/docker/docker-compose.spanner.yml down --remove-orphans -v || true
+	# Stop sqlite-based local stack (memory-service + weaviate + bootstrap) without deleting volumes
+	docker compose -f ../deployments/docker/docker-compose.sqlite.yml down --remove-orphans || true
+	# Also stop legacy spanner stack if running (best-effort, non-destructive)
+	docker compose -f ../deployments/docker/docker-compose.spanner.yml down --remove-orphans || true
+	# Also stop postgres stack if running (best-effort, non-destructive)
+	docker compose -f ../deployments/docker/docker-compose.postgres.yml down --remove-orphans || true
 
 docker-status:
 	./scripts/start-headless.sh --status
@@ -212,6 +214,23 @@ run-spanner:
 run-sqlite:
 	docker compose -f ../deployments/docker/docker-compose.sqlite.yml up -d --build --force-recreate
 
+.PHONY: run-postgres
+run-postgres:
+	docker compose -f ../deployments/docker/docker-compose.postgres.yml up -d --build --force-recreate
+
+# -----------------------------------------------------------------------------
+# Explicit data cleanup targets (DANGEROUS)
+# -----------------------------------------------------------------------------
+.PHONY: clean-postgres-data clean-sqlite-data
+
+clean-postgres-data:
+	@echo "This will delete all local Postgres data under ../data/postgres";
+	rm -rf ../data/postgres && mkdir -p ../data/postgres && echo "Postgres data directory reset."
+
+clean-sqlite-data:
+	@echo "This will delete all local SQLite data under ../data/sqllitedb";
+	rm -rf ../data/sqllitedb && mkdir -p ../data/sqllitedb && echo "SQLite data directory reset."
+
 # Map previous long form targets to new concise names (for backwards compatibility)
 docker-run-local-mycelian-service-spanner-emulator: run-spanner
 docker-run-local-mycelian-service-sqlite: run-sqlite
@@ -221,3 +240,4 @@ docker-run-local-sqllite: run-sqlite
 
 docker-run-spanner: run-spanner
 docker-run-sqlite: run-sqlite 
+docker-run-postgres: run-postgres

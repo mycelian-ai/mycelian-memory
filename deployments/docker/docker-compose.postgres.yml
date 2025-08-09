@@ -1,0 +1,134 @@
+name: mycelian-memory-service
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: memory-postgres
+    environment:
+      - POSTGRES_USER=memory
+      - POSTGRES_PASSWORD=memory
+      - POSTGRES_DB=memory
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memory -d memory"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - memory-network
+    volumes:
+      - ../../data/postgres:/var/lib/postgresql/data
+
+  migrations:
+    image: postgres:16-alpine
+    container_name: memory-postgres-migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=memory
+    volumes:
+      - ../../server/internal/storage/postgres/schema.sql:/schema/schema.sql:ro
+    entrypoint: ["sh", "-c"]
+    command: >
+      "psql -h postgres -U memory -d memory -f /schema/schema.sql && echo 'MIGRATIONS COMPLETED'"
+    networks:
+      - memory-network
+    restart: "no"
+
+  memory-service:
+    build:
+      context: ../../server
+      dockerfile: cmd/memory-service/Dockerfile
+    container_name: memory-service
+    ports:
+      - "8080:8080"
+    environment:
+      - MEMORY_BACKEND_ENVIRONMENT=development
+      - MEMORY_BACKEND_HTTP_PORT=8080
+      - MEMORY_BACKEND_DB_DRIVER=postgres
+      - MEMORY_BACKEND_BUILD_TARGET=cloud-dev
+      - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
+      - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
+      - MEMORY_BACKEND_EMBED_PROVIDER=ollama
+      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
+      - OLLAMA_URL=http://localhost:11434
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    networks:
+      - memory-network
+    restart: unless-stopped
+    extra_hosts:
+      - "localhost:host-gateway"
+
+  weaviate:
+    container_name: weaviate
+    image: cr.weaviate.io/semitechnologies/weaviate:1.31.2
+    platform: linux/arm64
+    ports:
+      - "8082:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "20"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+    networks:
+      - memory-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/v1/meta || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  outbox-worker:
+    container_name: outbox-worker
+    build:
+      context: ../../server
+      dockerfile: cmd/outbox-worker/Dockerfile
+    environment:
+      - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
+      - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
+      - MEMORY_BACKEND_EMBED_PROVIDER=ollama
+      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
+      - OLLAMA_URL=http://localhost:11434
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      weaviate:
+        condition: service_healthy
+    networks:
+      - memory-network
+    restart: unless-stopped
+    extra_hosts:
+      - "localhost:host-gateway"
+
+  user-bootstrap:
+    container_name: user-bootstrap
+    build:
+      context: ../../server
+      dockerfile: cmd/memoryctl/Dockerfile
+    depends_on:
+      memory-service:
+        condition: service_started
+    networks:
+      - memory-network
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command: >
+      "
+        until curl -s http://memory-service:8080/api/health | grep 'UP'; do
+          echo 'waiting for memory-service...';
+          sleep 2;
+        done;
+        ./memoryctl users create --userId local_user --email local.user@example.com --name 'Local User' --api http://memory-service:8080 || true
+      "
+
+networks:
+  memory-network:
+    driver: bridge
+    name: synapse-memory-network
+
+

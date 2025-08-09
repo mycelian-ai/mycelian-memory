@@ -62,7 +62,19 @@ func (p *OllamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 		return nil, fmt.Errorf("ollama request: %w", err)
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("ollama status %d: %s", resp.StatusCode(), resp.String())
+		// Attempt best-effort model pull if the model is missing, then retry once.
+		// Ollama typically returns 500 with a message when the model isn't present.
+		// We treat any non-200 as potentially recoverable by a pull, once.
+		_ = p.pullModel(ctx)
+		// Retry once after pull
+		resp2, err2 := p.client.R().SetContext(ctx).SetBody(&reqBody).Post("/api/embeddings")
+		if err2 != nil || resp2.StatusCode() != http.StatusOK {
+			if err2 != nil {
+				return nil, fmt.Errorf("ollama status %d: %s (after pull attempt; err=%v)", resp.StatusCode(), resp.String(), err2)
+			}
+			return nil, fmt.Errorf("ollama status %d: %s (after pull attempt)", resp2.StatusCode(), resp2.String())
+		}
+		resp = resp2
 	}
 
 	var er embedResponse
@@ -76,4 +88,11 @@ func (p *OllamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 	}
 
 	return vec, nil
+}
+
+// pullModel tries to pull the model via Ollama API; best-effort and silent on failure
+func (p *OllamaProvider) pullModel(ctx context.Context) error {
+	body := map[string]string{"name": p.model}
+	_, _ = p.client.R().SetContext(ctx).SetBody(body).Post("/api/pull")
+	return nil
 }

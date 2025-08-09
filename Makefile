@@ -11,7 +11,7 @@ API_HEALTH_URL := http://localhost:8080/api/health
 # ------------------------------------------------------------------------------
 # Backend (server) convenience wrappers
 # ------------------------------------------------------------------------------
-.PHONY: backend-spanner-up backend-sqlite-up backend-down backend-status backend-logs
+.PHONY: backend-spanner-up backend-sqlite-up backend-postgres-up backend-down backend-status backend-logs backend-clean-postgres backend-clean-sqlite
 
 backend-spanner-up:
 	$(MAKE) -C server run-spanner
@@ -19,8 +19,17 @@ backend-spanner-up:
 backend-sqlite-up:
 	$(MAKE) -C server run-sqlite
 
+backend-postgres-up:
+	$(MAKE) -C server run-postgres
+
 backend-down:
 	$(MAKE) -C server docker-stop
+# Data cleanup wrappers (explicit destructive actions)
+backend-clean-postgres:
+	$(MAKE) -C server clean-postgres-data
+
+backend-clean-sqlite:
+	$(MAKE) -C server clean-sqlite-data
 
 backend-status:
 	$(MAKE) -C server docker-status
@@ -106,7 +115,7 @@ server-test:
 
 # Server dev-env E2E tests (tagged e2e) run against the running docker stack
 server-e2e:
-	cd server && go test -v ./dev_env_e2e_tests -tags=e2e || true
+	cd server && go test -v ./dev_env_e2e_tests -tags=e2e
 
 client-test:
 	cd client && go test -v ./...
@@ -124,7 +133,7 @@ wait-backend-health:
 	echo "Backend is healthy."
 
 test-all:
-	@set -e; \
+	@set -euo pipefail; \
 	cleanup() { $(MAKE) backend-down; }; \
 	trap 'cleanup' EXIT INT TERM; \
 	$(MAKE) server-test; \
@@ -136,3 +145,17 @@ test-all:
 	trap - EXIT INT TERM; \
 	cleanup; \
 	echo "ALL TESTS COMPLETED SUCCESSFULLY"
+
+.PHONY: test-all-postgres
+test-all-postgres:
+	@set -e; \
+	cleanup() { $(MAKE) backend-down; }; \
+	trap 'cleanup' EXIT INT TERM; \
+	$(MAKE) server-test; \
+	$(MAKE) backend-postgres-up; \
+	$(MAKE) wait-backend-health; \
+	$(MAKE) server-e2e; \
+	$(MAKE) client-test; \
+	trap - EXIT INT TERM; \
+	cleanup; \
+	echo "ALL POSTGRES TESTS COMPLETED SUCCESSFULLY"
