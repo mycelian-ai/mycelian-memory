@@ -9,7 +9,7 @@
 #   make build                    - Build all application code
 #   make test                     - Run all tests
 #   make build-tools              - Build development tools
-#   make schema-create-emulator   - Set up local Spanner schema
+#   (Spanner emulator removed)
 #   make help                     - Show all available targets
 #
 # PROJECT STRUCTURE:
@@ -19,19 +19,15 @@
 #
 # DEPENDENCIES:
 #   - Go 1.24.3 or later
-#   - Google Cloud Spanner emulator (for local development)
+#   - Postgres (for local development)
 #   - Make sure GOPATH and GOROOT are properly configured
 #
 # DEVELOPMENT WORKFLOW:
-#   1. Start Spanner emulator: gcloud emulators spanner start
-#   2. Create schema: make schema-create-emulator
-#   3. Build and test: make build test
+#   1. Build and test: make build test
 #   4. Run service: ./bin/memory-service (after building)
 #
 # PRODUCTION DEPLOYMENT:
-#   - Use schema-manager tool directly with production credentials
 #   - Build binaries with appropriate GOOS/GOARCH for target platform
-#   - See tools/README.md for detailed schema management instructions
 #
 # ==============================================================================
 
@@ -65,16 +61,10 @@ help:
 	@echo "  make build-schema-manager     - Build schema manager tool"
 	@echo "  make clean-tools              - Clean tool binaries"
 	@echo ""
-	@echo "🗄️  DATABASE SCHEMA (Local Development):"
-	@echo "  make schema-create-emulator   - Create tables in Spanner emulator"
-	@echo "  make schema-validate-emulator - Validate schema against emulator"
-	@echo "  make schema-drop-emulator     - Drop all tables in emulator (DANGEROUS)"
-	@echo "  make schema-help              - Show detailed schema management help"
+	@echo "🗄️  DATABASE SCHEMA: (Spanner removed)"
 	@echo ""
 	@echo "💡 QUICK START:"
-	@echo "  1. gcloud emulators spanner start"
-	@echo "  2. make schema-create-emulator"
-	@echo "  3. make build test"
+	@echo "  1. make build test"
 	@echo ""
 	@echo "📚 For more details, see the file header comments in this Makefile"
 
@@ -82,18 +72,18 @@ help:
 .DEFAULT_GOAL := help
 
 # ============================================================================== 
-# Local macOS development targets (SQLite + Waviate)
+# Local macOS development targets
 # ==============================================================================
 
 .PHONY: build-local run-local
 
-# Build backend binary for macOS (CGO disabled for pure-Go SQLite)
+# Build backend binary for macOS
 build-local:
 	@echo "🔨 Building memory-service for macOS (local target)..."
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o bin/memory-service ./cmd/memory-service
 	@echo "✅ Built bin/memory-service"
 
-# Run backend in local mode (uses ~/.synapse-memory)
+# Run backend in local mode
 run-local: build-local
 	@echo "🛑 Stopping any existing memory-service ..."
 	- pkill -f "bin/memory-service" || true
@@ -183,17 +173,13 @@ docker-build:
 docker-start:
 	docker-compose up -d --build --force-recreate
 
-# Run stack with selectable DB_ENGINE (e.g., make docker-run DB_ENGINE=sqlite)
+# Run stack
 .PHONY: docker-run
 docker-run:
 	docker-compose up -d --build --force-recreate
 
 docker-stop:
-	# Stop sqlite-based local stack (memory-service + weaviate + bootstrap) without deleting volumes
-	docker compose -f ../deployments/docker/docker-compose.sqlite.yml down --remove-orphans || true
-	# Also stop legacy spanner stack if running (best-effort, non-destructive)
-	docker compose -f ../deployments/docker/docker-compose.spanner.yml down --remove-orphans || true
-	# Also stop postgres stack if running (best-effort, non-destructive)
+	# Stop postgres stack if running (best-effort, non-destructive)
 	docker compose -f ../deployments/docker/docker-compose.postgres.yml down --remove-orphans || true
 
 docker-status:
@@ -206,13 +192,8 @@ docker-clean:
 	./scripts/start-headless.sh --clean 
 
 # Short concise local run targets
-.PHONY: run-spanner run-sqlite
+ # spanner run target removed
 
-run-spanner:
-	docker compose -f ../deployments/docker/docker-compose.spanner.yml up -d --build --force-recreate
-
-run-sqlite:
-	docker compose -f ../deployments/docker/docker-compose.sqlite.yml up -d --build --force-recreate
 
 .PHONY: run-postgres
 run-postgres:
@@ -221,23 +202,13 @@ run-postgres:
 # -----------------------------------------------------------------------------
 # Explicit data cleanup targets (DANGEROUS)
 # -----------------------------------------------------------------------------
-.PHONY: clean-postgres-data clean-sqlite-data
+.PHONY: clean-postgres-data
 
 clean-postgres-data:
 	@echo "This will delete all local Postgres data under ../data/postgres";
 	rm -rf ../data/postgres && mkdir -p ../data/postgres && echo "Postgres data directory reset."
 
-clean-sqlite-data:
-	@echo "This will delete all local SQLite data under ../data/sqllitedb";
-	rm -rf ../data/sqllitedb && mkdir -p ../data/sqllitedb && echo "SQLite data directory reset."
 
 # Map previous long form targets to new concise names (for backwards compatibility)
-docker-run-local-mycelian-service-spanner-emulator: run-spanner
-docker-run-local-mycelian-service-sqlite: run-sqlite
-
-docker-run-local-spanner: run-spanner
-docker-run-local-sqllite: run-sqlite
-
-docker-run-spanner: run-spanner
-docker-run-sqlite: run-sqlite 
+# spanner aliases removed
 docker-run-postgres: run-postgres

@@ -1,4 +1,4 @@
-Read file: internal/indexer-prototype/uploader.go
+// indexer-prototype removed; uploader.go no longer exists.
 
 Read file: internal/core/memory/service.go
 

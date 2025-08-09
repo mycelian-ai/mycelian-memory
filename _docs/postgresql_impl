@@ -32,7 +32,7 @@ Net: Postgres is broadly at Spanner parity, with two notable gaps to fix for cor
 - Title-based memory HTTP endpoints (vaultTitle/memoryTitle): Present (`server/internal/api/http/memory.go`).
 - Cross-vault operations: SQLite also has Add/Delete stubs returning not implemented, so Postgres is not behind SQLite here; both need it.
 - Outbox integration: Postgres has robust outbox and worker; SQLite uses local publishes only. This is fine (Postgres ahead here).
-- Compose model bootstrap: SQLite stack has no model pull because it uses host Ollama or simple indexer; Postgres stack needs explicit model bootstrap for the outbox-worker embedder. Current Postgres compose lacks this.
+- Compose model bootstrap: Postgres stack handles embedder; SQLite stack has been removed.
 
 ### Additional transport gaps
 - No HTTP endpoint to trigger AddMemoryToVault; router has no route for it:

@@ -1,6 +1,32 @@
 package storage
 
-import "testing"
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+)
+
+// convertJSONToMap was part of Spanner adapter; ensure a minimal local copy for the test.
+func convertJSONToMap(v interface{}) (map[string]interface{}, error) {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		return val, nil
+	case string:
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(val), &obj); err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case []byte:
+		var obj map[string]interface{}
+		if err := json.Unmarshal(val, &obj); err != nil {
+			return nil, err
+		}
+		return obj, nil
+	default:
+		return nil, fmt.Errorf("unsupported JSON type %T", v)
+	}
+}
 
 func TestConvertJSONToMap(t *testing.T) {
 	// valid map passthrough

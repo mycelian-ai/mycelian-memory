@@ -11,13 +11,9 @@ API_HEALTH_URL := http://localhost:8080/api/health
 # ------------------------------------------------------------------------------
 # Backend (server) convenience wrappers
 # ------------------------------------------------------------------------------
-.PHONY: backend-spanner-up backend-sqlite-up backend-postgres-up backend-down backend-status backend-logs backend-clean-postgres backend-clean-sqlite
+.PHONY: backend-postgres-up backend-down backend-status backend-logs backend-clean-postgres
 
-backend-spanner-up:
-	$(MAKE) -C server run-spanner
 
-backend-sqlite-up:
-	$(MAKE) -C server run-sqlite
 
 backend-postgres-up:
 	$(MAKE) -C server run-postgres
@@ -28,8 +24,6 @@ backend-down:
 backend-clean-postgres:
 	$(MAKE) -C server clean-postgres-data
 
-backend-clean-sqlite:
-	$(MAKE) -C server clean-sqlite-data
 
 backend-status:
 	$(MAKE) -C server docker-status
@@ -78,8 +72,7 @@ help:
 	@echo "  mcp-streamable-up      Start (or rebuild) the Synapse MCP server container (streamable HTTP for Cursor)"
 	@echo "  mcp-streamable-down    Stop and remove the Synapse MCP server container"
 	@echo "  mcp-streamable-restart Shortcut for mcp-streamable-down then mcp-streamable-up"
-	@echo "  backend-spanner-up     Start backend stack (Spanner emulator)"
-	@echo "  backend-sqlite-up      Start backend stack (SQLite)"
+	@echo "  backend-postgres-up    Start backend stack (Postgres)"
 	@echo "  backend-down           Stop backend stack containers"
 	@echo "  backend-status         Show backend container status"
 	@echo "  backend-logs           Tail backend container logs"
@@ -87,7 +80,7 @@ help:
 	@echo "Test Commands:"
 	@echo "  client-coverage-check  Run client tests and assert >= 78% coverage"
 	@echo "  protogen               Generate gRPC code from api/proto via buf"
-	@echo "  test-all               Run server tests, start sqlite backend, then client tests (unit+integration)"
+	@echo "  test-all               Run server tests, start postgres backend, then client tests (unit+integration)"
 
 mcp-streamable-up:
 	docker compose -f $(MCP_COMPOSE_FILE) up -d --build --force-recreate
@@ -136,8 +129,8 @@ test-all:
 	@set -euo pipefail; \
 	cleanup() { $(MAKE) backend-down; }; \
 	trap 'cleanup' EXIT INT TERM; \
-	$(MAKE) server-test; \
-	$(MAKE) backend-sqlite-up; \
+    $(MAKE) server-test; \
+    $(MAKE) backend-postgres-up; \
 	$(MAKE) wait-backend-health; \
 	$(MAKE) server-e2e; \
 	$(MAKE) client-test; \

@@ -1,4 +1,4 @@
-package indexer
+package search
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 )
 
 // OllamaProvider calls the local Ollama embeddings API.
-
 type OllamaProvider struct {
 	client *resty.Client
 	model  string
@@ -35,7 +34,6 @@ func NewOllamaProvider(model string) *OllamaProvider {
 }
 
 // embedRequest / embedResponse structs for JSON binding
-
 type embedRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
@@ -63,8 +61,6 @@ func (p *OllamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 	}
 	if resp.StatusCode() != http.StatusOK {
 		// Attempt best-effort model pull if the model is missing, then retry once.
-		// Ollama typically returns 500 with a message when the model isn't present.
-		// We treat any non-200 as potentially recoverable by a pull, once.
 		_ = p.pullModel(ctx)
 		// Retry once after pull
 		resp2, err2 := p.client.R().SetContext(ctx).SetBody(&reqBody).Post("/api/embeddings")

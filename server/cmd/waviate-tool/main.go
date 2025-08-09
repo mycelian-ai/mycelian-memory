@@ -12,7 +12,7 @@ import (
 	filters "github.com/weaviate/weaviate-go-client/v5/weaviate/filters"
 	gql "github.com/weaviate/weaviate-go-client/v5/weaviate/graphql"
 
-	"github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Embed query
-	emb, err := indexer.NewProvider(provider, model)
+	emb, err := search.NewProvider(provider, model)
 	if err != nil {
 		log.Fatal().Err(err).Msg("embedder init failed")
 	}

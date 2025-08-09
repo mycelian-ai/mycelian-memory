@@ -20,7 +20,7 @@ func TestResolveDefaultsCloudDev(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config load: %v", err)
 	}
-	if cfg.DBDriver != "spanner-pg" || cfg.VectorStore != "waviate" {
+	if cfg.DBDriver != "postgres" || cfg.VectorStore != "waviate" {
 		t.Fatalf("unexpected mapping: %s %s", cfg.DBDriver, cfg.VectorStore)
 	}
 }
@@ -51,7 +51,7 @@ func TestResolveDefaultsLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config load: %v", err)
 	}
-	if cfg.DBDriver != "sqlite" || cfg.VectorStore != "waviate" {
+	if cfg.DBDriver != "postgres" || cfg.VectorStore != "waviate" {
 		t.Fatalf("unexpected mapping for local: %s %s", cfg.DBDriver, cfg.VectorStore)
 	}
 }

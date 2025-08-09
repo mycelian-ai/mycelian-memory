@@ -41,9 +41,7 @@ func main() {
 		Int("http_port", cfg.HTTPPort).
 		Msg("Memory service starting…")
 
-	if cfg.DBDriver == "sqlite" {
-		log.Warn().Msg("Running with SQLite driver – ensure an indexer is configured for SQLite or search will be empty")
-	}
+		// SQLite support removed
 
 	// -------- Storage layer -----------------
 	ctx := context.Background()

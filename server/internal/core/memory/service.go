@@ -192,12 +192,7 @@ func (s *Service) CreateMemoryEntry(ctx context.Context, req CreateMemoryEntryRe
 		Str("db_driver", dbDriver).
 		Msg("memory entry persisted")
 
-	if dbDriver == "sqlite" {
-		log.Warn().
-			Str("userID", req.UserID).
-			Str("memoryID", req.MemoryID).
-			Msg("SQLite driver active – make sure an indexer is ingesting entries or they will not be searchable")
-	}
+		// SQLite support removed
 
 	return entry, nil
 }
@@ -348,12 +343,7 @@ func (s *Service) CreateMemoryContext(ctx context.Context, req CreateMemoryConte
 		Str("db_driver", dbDriver).
 		Msg("memory context snapshot persisted")
 
-	if dbDriver == "sqlite" {
-		log.Warn().
-			Str("userID", req.UserID).
-			Str("memoryID", req.MemoryID).
-			Msg("SQLite driver active – ensure indexer handles contexts or they will not be searchable")
-	}
+		// SQLite support removed
 
 	return ctxObj, nil
 }

@@ -185,6 +185,16 @@ func (h *HealthHandler) CheckHealth(w http.ResponseWriter, r *http.Request) {
 // Note: This handler is NOT wired in the public router. It exists only for
 // internal tests and ops scenarios. Public clients should use /api/health.
 func (h *HealthHandler) CheckStorageHealth(w http.ResponseWriter, r *http.Request) {
+	// Allow nil storage for deprecated/ops-only path in tests
+	if h.storage == nil {
+		response := map[string]interface{}{
+			"status":    "UP",
+			"message":   "database health check disabled",
+			"timestamp": time.Now().Format(time.RFC3339),
+		}
+		platformHttp.WriteJSON(w, http.StatusOK, response)
+		return
+	}
 	if err := h.storage.HealthCheck(r.Context()); err != nil {
 		response := map[string]interface{}{
 			"status":    "DOWN",

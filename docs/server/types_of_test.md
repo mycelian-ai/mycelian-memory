@@ -25,7 +25,7 @@ The repo contains four distinct "flavours" of tests; each is enabled in a differ
    • Location: `dev_env_e2e_tests/` (single package).  
    • Build tag: `e2e` (`//go:build e2e`).  
    • Stack requirements:  
-     – `docker compose up` → brings up `memory-service`, `indexer-prototype`, Weaviate, Spanner emulator, etc.  
+     – `docker compose up` → brings up `memory-service`, Weaviate, etc. (indexer-prototype removed)  
      – Ollama container running locally with the specified embedding model pre-pulled.  
    • Invocation (local dev):  
      ```bash

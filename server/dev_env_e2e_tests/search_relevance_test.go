@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
-	indexer "github.com/mycelian/mycelian-memory/server/internal/indexer-prototype"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
 
 	weaviate "github.com/weaviate/weaviate-go-client/v5/weaviate"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate/filters"
@@ -126,7 +126,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		}
 	}
 
-	embedder, err := indexer.NewProvider("ollama", env("EMBED_MODEL", "mxbai-embed-large"))
+	embedder, err := search.NewProvider("ollama", env("EMBED_MODEL", "mxbai-embed-large"))
 	if err != nil {
 		t.Fatalf("embed provider: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 		}
 	}
 
-	embedder, err := indexer.NewProvider("ollama", env("EMBED_MODEL", "mxbai-embed-large"))
+	embedder, err := search.NewProvider("ollama", env("EMBED_MODEL", "mxbai-embed-large"))
 	if err != nil {
 		t.Fatalf("embed provider: %v", err)
 	}

@@ -187,17 +187,17 @@ make --version
 
 ### Running the Stack
 
-#### Quick Start (SQLite + Weaviate)
+#### Quick Start (Postgres + Weaviate)
 
 ```bash
-# Start all services with SQLite backend
-make docker-run-sqlite
+# Start all services with Postgres backend
+make backend-postgres-up
 
 # Verify services are running
-make docker-status
+make backend-status
 
 # View logs
-docker-compose -f docker-compose.sqlite.yml logs -f
+make backend-logs
 ```
 
 #### Production-like Setup (Spanner + Weaviate)
@@ -225,7 +225,7 @@ memory-backend/
 ├── cmd/                    # Application entry points
 │   ├── memory-service/     # Main API server
 │   ├── memoryctl/          # CLI tool
-│   └── indexer-prototype/  # Background indexer
+│   └── (removed) indexer-prototype/
 ├── internal/               # Private application code
 │   ├── api/                # HTTP handlers and routing
 │   ├── core/               # Business logic
@@ -301,7 +301,7 @@ make build
 # Build specific components
 go build -o bin/memory-service ./cmd/memory-service
 go build -o bin/memoryctl ./cmd/memoryctl
-go build -o bin/indexer-prototype ./cmd/indexer-prototype
+// indexer-prototype removed
 
 # Build with specific tags
 go build -tags production -o bin/memory-service ./cmd/memory-service
@@ -332,7 +332,7 @@ BUILD_TARGET=local \
 # Start specific services
 docker-compose up -d memory-service
 docker-compose up -d weaviate
-docker-compose up -d indexer-prototype
+// indexer-prototype removed
 
 # Rebuild and restart a service
 docker-compose up -d --build memory-service
@@ -361,15 +361,7 @@ docker-compose build --no-cache
 
 #### Docker Compose Profiles
 
-We use different compose files for different backends:
-
-```bash
-# SQLite stack (default for development)
-docker-compose -f docker-compose.sqlite.yml up -d
-
-# Spanner stack (production-like)
-docker-compose -f docker-compose.spanner.yml up -d
-```
+Postgres is the only supported backend; use `deployments/docker/docker-compose.postgres.yml` via server Makefile targets.
 
 ## Testing
 
@@ -705,7 +697,7 @@ docker stats
 
 3. Check indexer logs:
    ```bash
-   docker-compose logs -f indexer-prototype
+   # indexer-prototype removed
    ```
 
 ## Contributing

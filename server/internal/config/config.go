@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog/log"
@@ -37,10 +35,7 @@ type Config struct {
 	// gRPC Configuration
 	GRPCPort int `envconfig:"GRPC_PORT" default:"9090"`
 
-	// Spanner Configuration
-	SpannerInstanceID   string `envconfig:"SPANNER_INSTANCE_ID" default:"test"`
-	SpannerDatabaseID   string `envconfig:"SPANNER_DATABASE_ID" default:"memories"`
-	SpannerEmulatorHost string `envconfig:"SPANNER_EMULATOR_HOST" default:"localhost:9010"`
+	// Spanner removed
 
 	// Postgres Configuration
 	PostgresDSN string `envconfig:"POSTGRES_DSN" default:""`
@@ -50,8 +45,8 @@ type Config struct {
 	EmbedModel    string  `envconfig:"EMBED_MODEL" default:"mxbai-embed-large"`
 	SearchAlpha   float32 `envconfig:"SEARCH_ALPHA" default:"0.6"`
 
-	// Optional override for SQLite file path (used when DB_DRIVER=sqlite)
-	SQLitePath string `envconfig:"SQLITE_PATH" default:""`
+	// SQLite support removed
+	// SQLitePath string `envconfig:"SQLITE_PATH" default:""`
 
 	// Waviate (default for all targets)
 	WaviateURL string `envconfig:"WAVIATE_URL" default:"weaviate:8080"`
@@ -68,11 +63,11 @@ func (c *Config) ResolveDefaults() error {
 
 	switch c.BuildTarget {
 	case "cloud-dev":
-		defaultDB = "spanner-pg"
+		defaultDB = "postgres"
 	case "cloud":
-		defaultDB = "spanner-pg"
+		defaultDB = "postgres"
 	case "local":
-		defaultDB = "sqlite"
+		defaultDB = "postgres"
 	default:
 		return fmt.Errorf("unsupported BUILD_TARGET: %s", c.BuildTarget)
 	}
@@ -83,15 +78,9 @@ func (c *Config) ResolveDefaults() error {
 	// Vector store is fixed to Waviate after M3 refactor.
 	c.VectorStore = "waviate"
 
-	// Derive default SQLite path if needed
-	if c.DBDriver == "sqlite" && c.SQLitePath == "" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			c.SQLitePath = filepath.Join(home, ".synapse-memory", "memory.db")
-		}
-	}
+	// SQLite removed: no local file path derivation
 
-	allowedDB := map[string]bool{"spanner-pg": true, "postgres": true, "sqlite": true}
+	allowedDB := map[string]bool{"postgres": true}
 	if !allowedDB[c.DBDriver] {
 		return fmt.Errorf("unsupported DB_DRIVER: %s", c.DBDriver)
 	}
@@ -118,12 +107,11 @@ func New() (*Config, error) {
 		Str("environment", string(cfg.Environment)).
 		Str("project", cfg.GCPProjectID).
 		Int("port", cfg.HTTPPort).
-		Str("instance", cfg.SpannerInstanceID).
-		Str("database", cfg.SpannerDatabaseID).
+		// spanner removed
 		Str("embed_provider", cfg.EmbedProvider).
 		Str("embed_model", cfg.EmbedModel).
 		Float32("search_alpha", cfg.SearchAlpha).
-		Str("sqlite_path", cfg.SQLitePath).
+		// sqlite removed
 		Str("postgres_dsn_present", func() string {
 			if cfg.PostgresDSN != "" {
 				return "true"
@@ -145,9 +133,7 @@ func NewForTesting() *Config {
 
 	cfg.HTTPPort = 8080
 
-	cfg.SpannerInstanceID = "test-instance"
-	cfg.SpannerDatabaseID = "test-database"
-	cfg.SpannerEmulatorHost = "localhost:9010"
+	// spanner removed
 
 	cfg.EmbedProvider = "ollama"
 	cfg.EmbedModel = "mxbai-embed-large"
@@ -175,16 +161,7 @@ func (c *Config) IsProduction() bool {
 	return c.Environment == EnvProduction
 }
 
-// GetSpannerDatabase returns the full Spanner database path
-func (c *Config) GetSpannerDatabase() string {
-	return fmt.Sprintf("projects/%s/instances/%s/databases/%s",
-		c.GCPProjectID, c.SpannerInstanceID, c.SpannerDatabaseID)
-}
-
-// GetSpannerEmulatorEndpoint returns the emulator endpoint
-func (c *Config) GetSpannerEmulatorEndpoint() string {
-	return c.SpannerEmulatorHost
-}
+// spanner helpers removed
 
 // GetHTTPAddr returns the HTTP server address
 func (c *Config) GetHTTPAddr() string {

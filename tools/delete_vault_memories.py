@@ -2,28 +2,40 @@
 """
 Delete all memories and related data within a vault by vault ID.
 
+Supports Postgres (primary) and legacy SQLite (deprecated).
+
 Usage:
-    python delete_vault_memories.py <vault_id> [--db-path <path>] [--delete-vault] [--yes]
+    # Postgres (recommended)
+    python delete_vault_memories.py <vault_id> --pg-dsn "postgres://user:pass@host:5432/db?sslmode=disable" [--delete-vault] [--yes]
+    
+    # or rely on environment (MEMORY_BACKEND_POSTGRES_DSN)
+    MEMORY_BACKEND_POSTGRES_DSN=postgres://... python delete_vault_memories.py <vault_id> [--delete-vault] [--yes]
+
+    # Legacy SQLite (deprecated)
+    python delete_vault_memories.py <vault_id> --db-path /path/to/memory.db [--delete-vault] [--yes]
 
 Examples:
     # Preview what will be deleted (safe)
-    python delete_vault_memories.py 97db1a27-695b-4bf3-bbd1-a00c6d4501de
+    python delete_vault_memories.py 97db1a27-695b-4bf3-bbd1-a00c6d4501de --pg-dsn postgres://...
     
     # Delete memories but keep the vault
-    python delete_vault_memories.py 97db1a27-695b-4bf3-bbd1-a00c6d4501de --yes
+    python delete_vault_memories.py 97db1a27-695b-4bf3-bbd1-a00c6d4501de --pg-dsn postgres://... --yes
     
     # Delete everything including the vault itself
-    python delete_vault_memories.py 97db1a27-695b-4bf3-bbd1-a00c6d4501de --delete-vault --yes
-    
-    # Use custom database path
-    python delete_vault_memories.py <vault_id> --db-path /path/to/memory.db
+    python delete_vault_memories.py 97db1a27-695b-4bf3-bbd1-a00c6d4501de --pg-dsn postgres://... --delete-vault --yes
 """
 
 import argparse
+import os
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
+
+try:
+    import psycopg  
+except Exception:  
+    psycopg = None
 
 
 class VaultMemoryDeleter:
@@ -119,6 +131,82 @@ class VaultMemoryDeleter:
             }
 
 
+class PostgresVaultMemoryDeleter:
+    """Postgres deleter for vault data using DSN connection string."""
+
+    def __init__(self, pg_dsn: str):
+        if not psycopg:
+            raise RuntimeError("psycopg is required for Postgres operations. Install psycopg[binary] >=3.2")
+        if not pg_dsn:
+            raise ValueError("Postgres DSN is required")
+        self.pg_dsn = pg_dsn
+
+    def get_vault_info(self, vault_id: str) -> Optional[Dict[str, Any]]:
+        with psycopg.connect(self.pg_dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT user_id, title, description, creation_time FROM vaults WHERE vault_id = %s",
+                    (vault_id,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                user_id, title, description, creation_time = row
+
+                cur.execute("SELECT COUNT(*) FROM memories WHERE vault_id = %s", (vault_id,))
+                memory_count = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM memory_entries WHERE vault_id = %s", (vault_id,))
+                entry_count = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM memory_contexts WHERE vault_id = %s", (vault_id,))
+                context_count = cur.fetchone()[0]
+
+                return {
+                    'vault': {
+                        'UserId': user_id,
+                        'Title': title,
+                        'Description': description,
+                        'CreationTime': creation_time,
+                    },
+                    'memory_count': memory_count,
+                    'entry_count': entry_count,
+                    'context_count': context_count,
+                }
+
+    def get_memories_list(self, vault_id: str) -> List[Tuple[str, str, Optional[str]]]:
+        with psycopg.connect(self.pg_dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT title, memory_type, description FROM memories WHERE vault_id = %s ORDER BY title",
+                    (vault_id,)
+                )
+                return list(cur.fetchall())
+
+    def delete_vault_memories(self, vault_id: str, delete_vault: bool = False) -> Dict[str, int]:
+        with psycopg.connect(self.pg_dsn) as conn:
+            with conn.cursor() as cur:
+                # 1. Delete entries
+                cur.execute("DELETE FROM memory_entries WHERE vault_id = %s", (vault_id,))
+                entries_deleted = cur.rowcount or 0
+                # 2. Delete contexts
+                cur.execute("DELETE FROM memory_contexts WHERE vault_id = %s", (vault_id,))
+                contexts_deleted = cur.rowcount or 0
+                # 3. Delete memories
+                cur.execute("DELETE FROM memories WHERE vault_id = %s", (vault_id,))
+                memories_deleted = cur.rowcount or 0
+                # 4. Optionally delete vault
+                vault_deleted = 0
+                if delete_vault:
+                    cur.execute("DELETE FROM vaults WHERE vault_id = %s", (vault_id,))
+                    vault_deleted = cur.rowcount or 0
+            conn.commit()
+        return {
+            'entries_deleted': entries_deleted,
+            'contexts_deleted': contexts_deleted,
+            'memories_deleted': memories_deleted,
+            'vault_deleted': vault_deleted,
+        }
+
+
 def print_vault_info(vault_info: Dict[str, Any]) -> None:
     """Print formatted vault information."""
     vault = vault_info['vault']
@@ -182,8 +270,14 @@ def main():
     
     parser.add_argument(
         '--db-path',
-        default='data/sqllitedb/memory.db',
-        help='Path to SQLite database file (default: data/sqllitedb/memory.db)'
+        default='',
+        help='(Deprecated) Path to legacy SQLite database file if still present'
+    )
+
+    parser.add_argument(
+        '--pg-dsn',
+        default=os.getenv('MEMORY_BACKEND_POSTGRES_DSN', ''),
+        help='Postgres DSN (e.g., postgres://user:pass@host:5432/db?sslmode=disable). Defaults to MEMORY_BACKEND_POSTGRES_DSN'
     )
     
     parser.add_argument(
@@ -201,11 +295,17 @@ def main():
     args = parser.parse_args()
     
     try:
-        # Initialize deleter
-        deleter = VaultMemoryDeleter(args.db_path)
+        # Initialize deleter (prefer Postgres)
+        deleter_obj = None
+        if args.pg_dsn:
+            deleter_obj = PostgresVaultMemoryDeleter(args.pg_dsn)
+        elif args.db_path:
+            deleter_obj = VaultMemoryDeleter(args.db_path)
+        else:
+            raise ValueError("Provide --pg-dsn (recommended) or --db-path (legacy SQLite)")
         
         # Get vault info
-        vault_info = deleter.get_vault_info(args.vault_id)
+        vault_info = deleter_obj.get_vault_info(args.vault_id)
         if not vault_info:
             print(f"❌ Vault not found: {args.vault_id}")
             sys.exit(1)
@@ -217,7 +317,7 @@ def main():
         print_vault_info(vault_info)
         
         # Get and show memories list
-        memories = deleter.get_memories_list(args.vault_id)
+        memories = deleter_obj.get_memories_list(args.vault_id)
         print_memories_list(memories)
         
         # Check if there's anything to delete
@@ -237,7 +337,7 @@ def main():
         
         # Perform deletion
         print(f"\n🗑️  Deleting...")
-        results = deleter.delete_vault_memories(args.vault_id, args.delete_vault)
+        results = deleter_obj.delete_vault_memories(args.vault_id, args.delete_vault)
         
         # Show results
         print(f"\n✅ Deletion completed:")

@@ -54,7 +54,7 @@ Examples:
 $ docker logs -f memory-backend-memory-service-1
 
 # Last 5 minutes of indexer logs
-$ docker logs --since 5m memory-backend-indexer-prototype-1
+# indexer-prototype service removed (use outbox worker logs instead)
 ```
 
 ---
@@ -148,7 +148,7 @@ alias dps='docker ps --filter label=com.docker.compose.project=memory-backend --
 alias dmem='docker logs -n 100 -f memory-backend-memory-service-1'
 
 # Inspect restart counts for both critical services
-alias drestarts='docker inspect -f "{{ .Name }} {{ .RestartCount }}" memory-backend-memory-service-1 memory-backend-indexer-prototype-1'
+alias drestarts='docker inspect -f "{{ .Name }} {{ .RestartCount }}" memory-backend-memory-service-1'
 ```
 
 Add these to your `~/.zshrc` or `~/.bashrc` for convenience.
