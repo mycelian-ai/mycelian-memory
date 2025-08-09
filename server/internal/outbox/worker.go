@@ -133,7 +133,7 @@ func (w *Worker) leaseBatch(ctx context.Context, tx *sql.Tx, batchSize int) ([]j
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var jobs []job
 	for rows.Next() {
@@ -183,7 +183,7 @@ func (w *Worker) markDone(ctx context.Context, tx *sql.Tx, id int64) error {
 	return err
 }
 
-func (w *Worker) markFailed(ctx context.Context, tx *sql.Tx, id int64, cause error) error {
+func (w *Worker) markFailed(ctx context.Context, tx *sql.Tx, id int64, _ error) error {
 	_, err := tx.ExecContext(ctx, markFailedSQL, id)
 	return err
 }

@@ -1,16 +1,9 @@
-# .golangci.yml  ── validated against GolangCI-Lint v1 schema
-version: "1"                # ← MUST be a **string**, therefore quoted
+# .golangci.yml  ── GolangCI-Lint v2 minimal config
+version: "2"
 
 run:
-  tests: true               # true = lint test files, false = skip globally
+  tests: true
 
-linters-settings:           # top-level key (same indent as run:)
-  errcheck:
-    exclude-files:          # regex; errcheck will skip any file that matches
-      - _test\.go$
-
-issues:                     # top-level
-  exclude-rules:            # lives *inside* issues:
-    - path: _test\.go$      # regex for paths to silence
-      linters:
-        - errcheck
+# Note: v2 schema expects linter configs under `linters.settings`.
+# We no longer need errcheck exclusions for tests (code fixed),
+# so `linters-settings` and `issues.exclude-rules` were removed.

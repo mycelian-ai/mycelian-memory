@@ -305,7 +305,7 @@ func (ic *InvariantChecker) makeRequest(t *testing.T, method, path string, body 
 
 	resp, err := ic.client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify expected status
 	assert.Equal(t, expectedStatus, resp.StatusCode,

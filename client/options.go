@@ -38,12 +38,3 @@ func WithDebugLogging(enabled bool) Option {
 		return nil
 	}
 }
-
-// WithoutExecutor disables the internal shardqueue executor – useful for
-// short-lived CLIs that only call synchronous endpoints.
-func WithoutExecutor() Option {
-	return func(c *Client) error {
-		c.exec = &noOpExecutor{}
-		return nil
-	}
-}

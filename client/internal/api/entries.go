@@ -149,8 +149,8 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 	return &e, nil
 }
 
-// DeleteEntry removes an entry by ID from a memory via the sharded executor (async).
-// This ensures FIFO ordering per memory and provides offline resilience.
+// DeleteEntry removes an entry by ID from a memory synchronously.
+// It performs an HTTP DELETE and expects 204 No Content.
 func DeleteEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) error {
 	if err := ctx.Err(); err != nil {
 		return err

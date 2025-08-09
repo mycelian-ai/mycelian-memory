@@ -115,7 +115,7 @@ func newCreateUserCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("creating user")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -204,7 +204,7 @@ func newCreateMemoryCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("creating memory")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -296,7 +296,7 @@ func newCreateEntryCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("creating entry")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 			defer c.Close() // Ensure queues are drained before context is cancelled
@@ -380,7 +380,7 @@ func newListEntriesCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("listing entries")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -443,7 +443,7 @@ func newGetPromptsCmd() *cobra.Command {
 				return fmt.Errorf("--memory-type is required")
 			}
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
 			defer cancel()
 
@@ -575,7 +575,7 @@ func newGetContextCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("getting context")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -715,7 +715,7 @@ func newSearchCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("searching memories")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 			defer cancel()
 
@@ -779,7 +779,7 @@ func newGetUserCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("getting user")
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
 			defer cancel()
 
@@ -1038,7 +1038,7 @@ func newCreateVaultCmd() *cobra.Command {
 				}
 			}
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -1071,7 +1071,7 @@ func newListVaultsCmd() *cobra.Command {
 				return fmt.Errorf("invalid --user-id: %w", err)
 			}
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -1107,7 +1107,7 @@ func newGetVaultCmd() *cobra.Command {
 				return fmt.Errorf("invalid --title: %w", err)
 			}
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -1144,7 +1144,7 @@ func newDeleteVaultCmd() *cobra.Command {
 				return fmt.Errorf("invalid --vault-id: %w", err)
 			}
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
@@ -1198,7 +1198,7 @@ func newListMemoriesCmd() *cobra.Command {
 				}
 			}
 
-			c := client.New(serviceURL, client.WithoutExecutor())
+			c := client.New(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 

@@ -239,7 +239,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 			t.Fatalf("search request: %v", err)
 		}
 		data, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode == http.StatusOK && bytes.Contains(data, []byte(entryResp.EntryID)) {
 			// quick sanity: verify latestContext keys present (optional)
 			if !bytes.Contains(data, []byte("latestContext")) || !bytes.Contains(data, []byte("entries")) {
@@ -311,10 +311,10 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.Fatalf("expected 201, got %d: %s", resp.StatusCode, string(body))
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// 4. GET latest context and verify
 	getURL := putURL

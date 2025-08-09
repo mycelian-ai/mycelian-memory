@@ -8,8 +8,8 @@ import (
 
 func TestDataDir_Override(t *testing.T) {
 	tmp := t.TempDir()
-	os.Setenv(envHome, tmp)
-	defer os.Unsetenv(envHome)
+	_ = os.Setenv(envHome, tmp)
+	defer func() { _ = os.Unsetenv(envHome) }()
 
 	dir, err := DataDir()
 	if err != nil {
@@ -25,8 +25,8 @@ func TestDataDir_Override(t *testing.T) {
 
 func TestDBPath(t *testing.T) {
 	tmp := t.TempDir()
-	os.Setenv(envHome, tmp)
-	defer os.Unsetenv(envHome)
+	_ = os.Setenv(envHome, tmp)
+	defer func() { _ = os.Unsetenv(envHome) }()
 
 	p, err := DBPath()
 	if err != nil {

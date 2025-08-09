@@ -35,7 +35,7 @@ func TestAllSystemInvariants(t *testing.T) {
 	resp, err := http.Get(baseURL + "/api/health")
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "Service must be running for invariant tests")
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Create test users
 	userID1 := createTestUser(t, checker, "invariant-test-1@example.com")

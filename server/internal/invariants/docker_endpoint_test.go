@@ -60,7 +60,7 @@ func TestDockerEndpointContract(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode,
 		"Docker service must be running. Run: docker-compose up -d")
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Track endpoint availability
 	var workingEndpoints []string
@@ -79,7 +79,7 @@ func TestDockerEndpointContract(t *testing.T) {
 			missingEndpoints = append(missingEndpoints, "POST /api/users")
 			t.Logf("❌ POST /api/users - Connection failed")
 		} else {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusCreated {
 				workingEndpoints = append(workingEndpoints, "POST /api/users")
 				t.Logf("✅ POST /api/users - Working (Status: %d)", resp.StatusCode)
@@ -96,7 +96,7 @@ func TestDockerEndpointContract(t *testing.T) {
 		testUserID := "test-user-123"
 		resp = checker.makeRequestNoAssert("GET", fmt.Sprintf("/api/users/%s", testUserID), nil)
 		if resp != nil {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusNotFound {
 				workingEndpoints = append(workingEndpoints, "GET /api/users/{userId}")
 				t.Logf("✅ GET /api/users/{userId} - Working (404 for non-existent user)")
@@ -135,7 +135,7 @@ func TestDockerEndpointContract(t *testing.T) {
 				missingEndpoints = append(missingEndpoints, endpointName)
 				t.Logf("❌ %s - Connection failed", endpointName)
 			} else {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusNotFound {
 					workingEndpoints = append(workingEndpoints, endpointName)
 					t.Logf("✅ %s - Working (404 for non-existent resource)", endpointName)
@@ -172,7 +172,7 @@ func TestDockerEndpointContract(t *testing.T) {
 				missingEndpoints = append(missingEndpoints, endpointName)
 				t.Logf("❌ %s - Connection failed", endpointName)
 			} else {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusNotFound {
 					workingEndpoints = append(workingEndpoints, endpointName)
 					t.Logf("✅ %s - Working (404 for non-existent resource)", endpointName)
@@ -227,7 +227,7 @@ func TestDockerSystemInvariants(t *testing.T) {
 	resp, err := http.Get(baseURL + "/api/health")
 	require.NoError(t, err, "Docker service must be running. Run: docker-compose up -d")
 	require.Equal(t, http.StatusOK, resp.StatusCode, "Service health check failed")
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	t.Logf("🐳 Running invariant tests against Docker service at %s", baseURL)
 
@@ -300,7 +300,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 	resp, err := http.Get(baseURL + "/api/health")
 	require.NoError(t, err, "Docker service must be running. Run: docker-compose up -d")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	t.Run("🔄 Complete CRUD Workflow", func(t *testing.T) {
 		// Step 1: Create a user with unique email

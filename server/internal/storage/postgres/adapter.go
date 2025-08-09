@@ -147,7 +147,7 @@ func (s *PostgresStorage) ListVaults(ctx context.Context, userID string) ([]*sto
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*storage.Vault
 	for rows.Next() {
 		var v storage.Vault
@@ -190,12 +190,12 @@ func (s *PostgresStorage) DeleteVault(ctx context.Context, userID string, vaultI
 	for entryRows.Next() {
 		var id string
 		if err := entryRows.Scan(&id); err != nil {
-			entryRows.Close()
+			_ = entryRows.Close()
 			return err
 		}
 		entryIDs = append(entryIDs, id)
 	}
-	entryRows.Close()
+	_ = entryRows.Close()
 
 	ctxRows, err := tx.QueryContext(ctx, `SELECT context_id FROM memory_contexts WHERE user_id=$1 AND vault_id=$2`, userID, vaultID.String())
 	if err != nil {
@@ -205,12 +205,12 @@ func (s *PostgresStorage) DeleteVault(ctx context.Context, userID string, vaultI
 	for ctxRows.Next() {
 		var id string
 		if err := ctxRows.Scan(&id); err != nil {
-			ctxRows.Close()
+			_ = ctxRows.Close()
 			return err
 		}
 		ctxIDs = append(ctxIDs, id)
 	}
-	ctxRows.Close()
+	_ = ctxRows.Close()
 
 	// Delete children and parent objects
 	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE user_id=$1 AND vault_id=$2`, userID, vaultID.String()); err != nil {
@@ -321,7 +321,7 @@ func (s *PostgresStorage) ListMemories(ctx context.Context, userID string, vault
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*storage.Memory
 	for rows.Next() {
 		var m storage.Memory
@@ -367,12 +367,12 @@ func (s *PostgresStorage) DeleteMemory(ctx context.Context, userID string, vault
 	for entryRows.Next() {
 		var id string
 		if err := entryRows.Scan(&id); err != nil {
-			entryRows.Close()
+			_ = entryRows.Close()
 			return err
 		}
 		entryIDs = append(entryIDs, id)
 	}
-	entryRows.Close()
+	_ = entryRows.Close()
 
 	ctxRows, err := tx.QueryContext(ctx, `SELECT context_id FROM memory_contexts WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID.String(), memoryID)
 	if err != nil {
@@ -382,12 +382,12 @@ func (s *PostgresStorage) DeleteMemory(ctx context.Context, userID string, vault
 	for ctxRows.Next() {
 		var id string
 		if err := ctxRows.Scan(&id); err != nil {
-			ctxRows.Close()
+			_ = ctxRows.Close()
 			return err
 		}
 		ctxIDs = append(ctxIDs, id)
 	}
-	ctxRows.Close()
+	_ = ctxRows.Close()
 
 	// Delete children and parent
 	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID.String(), memoryID); err != nil {
@@ -429,8 +429,8 @@ func (s *PostgresStorage) CreateMemoryEntry(ctx context.Context, req storage.Cre
 	metaJSON, _ := json.Marshal(req.Metadata)
 	tagsJSON, _ := json.Marshal(req.Tags)
 	row := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_entries (user_id, vault_id, memory_id, title, raw_entry, summary, metadata, tags, entry_id)
-        VALUES ($1,$2,$3,'',$4,$5,$6,$7,$8)
+        INSERT INTO memory_entries (user_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         RETURNING creation_time
     `, req.UserID, req.VaultID.String(), req.MemoryID, req.RawEntry, req.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
 	if err := row.Scan(&creation); err != nil {
@@ -584,7 +584,7 @@ func (s *PostgresStorage) ListMemoryEntries(ctx context.Context, req storage.Lis
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []*storage.MemoryEntry
 	for rows.Next() {
 		var e storage.MemoryEntry
@@ -659,8 +659,8 @@ func (s *PostgresStorage) CorrectMemoryEntry(ctx context.Context, req storage.Co
 	metaJSON, _ := json.Marshal(req.Metadata)
 	tagsJSON, _ := json.Marshal(req.Tags)
 	if err := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_entries (user_id, vault_id, memory_id, title, raw_entry, summary, metadata, tags, entry_id)
-        VALUES ($1,$2,$3,'',$4,$5,$6,$7,$8)
+        INSERT INTO memory_entries (user_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         RETURNING creation_time
     `, req.UserID, req.VaultID.String(), req.MemoryID, req.CorrectedContent, req.CorrectedSummary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), req.CorrectedEntryID).Scan(&created); err != nil {
 		return nil, fmt.Errorf("failed to insert correction entry: %w", err)

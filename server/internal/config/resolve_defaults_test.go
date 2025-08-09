@@ -6,14 +6,14 @@ import (
 )
 
 func unsetBuildEnv() {
-	os.Unsetenv("MEMORY_BACKEND_BUILD_TARGET")
-	os.Unsetenv("MEMORY_BACKEND_DB_DRIVER")
-	os.Unsetenv("MEMORY_BACKEND_VECTOR_STORE")
+	_ = os.Unsetenv("MEMORY_BACKEND_BUILD_TARGET")
+	_ = os.Unsetenv("MEMORY_BACKEND_DB_DRIVER")
+	_ = os.Unsetenv("MEMORY_BACKEND_VECTOR_STORE")
 }
 
 func TestResolveDefaultsCloudDev(t *testing.T) {
 	unsetBuildEnv()
-	os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "cloud-dev")
+	_ = os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "cloud-dev")
 	defer unsetBuildEnv()
 
 	cfg, err := New()
@@ -27,8 +27,8 @@ func TestResolveDefaultsCloudDev(t *testing.T) {
 
 func TestResolveDefaultsOverride(t *testing.T) {
 	unsetBuildEnv()
-	os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "local")
-	os.Setenv("MEMORY_BACKEND_DB_DRIVER", "postgres")
+	_ = os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "local")
+	_ = os.Setenv("MEMORY_BACKEND_DB_DRIVER", "postgres")
 	defer unsetBuildEnv()
 
 	cfg, err := New()
@@ -42,9 +42,9 @@ func TestResolveDefaultsOverride(t *testing.T) {
 
 func TestResolveDefaultsLocal(t *testing.T) {
 	unsetBuildEnv()
-	os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "local")
-	os.Unsetenv("MEMORY_BACKEND_DB_DRIVER")
-	os.Unsetenv("MEMORY_BACKEND_VECTOR_STORE")
+	_ = os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "local")
+	_ = os.Unsetenv("MEMORY_BACKEND_DB_DRIVER")
+	_ = os.Unsetenv("MEMORY_BACKEND_VECTOR_STORE")
 	defer unsetBuildEnv()
 
 	cfg, err := New()

@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS memory_entries (
   user_id        TEXT NOT NULL,
   vault_id       TEXT NOT NULL,
   memory_id      TEXT NOT NULL,
-  title          TEXT,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
   entry_id       TEXT NOT NULL,
   raw_entry      TEXT NOT NULL,

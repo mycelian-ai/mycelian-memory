@@ -7,9 +7,9 @@ import (
 
 func TestConfigLoad_EmbedDefaults(t *testing.T) {
 	// clear env vars
-	os.Unsetenv("MEMORY_BACKEND_EMBED_PROVIDER")
-	os.Unsetenv("MEMORY_BACKEND_EMBED_MODEL")
-	os.Unsetenv("MEMORY_BACKEND_SEARCH_ALPHA")
+	_ = os.Unsetenv("MEMORY_BACKEND_EMBED_PROVIDER")
+	_ = os.Unsetenv("MEMORY_BACKEND_EMBED_MODEL")
+	_ = os.Unsetenv("MEMORY_BACKEND_SEARCH_ALPHA")
 
 	cfg, err := New()
 	if err != nil {
@@ -21,8 +21,8 @@ func TestConfigLoad_EmbedDefaults(t *testing.T) {
 }
 
 func TestConfigLoad_EmbedEnvOverride(t *testing.T) {
-	os.Setenv("MEMORY_BACKEND_EMBED_MODEL", "test-model")
-	defer os.Unsetenv("MEMORY_BACKEND_EMBED_MODEL")
+	_ = os.Setenv("MEMORY_BACKEND_EMBED_MODEL", "test-model")
+	defer func() { _ = os.Unsetenv("MEMORY_BACKEND_EMBED_MODEL") }()
 
 	cfg, err := New()
 	if err != nil {

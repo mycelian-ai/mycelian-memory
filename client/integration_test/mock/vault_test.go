@@ -44,7 +44,7 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.New(srv.URL, client.WithoutExecutor())
+	c := client.New(srv.URL)
 	t.Cleanup(func() { _ = c.Close() })
 	ctx := context.Background()
 

@@ -104,7 +104,7 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, v
 	}
 }
 
-// DeleteContext removes a context snapshot by contextId via the sharded executor (async).
+// DeleteContext removes a context snapshot by contextId synchronously.
 // Server treats contexts as append-only snapshots; delete is hard and irreversible.
 func DeleteContext(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, contextID string) error {
 	if err := ctx.Err(); err != nil {

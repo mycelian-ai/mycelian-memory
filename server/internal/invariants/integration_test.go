@@ -41,7 +41,7 @@ func TestInvariantContractDefinition(t *testing.T) {
 			t.Logf("❌ Service not running: %v", err)
 			t.Skip("Service not available - this is expected during development")
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode == http.StatusOK {
 			t.Logf("✅ Service is running")
@@ -63,7 +63,7 @@ func TestInvariantContractDefinition(t *testing.T) {
 			missingEndpoints = append(missingEndpoints, "POST /api/users")
 			t.Logf("❌ POST /api/users - Connection failed (expected)")
 		} else {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusNotFound {
 				missingEndpoints = append(missingEndpoints, "POST /api/users")
 				t.Logf("❌ POST /api/users - 404 Not Found (expected)")
@@ -99,7 +99,7 @@ func TestInvariantContractDefinition(t *testing.T) {
 				missingEndpoints = append(missingEndpoints, endpointName)
 				t.Logf("❌ %s - Connection failed (expected)", endpointName)
 			} else {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusNotFound {
 					missingEndpoints = append(missingEndpoints, endpointName)
 					t.Logf("❌ %s - 404 Not Found (expected)", endpointName)
@@ -144,7 +144,7 @@ func TestInvariantContractDefinition(t *testing.T) {
 				missingEndpoints = append(missingEndpoints, endpointName)
 				t.Logf("❌ %s - Connection failed (expected)", endpointName)
 			} else {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusNotFound {
 					missingEndpoints = append(missingEndpoints, endpointName)
 					t.Logf("❌ %s - 404 Not Found (expected)", endpointName)

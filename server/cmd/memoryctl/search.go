@@ -23,7 +23,7 @@ func runSearch(apiURL, userID, memoryID, query string, topK int, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		data, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("http %d: %s", resp.StatusCode, string(data))

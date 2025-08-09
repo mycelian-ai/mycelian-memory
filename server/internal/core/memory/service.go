@@ -427,7 +427,7 @@ func validateUserID(u string) bool {
 		return false
 	}
 	for _, r := range u {
-		if !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9') && r != '_' {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
 			return false
 		}
 	}

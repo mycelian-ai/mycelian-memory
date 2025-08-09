@@ -44,12 +44,4 @@ func TestWithHTTPClientAndDebugLogging(t *testing.T) {
 	}
 }
 
-func TestWithoutExecutorPanics(t *testing.T) {
-	c := New("http://example.com", WithoutExecutor())
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic")
-		}
-	}()
-	_, _ = c.AddEntry(context.Background(), "user1", "v1", "m1", AddEntryRequest{RawEntry: "hi"})
-}
+// Removed: sync-only client option and its panic path

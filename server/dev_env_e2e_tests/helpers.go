@@ -40,7 +40,7 @@ func mustJSON(t *testing.T, resp *http.Response, v interface{}) {
 	if resp == nil {
 		t.Fatalf("nil response")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("http %d: %s", resp.StatusCode, string(body))
@@ -62,12 +62,12 @@ func waitForHealthy(t *testing.T, baseURL string, timeout time.Duration) {
 				Status string `json:"status"`
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&data); err == nil && data.Status == "UP" {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return // healthy
 			}
 		}
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
