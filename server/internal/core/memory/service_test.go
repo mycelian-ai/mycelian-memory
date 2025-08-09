@@ -9,7 +9,7 @@ import (
 
 func TestValidateCreateMemoryRequest_LengthLimits(t *testing.T) {
 	s := &Service{}
-	
+
 	// Helper to create a valid base request
 	validReq := func() CreateMemoryRequest {
 		return CreateMemoryRequest{
@@ -19,7 +19,7 @@ func TestValidateCreateMemoryRequest_LengthLimits(t *testing.T) {
 			Title:      "valid-title",
 		}
 	}
-	
+
 	// Test title length limit (50 characters)
 	req := validReq()
 	req.Title = strings.Repeat("a", 51)

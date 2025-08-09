@@ -37,8 +37,7 @@ CREATE TABLE Memories (
     MemoryType STRING(50) NOT NULL,       -- 'CONVERSATION', 'PROJECT', 'CONTEXT', etc.
     Title STRING(50) NOT NULL,
     Description STRING(2048),              -- Optional free-form description (≤2 KB)
-    CreationTime TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
-    DeletionScheduledTime TIMESTAMP       -- Soft delete timestamp
+    CreationTime TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)
 ) PRIMARY KEY (UserId, VaultId, MemoryId),
 INTERLEAVE IN PARENT Vaults ON DELETE CASCADE;
 
@@ -64,7 +63,6 @@ CREATE TABLE MemoryEntries (
     CorrectedEntryCreationTime TIMESTAMP, -- Points to correction entry timestamp  
     CorrectionReason STRING(MAX),         -- Why this entry was corrected
     LastUpdateTime TIMESTAMP OPTIONS (allow_commit_timestamp=true), -- When summary was last updated
-    DeletionScheduledTime TIMESTAMP,      -- Soft delete timestamp
     ExpirationTime TIMESTAMP,             -- TTL support
     
     -- Ensure correction fields are all-or-nothing
@@ -75,10 +73,13 @@ CREATE TABLE MemoryEntries (
         (CorrectionTime IS NOT NULL AND CorrectedEntryMemoryId IS NOT NULL 
          AND CorrectedEntryCreationTime IS NOT NULL AND CorrectionReason IS NOT NULL)
     )
-) PRIMARY KEY (UserId, VaultId, MemoryId, CreationTime), -- Timestamp-based chronological ordering
+    ) PRIMARY KEY (UserId, VaultId, MemoryId, CreationTime), -- Timestamp-based chronological ordering
 INTERLEAVE IN PARENT Memories ON DELETE CASCADE; 
 
 ALTER TABLE MemoryEntries ADD CONSTRAINT FK_MemoryEntries_Memories FOREIGN KEY (UserId, VaultId, MemoryId) REFERENCES Memories(UserId, VaultId, MemoryId);
+
+-- Direct lookup by EntryId regardless of parent path
+CREATE UNIQUE INDEX MemoryEntries_EntryId_Idx ON MemoryEntries(EntryId);
 
 -- Memory contexts – Decoupled context snapshots per memory (append-only)
 CREATE TABLE MemoryContexts (

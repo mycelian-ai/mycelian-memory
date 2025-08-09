@@ -1,0 +1,21 @@
+version: v1
+
+# Buf module for Mycelian Memory API contracts
+name: buf.build/mycelian/mycelian-memory
+
+deps:
+  - buf.build/googleapis/googleapis
+
+build:
+  roots:
+    - proto
+
+lint:
+  use:
+    - DEFAULT
+
+breaking:
+  use:
+    - FILE
+
+

@@ -110,9 +110,8 @@ func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 	return &lr, nil
 }
 
-// DeleteEntry removes an entry by ID from a memory via the sharded executor (async).
-// This ensures FIFO ordering per memory and provides offline resilience.
-func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) (*types.EnqueueAck, error) {
+// GetEntry retrieves a single entry by entryId within a memory (synchronous).
+func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) (*types.Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -129,30 +128,58 @@ func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Clie
 		return nil, err
 	}
 
-	// Create job that makes the actual HTTP request
-	deleteJob := job.New(func(jobCtx context.Context) error {
-		url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
-		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodDelete, url, nil)
-		if err != nil {
-			return err
-		}
-		resp, err := httpClient.Do(httpReq)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = resp.Body.Close() }()
-
-		if resp.StatusCode != http.StatusNoContent {
-			return fmt.Errorf("delete entry: status %d", resp.StatusCode)
-		}
-		return nil
-	})
-
-	// Submit job to executor for FIFO ordering per memory
-	if err := exec.Submit(ctx, memID, deleteJob); err != nil {
+	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
 		return nil, err
 	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
 
-	// Return acknowledgment that job was enqueued
-	return &types.EnqueueAck{MemoryID: memID, Status: "enqueued"}, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get entry: status %d", resp.StatusCode)
+	}
+	var e types.Entry
+	if err := json.NewDecoder(resp.Body).Decode(&e); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+// DeleteEntry removes an entry by ID from a memory via the sharded executor (async).
+// This ensures FIFO ordering per memory and provides offline resilience.
+func DeleteEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := types.ValidateUserID(userID); err != nil {
+		return err
+	}
+	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
+		return err
+	}
+	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
+		return err
+	}
+	if err := types.ValidateIDPresent(entryID, "entryId"); err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("delete entry: status %d", resp.StatusCode)
+	}
+	return nil
 }

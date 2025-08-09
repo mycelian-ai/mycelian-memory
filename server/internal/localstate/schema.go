@@ -34,7 +34,6 @@ func EnsureSQLiteSchema(db *sql.DB) error {
             Title TEXT NOT NULL,
             Description TEXT,
             CreationTime TIMESTAMP NOT NULL,
-            DeletionScheduledTime TIMESTAMP,
             Indexed BOOLEAN NOT NULL DEFAULT 0,
             PRIMARY KEY(UserId, VaultId, MemoryId),
             UNIQUE(VaultId, Title)
@@ -55,11 +54,11 @@ func EnsureSQLiteSchema(db *sql.DB) error {
             CorrectedEntryCreationTime TIMESTAMP,
             CorrectionReason TEXT,
             LastUpdateTime TIMESTAMP,
-            DeletionScheduledTime TIMESTAMP,
             ExpirationTime TIMESTAMP,
             Indexed BOOLEAN NOT NULL DEFAULT 0,
-            PRIMARY KEY(UserId, VaultId, MemoryId, CreationTime)
+            PRIMARY KEY(UserId, VaultId, MemoryId, CreationTime, EntryId)
         );`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS MemoryEntries_EntryId_Idx ON MemoryEntries(EntryId);`,
 		`CREATE TABLE IF NOT EXISTS MemoryContexts (
             UserId TEXT NOT NULL,
             VaultId TEXT NOT NULL,

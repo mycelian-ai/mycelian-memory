@@ -27,22 +27,7 @@ Checks the overall health of the service.
 **Response (200) – Success**
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-07-26T19:58:00Z"
-}
-```
-
-### Database Health Check
-```http
-GET /api/health/db
-```
-
-Checks the health of the database connection.
-
-**Response (200) – Success**
-```json
-{
-  "status": "healthy",
+  "status": "UP",
   "timestamp": "2025-07-26T19:58:00Z"
 }
 ```
@@ -465,7 +450,7 @@ Creates a new entry in a memory.
   "correctedEntryCreationTime": null,
   "correctionReason": null,
   "lastUpdateTime": null,
-  "deletionScheduledTime": null
+  
 }
 ```
 
@@ -516,16 +501,51 @@ Lists entries in a memory with optional pagination.
       "correctedEntryCreationTime": null,
       "correctionReason": null,
       "lastUpdateTime": null,
-      "deletionScheduledTime": null
+      
     }
   ],
   "count": 1
 }
 ```
 
+### Get Memory Entry by ID
+```http
+GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
+```
+
+Returns a single memory entry by its stable `entryId`.
+
+**Path Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `userId` | string | userId (caller-supplied) |
+| `vaultId` | UUID | Vault identifier |
+| `memoryId` | UUID | Memory identifier |
+| `entryId` | UUID | Entry identifier |
+
+**Response (200) – Success**
+Returns the same full entry object shape as in Create Memory Entry response.
+
+### Delete Memory Entry
+```http
+DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
+```
+
+Hard-deletes a memory entry by its `entryId`.
+
+**Path Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `userId` | string | userId (caller-supplied) |
+| `vaultId` | UUID | Vault identifier |
+| `memoryId` | UUID | Memory identifier |
+| `entryId` | UUID | Entry identifier |
+
+**Response (204) – No Content**
+
 ### Update Memory Entry Tags
 ```http
-PATCH /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{creationTime}/tags
+PATCH /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}/tags
 Content-Type: application/json
 ```
 
@@ -537,7 +557,7 @@ Updates the tags of a memory entry.
 | `userId` | string |userId (caller-supplied) |
 | `vaultId` | UUID | Vault identifier |
 | `memoryId` | UUID | Memory identifier |
-| `creationTime` | RFC3339/RFC3339Nano | Entry creation timestamp |
+| `entryId` | UUID | Entry identifier |
 
 **Request Body**
 ```json
@@ -637,6 +657,23 @@ Returns the most recent context snapshot for the memory. A brand-new memory alwa
   "creationTime": "2025-07-26T19:58:00Z"
 }
 ```
+
+### Delete Context Snapshot
+```http
+DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts/{contextId}
+```
+
+Hard-deletes a specific context snapshot by `contextId`.
+
+**Path Parameters**
+| Name | Type | Description |
+|------|------|-------------|
+| `userId` | string | userId (caller-supplied) |
+| `vaultId` | UUID | Vault identifier |
+| `memoryId` | UUID | Memory identifier |
+| `contextId` | UUID | Context identifier |
+
+**Response (204) – No Content**
 
 ---
 
@@ -767,6 +804,13 @@ All endpoints use a consistent error response format:
 - Default and maximum limits vary by endpoint
 - Results ordered by creation time (newest first)
 
-### Soft Deletion
-- Deleted resources are marked for deletion but retained for 30 days
-- See ADR-0007 for retention policy details
+### Deletion
+- All DELETE endpoints perform immediate hard deletion in the primary store.
+- Vector index cleanup is best-effort and may lag slightly in local dev; production uses a background worker.
+
+### Context API Roadmap (planned)
+- DELETE latest context snapshot (clear latest):
+  - `DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts`
+- List historical context snapshots (pagination params `limit` and optional `before`):
+  - `GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts/history?limit=&before=`
+Note: These endpoints are not implemented yet; tracked in milestone 02 context roadmap.

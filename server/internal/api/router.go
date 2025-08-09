@@ -33,10 +33,13 @@ func NewRouter(storage storage.Storage) *mux.Router {
 	emb, _ := search.NewProvider(cfg.EmbedProvider, cfg.EmbedModel)
 	wavSearcher, _ := search.NewWaviateSearcher(cfg.WaviateURL)
 	searchHandler := httpHandlers.NewSearchHandler(emb, wavSearcher, cfg.SearchAlpha)
+	// Wire searcher into memory handler for best-effort delete propagation
+	if wavSearcher != nil {
+		_ = memoryHandler.WithSearcher(wavSearcher)
+	}
 
 	// Health endpoints
 	router.HandleFunc("/api/health", healthHandler.CheckHealth).Methods("GET")
-	router.HandleFunc("/api/health/db", healthHandler.CheckStorageHealth).Methods("GET")
 
 	// User endpoints
 	router.HandleFunc("/api/users", memoryHandler.CreateUser).Methods("POST")
@@ -51,11 +54,14 @@ func NewRouter(storage storage.Storage) *mux.Router {
 	// Memory entry endpoints
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries", memoryHandler.CreateMemoryEntry).Methods("POST")
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries", memoryHandler.ListMemoryEntries).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{creationTime}/tags", memoryHandler.UpdateMemoryEntryTags).Methods("PATCH")
+	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{entryId}", memoryHandler.GetMemoryEntryByID).Methods("GET")
+	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{entryId}", memoryHandler.DeleteMemoryEntryByID).Methods("DELETE")
+	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{entryId}/tags", memoryHandler.UpdateMemoryEntryTags).Methods("PATCH")
 
 	// Memory context endpoint
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/contexts", memoryHandler.PutMemoryContext).Methods("PUT")
 	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/contexts", memoryHandler.GetLatestMemoryContext).Methods("GET")
+	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/contexts/{contextId}", memoryHandler.DeleteMemoryContextByID).Methods("DELETE")
 
 	// Search endpoint
 	router.HandleFunc("/api/search", searchHandler.HandleSearch).Methods("POST")

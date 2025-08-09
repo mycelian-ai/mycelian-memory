@@ -103,3 +103,38 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, v
 		return nil, fmt.Errorf("get context: status %d", resp.StatusCode)
 	}
 }
+
+// DeleteContext removes a context snapshot by contextId via the sharded executor (async).
+// Server treats contexts as append-only snapshots; delete is hard and irreversible.
+func DeleteContext(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, contextID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := types.ValidateUserID(userID); err != nil {
+		return err
+	}
+	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
+		return err
+	}
+	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
+		return err
+	}
+	if err := types.ValidateIDPresent(contextID, "contextId"); err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/contexts/%s", baseURL, userID, vaultID, memID, contextID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("delete context: status %d", resp.StatusCode)
+	}
+	return nil
+}

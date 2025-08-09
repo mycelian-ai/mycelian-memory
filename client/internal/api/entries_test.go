@@ -32,23 +32,18 @@ func TestAddEntry_EnqueuesAndCallsHTTP(t *testing.T) {
 	}
 }
 
-func TestDeleteEntry_EnqueuesAndCallsHTTP(t *testing.T) {
+func TestDeleteEntry_SyncCallsHTTP(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Fatalf("expected DELETE, got %s", r.Method)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
 
-	exec := &mockExec{}
-	ack, err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1")
-	if err != nil {
+	if err := DeleteEntry(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err != nil {
 		t.Fatalf("DeleteEntry error: %v", err)
-	}
-	if ack == nil || ack.MemoryID != "m1" || ack.Status != "enqueued" {
-		t.Fatalf("unexpected ack: %+v", ack)
-	}
-	if len(exec.calls) != 1 || exec.calls[0] != "m1" {
-		t.Fatalf("expected one Submit call for shard m1, got %+v", exec.calls)
 	}
 }
 
@@ -63,7 +58,7 @@ func TestEntries_InvalidUserID(t *testing.T) {
 	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1", "m1", nil); err == nil {
 		t.Fatal("expected validation error for ListEntries")
 	}
-	if _, err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "BAD ID!", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected validation error for DeleteEntry")
 	}
 }
@@ -88,7 +83,7 @@ func TestEntries_NonOKStatuses(t *testing.T) {
 	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", nil); err == nil {
 		t.Fatal("expected error for ListEntries non-200")
 	}
-	if _, err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected error for DeleteEntry non-204")
 	}
 }
@@ -160,13 +155,11 @@ func TestAddEntry_CtxCanceled(t *testing.T) {
 	}
 }
 
-func TestDeleteEntry_SubmitError(t *testing.T) {
+func TestDeleteEntry_HTTPDoError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.NotFoundHandler())
-	defer srv.Close()
-	exec := &failingExec{}
-	if _, err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
-		t.Fatal("expected submit error for DeleteEntry")
+	hc := &http.Client{Transport: &errRT{}}
+	if err := DeleteEntry(context.Background(), hc, "http://example.com", "user_1", "v1", "m1", "e1"); err == nil {
+		t.Fatal("expected http Do error for DeleteEntry")
 	}
 }
 
@@ -176,8 +169,7 @@ func TestDeleteEntry_CtxCanceled(t *testing.T) {
 	cancel()
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	exec := &mockExec{}
-	if _, err := DeleteEntry(ctx, exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(ctx, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected context canceled for DeleteEntry")
 	}
 }

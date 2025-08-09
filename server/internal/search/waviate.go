@@ -37,6 +37,10 @@ type Searcher interface {
 	// Index upsert operations (no-ops for implementations that don’t support it)
 	UpsertEntry(ctx context.Context, entryID string, vec []float32, payload map[string]interface{}) error
 	UpsertContext(ctx context.Context, contextID string, vec []float32, payload map[string]interface{}) error
+
+	// Deletion helpers (best-effort; ignore not found)
+	DeleteEntry(ctx context.Context, userID, entryID string) error
+	DeleteContext(ctx context.Context, userID, contextID string) error
 }
 
 // waviateSearcher implements Searcher using weaviate-go-client.
@@ -87,6 +91,25 @@ func (w *waviateSearcher) UpsertContext(ctx context.Context, contextID string, v
 
 	_, err := w.client.Data().Creator().WithClassName("MemoryContext").WithTenant(tenant).WithID(contextID).WithProperties(payload).WithVector(vec).Do(ctx)
 	return err
+}
+
+// DeleteEntry removes a MemoryEntry object from Waviate for the given tenant.
+func (w *waviateSearcher) DeleteEntry(ctx context.Context, userID, entryID string) error {
+	if w == nil || w.client == nil || userID == "" || entryID == "" {
+		return nil
+	}
+	// Best-effort; ignore errors to avoid coupling API latency to index cleanup
+	_ = w.client.Data().Deleter().WithClassName("MemoryEntry").WithTenant(userID).WithID(entryID).Do(ctx)
+	return nil
+}
+
+// DeleteContext removes a MemoryContext object from Waviate for the given tenant.
+func (w *waviateSearcher) DeleteContext(ctx context.Context, userID, contextID string) error {
+	if w == nil || w.client == nil || userID == "" || contextID == "" {
+		return nil
+	}
+	_ = w.client.Data().Deleter().WithClassName("MemoryContext").WithTenant(userID).WithID(contextID).Do(ctx)
+	return nil
 }
 
 // helper to detect tenant not found error

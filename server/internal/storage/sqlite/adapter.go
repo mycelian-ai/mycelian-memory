@@ -113,12 +113,12 @@ func (s *SqliteStorage) CreateMemory(ctx context.Context, req storage.CreateMemo
 	}, nil
 }
 func (s *SqliteStorage) GetMemory(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string) (*storage.Memory, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT MemoryType, Title, Description, CreationTime, DeletionScheduledTime FROM Memories WHERE UserId = ? AND VaultId = ? AND MemoryId = ?`, userID, vaultID.String(), memoryID)
+	row := s.db.QueryRowContext(ctx, `SELECT MemoryType, Title, Description, CreationTime FROM Memories WHERE UserId = ? AND VaultId = ? AND MemoryId = ?`, userID, vaultID.String(), memoryID)
 	var m storage.Memory
 	m.UserID = userID
 	m.VaultID = vaultID
 	m.MemoryID = memoryID
-	err := row.Scan(&m.MemoryType, &m.Title, &m.Description, &m.CreationTime, new(interface{})) // ignore deletion time
+	err := row.Scan(&m.MemoryType, &m.Title, &m.Description, &m.CreationTime)
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +190,31 @@ func (s *SqliteStorage) GetMemoryEntry(ctx context.Context, userID string, vault
 	row := s.db.QueryRowContext(ctx, `SELECT EntryId, RawEntry, Summary, Metadata, Tags FROM MemoryEntries WHERE UserId=? AND VaultId=? AND MemoryId=? AND CreationTime=?`, userID, vaultID.String(), memoryID, creationTime)
 	return scanEntry(row, userID, vaultID, memoryID, creationTime)
 }
+func (s *SqliteStorage) GetMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) (*storage.MemoryEntry, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT CreationTime, RawEntry, Summary, Metadata, Tags FROM MemoryEntries WHERE UserId=? AND VaultId=? AND MemoryId=? AND EntryId=?`, userID, vaultID.String(), memoryID, entryID)
+	var creation time.Time
+	var raw string
+	var summary *string
+	var metaStr, tagsStr sql.NullString
+	if err := row.Scan(&creation, &raw, &summary, &metaStr, &tagsStr); err != nil {
+		return nil, err
+	}
+	var meta map[string]interface{}
+	var tags map[string]interface{}
+	_ = json.Unmarshal([]byte(metaStr.String), &meta)
+	_ = json.Unmarshal([]byte(tagsStr.String), &tags)
+	return &storage.MemoryEntry{
+		UserID:       userID,
+		VaultID:      vaultID,
+		MemoryID:     memoryID,
+		CreationTime: creation,
+		EntryID:      entryID,
+		RawEntry:     raw,
+		Summary:      summary,
+		Metadata:     meta,
+		Tags:         tags,
+	}, nil
+}
 func (s *SqliteStorage) ListMemoryEntries(ctx context.Context, req storage.ListMemoryEntriesRequest) ([]*storage.MemoryEntry, error) {
 	q := `SELECT CreationTime, EntryId, RawEntry, Summary, Metadata, Tags FROM MemoryEntries WHERE UserId=? AND VaultId=? AND MemoryId=?`
 	args := []interface{}{req.UserID, req.VaultID.String(), req.MemoryID}
@@ -226,33 +251,40 @@ func (s *SqliteStorage) CorrectMemoryEntry(ctx context.Context, req storage.Corr
 }
 func (s *SqliteStorage) UpdateMemoryEntrySummary(ctx context.Context, req storage.UpdateMemoryEntrySummaryRequest) (*storage.MemoryEntry, error) {
 	now := time.Now().UTC()
-	res, err := s.db.ExecContext(ctx, `UPDATE MemoryEntries SET Summary = ?, LastUpdateTime = ? WHERE UserId = ? AND VaultId = ? AND MemoryId = ? AND CreationTime = ?`,
-		req.Summary, now, req.UserID, req.VaultID.String(), req.MemoryID, req.CreationTime)
+	res, err := s.db.ExecContext(ctx, `UPDATE MemoryEntries SET Summary = ?, LastUpdateTime = ? WHERE UserId = ? AND VaultId = ? AND MemoryId = ? AND EntryId = ?`,
+		req.Summary, now, req.UserID, req.VaultID.String(), req.MemoryID, req.EntryID)
 	if err != nil {
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil, fmt.Errorf("entry not found")
 	}
-	return s.GetMemoryEntry(ctx, req.UserID, req.VaultID, req.MemoryID, req.CreationTime)
+	return s.GetMemoryEntryByID(ctx, req.UserID, req.VaultID, req.MemoryID, req.EntryID)
 }
 
 func (s *SqliteStorage) UpdateMemoryEntryTags(ctx context.Context, req storage.UpdateMemoryEntryTagsRequest) (*storage.MemoryEntry, error) {
 	now := time.Now().UTC()
 	tagsJSON, _ := json.Marshal(req.Tags)
-	res, err := s.db.ExecContext(ctx, `UPDATE MemoryEntries SET Tags = ?, LastUpdateTime = ? WHERE UserId = ? AND VaultId = ? AND MemoryId = ? AND CreationTime = ?`,
-		string(tagsJSON), now, req.UserID, req.VaultID.String(), req.MemoryID, req.CreationTime)
+	res, err := s.db.ExecContext(ctx, `UPDATE MemoryEntries SET Tags = ?, LastUpdateTime = ? WHERE UserId = ? AND VaultId = ? AND MemoryId = ? AND EntryId = ?`,
+		string(tagsJSON), now, req.UserID, req.VaultID.String(), req.MemoryID, req.EntryID)
 	if err != nil {
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil, fmt.Errorf("entry not found")
 	}
-	return s.GetMemoryEntry(ctx, req.UserID, req.VaultID, req.MemoryID, req.CreationTime)
+	return s.GetMemoryEntryByID(ctx, req.UserID, req.VaultID, req.MemoryID, req.EntryID)
 }
-func (s *SqliteStorage) SoftDeleteMemoryEntry(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, creationTime time.Time) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE MemoryEntries SET DeletionScheduledTime = ? WHERE UserId=? AND VaultId=? AND MemoryId=? AND CreationTime=?`, time.Now().UTC(), userID, vaultID.String(), memoryID, creationTime)
-	return err
+
+// DeleteMemoryEntryByID performs a hard delete by external entryId
+func (s *SqliteStorage) DeleteMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM MemoryEntries WHERE UserId=? AND VaultId=? AND MemoryId=? AND EntryId=?`, userID, vaultID.String(), memoryID, entryID)
+	if err != nil {
+		return err
+	}
+	// idempotent semantics: no error if 0 rows
+	_, _ = res.RowsAffected()
+	return nil
 }
 
 // --- Memory context ---
@@ -294,6 +326,17 @@ func (s *SqliteStorage) GetLatestMemoryContext(ctx context.Context, userID strin
 		Context:      json.RawMessage(ctxJSON),
 		CreationTime: creation,
 	}, nil
+}
+
+// DeleteMemoryContextByID performs a hard delete of a context snapshot by contextId
+func (s *SqliteStorage) DeleteMemoryContextByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, contextID string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM MemoryContexts WHERE UserId=? AND VaultId=? AND MemoryId=? AND ContextId=?`, userID, vaultID.String(), memoryID, contextID)
+	if err != nil {
+		return err
+	}
+	// idempotent semantics
+	_, _ = res.RowsAffected()
+	return nil
 }
 
 // --- Vault operations ---

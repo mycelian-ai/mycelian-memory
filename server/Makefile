@@ -47,7 +47,7 @@ SCHEMA_MANAGER_DIR := $(TOOLS_DIR)/schema-manager
 
 # Default target - show help
 help:
-	@echo "🚀 Synapse Memory Backend - Available Commands"
+	@echo "🚀 Mycelian Memory Backend - Available Commands"
 	@echo "=============================================="
 	@echo ""
 	@echo "📦 APPLICATION BUILDS:"
@@ -189,7 +189,10 @@ docker-run:
 	docker-compose up -d --build --force-recreate
 
 docker-stop:
-	./scripts/start-headless.sh --stop
+	# Stop sqlite-based local stack (memory-service + weaviate + indexer + bootstrap)
+	docker compose -f ../deployments/docker/docker-compose.sqlite.yml down --remove-orphans -v || true
+	# Also stop legacy spanner stack if running (best-effort)
+	docker compose -f ../deployments/docker/docker-compose.spanner.yml down --remove-orphans -v || true
 
 docker-status:
 	./scripts/start-headless.sh --status

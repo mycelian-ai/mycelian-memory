@@ -6,6 +6,7 @@
 # ==============================================================================
 
 MCP_COMPOSE_FILE := deployments/docker/docker-compose.streamable.yml
+API_HEALTH_URL := http://localhost:8080/api/health
 
 # ------------------------------------------------------------------------------
 # Backend (server) convenience wrappers
@@ -76,6 +77,8 @@ help:
 	@echo ""
 	@echo "Test Commands:"
 	@echo "  client-coverage-check  Run client tests and assert >= 78% coverage"
+	@echo "  protogen               Generate gRPC code from api/proto via buf"
+	@echo "  test-all               Run server tests, start sqlite backend, then client tests (unit+integration)"
 
 mcp-streamable-up:
 	docker compose -f $(MCP_COMPOSE_FILE) up -d --build --force-recreate
@@ -88,3 +91,48 @@ mcp-streamable-restart: mcp-streamable-down mcp-streamable-up
 .PHONY: client-coverage-check
 client-coverage-check:
 	cd client && bash scripts/coverage_check.sh 78.0
+
+.PHONY: protogen
+protogen:
+	cd api && buf generate
+
+# ------------------------------------------------------------------------------
+# End-to-end developer test pipeline
+# ------------------------------------------------------------------------------
+.PHONY: server-test server-e2e client-test client-test-integration wait-backend-health test-all
+
+server-test:
+	$(MAKE) -C server test
+
+# Server dev-env E2E tests (tagged e2e) run against the running docker stack
+server-e2e:
+	cd server && go test -v ./dev_env_e2e_tests -tags=e2e || true
+
+client-test:
+	cd client && go test -v ./...
+
+client-test-integration:
+	cd client && TEST_BACKEND_URL=http://localhost:8080 go test -v -tags=integration ./integration_test/real
+
+wait-backend-health:
+	@echo "Waiting for memory-service to be healthy at $(API_HEALTH_URL) ..."
+	@i=0; \
+	until curl -sf $(API_HEALTH_URL) | grep -q 'UP'; do \
+	  if [ $$i -ge 60 ]; then echo "ERROR: backend health timeout"; exit 1; fi; \
+	  i=$$((i+1)); sleep 2; \
+	done; \
+	echo "Backend is healthy."
+
+test-all:
+	@set -e; \
+	cleanup() { $(MAKE) backend-down; }; \
+	trap 'cleanup' EXIT INT TERM; \
+	$(MAKE) server-test; \
+	$(MAKE) backend-sqlite-up; \
+	$(MAKE) wait-backend-health; \
+	$(MAKE) server-e2e; \
+	$(MAKE) client-test; \
+	$(MAKE) client-test-integration; \
+	trap - EXIT INT TERM; \
+	cleanup; \
+	echo "ALL TESTS COMPLETED SUCCESSFULLY"

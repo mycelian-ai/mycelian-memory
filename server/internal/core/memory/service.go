@@ -234,6 +234,34 @@ func (s *Service) ListMemoryEntries(ctx context.Context, req ListMemoryEntriesRe
 	return entries, nil
 }
 
+// GetMemoryEntryByID fetches a single entry by entryId
+func (s *Service) GetMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) (*storage.MemoryEntry, error) {
+	if userID == "" || memoryID == "" || entryID == "" || vaultID == uuid.Nil {
+		return nil, fmt.Errorf("user ID, vault ID, memory ID and entry ID are required")
+	}
+	entry, err := s.storage.GetMemoryEntryByID(ctx, userID, vaultID, memoryID, entryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get memory entry by id: %w", err)
+	}
+	return entry, nil
+}
+
+// DeleteMemoryEntryByID deletes a single entry by entryId (hard delete)
+func (s *Service) DeleteMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID, entryID string) error {
+	if userID == "" || memoryID == "" || entryID == "" || vaultID == uuid.Nil {
+		return fmt.Errorf("user ID, vault ID, memory ID and entry ID are required")
+	}
+	return s.storage.DeleteMemoryEntryByID(ctx, userID, vaultID, memoryID, entryID)
+}
+
+// DeleteMemoryContextByID deletes a context snapshot by contextId (hard delete)
+func (s *Service) DeleteMemoryContextByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID, contextID string) error {
+	if userID == "" || memoryID == "" || contextID == "" || vaultID == uuid.Nil {
+		return fmt.Errorf("user ID, vault ID, memory ID and context ID are required")
+	}
+	return s.storage.DeleteMemoryContextByID(ctx, userID, vaultID, memoryID, contextID)
+}
+
 // UpdateMemoryEntryTags updates the tags of a memory entry
 func (s *Service) UpdateMemoryEntryTags(ctx context.Context, req UpdateMemoryEntryTagsRequest) (*storage.MemoryEntry, error) {
 	// Business validation
@@ -243,14 +271,14 @@ func (s *Service) UpdateMemoryEntryTags(ctx context.Context, req UpdateMemoryEnt
 
 	// Create storage request
 	updateReq := storage.UpdateMemoryEntryTagsRequest{
-		VaultID:      req.VaultID,
-		UserID:       req.UserID,
-		MemoryID:     req.MemoryID,
-		CreationTime: req.CreationTime,
-		Tags:         req.Tags,
+		VaultID:  req.VaultID,
+		UserID:   req.UserID,
+		MemoryID: req.MemoryID,
+		EntryID:  req.EntryID,
+		Tags:     req.Tags,
 	}
 
-	log.Info().Str("userID", req.UserID).Str("memoryID", req.MemoryID).Time("creationTime", req.CreationTime).Msg("Updating memory entry tags")
+	log.Info().Str("userID", req.UserID).Str("memoryID", req.MemoryID).Str("entryId", req.EntryID).Msg("Updating memory entry tags")
 
 	entry, err := s.storage.UpdateMemoryEntryTags(ctx, updateReq)
 	if err != nil {

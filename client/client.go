@@ -194,11 +194,15 @@ func (c *Client) ListEntries(ctx context.Context, userID, vaultID, memID string,
 	return api.ListEntries(ctx, c.http, c.baseURL, userID, vaultID, memID, params)
 }
 
+// GetEntry retrieves a single entry by entryId within a memory (synchronous).
+func (c *Client) GetEntry(ctx context.Context, userID, vaultID, memID, entryID string) (*Entry, error) {
+	return api.GetEntry(ctx, c.http, c.baseURL, userID, vaultID, memID, entryID)
+}
+
 // DeleteEntry removes an entry by ID from a memory via the sharded executor (async).
 // This ensures FIFO ordering per memory and provides offline resilience.
-func (c *Client) DeleteEntry(ctx context.Context, userID, vaultID, memID, entryID string) (*EnqueueAck, error) {
-	// CRITICAL: Pass the executor for async operation
-	return api.DeleteEntry(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, entryID)
+func (c *Client) DeleteEntry(ctx context.Context, userID, vaultID, memID, entryID string) error {
+	return api.DeleteEntry(ctx, c.http, c.baseURL, userID, vaultID, memID, entryID)
 }
 
 // --------------------------------------------------------------------
@@ -216,6 +220,11 @@ func (c *Client) PutContext(ctx context.Context, userID, vaultID, memID string, 
 // GetContext retrieves the most recent context snapshot for a memory (synchronous).
 func (c *Client) GetContext(ctx context.Context, userID, vaultID, memID string) (*GetContextResponse, error) {
 	return api.GetContext(ctx, c.http, c.baseURL, userID, vaultID, memID)
+}
+
+// DeleteContext removes a context snapshot by ID via the sharded executor (async).
+func (c *Client) DeleteContext(ctx context.Context, userID, vaultID, memID, contextID string) error {
+	return api.DeleteContext(ctx, c.http, c.baseURL, userID, vaultID, memID, contextID)
 }
 
 // --------------------------------------------------------------------

@@ -48,11 +48,11 @@ type ListMemoryEntriesRequest struct {
 
 // UpdateMemoryEntryTagsRequest represents a request to update memory entry tags
 type UpdateMemoryEntryTagsRequest struct {
-	VaultID      uuid.UUID
-	UserID       string
-	MemoryID     string
-	CreationTime time.Time
-	Tags         map[string]interface{}
+	VaultID  uuid.UUID
+	UserID   string
+	MemoryID string
+	EntryID  string
+	Tags     map[string]interface{}
 }
 
 // CreateMemoryContextRequest represents a request to create a context snapshot for a memory

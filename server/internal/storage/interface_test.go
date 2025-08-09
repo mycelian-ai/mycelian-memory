@@ -382,11 +382,11 @@ func TestStorageInterface_MemoryEntryOperations(t *testing.T) {
 		}
 
 		updateReq := UpdateMemoryEntryTagsRequest{
-			UserID:       userID,
-			VaultID:      vaultID,
-			MemoryID:     memoryID,
-			CreationTime: createdEntry.CreationTime,
-			Tags:         updatedTags,
+			UserID:   userID,
+			VaultID:  vaultID,
+			MemoryID: memoryID,
+			EntryID:  createdEntry.EntryID,
+			Tags:     updatedTags,
 		}
 
 		updatedEntry, err := storage.UpdateMemoryEntryTags(ctx, updateReq)
@@ -406,11 +406,11 @@ func TestStorageInterface_MemoryEntryOperations(t *testing.T) {
 
 	t.Run("UpdateMemoryEntryTags_NonexistentEntry", func(t *testing.T) {
 		updateReq := UpdateMemoryEntryTagsRequest{
-			UserID:       userID,
-			VaultID:      vaultID,
-			MemoryID:     memoryID,
-			CreationTime: time.Now(),
-			Tags:         map[string]interface{}{"status": "test"},
+			UserID:   userID,
+			VaultID:  vaultID,
+			MemoryID: memoryID,
+			EntryID:  "00000000-0000-0000-0000-000000000000",
+			Tags:     map[string]interface{}{"status": "test"},
 		}
 
 		_, err := storage.UpdateMemoryEntryTags(ctx, updateReq)

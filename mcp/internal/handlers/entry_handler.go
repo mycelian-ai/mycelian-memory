@@ -9,17 +9,17 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/mycelian/mycelian-memory/client"
+	clientpkg "github.com/mycelian/mycelian-memory/client"
 	"github.com/rs/zerolog/log"
 )
 
-// EntryHandler exposes add_entry and list_entries tools.
+// EntryHandler exposes add_entry, list_entries, and get_entry tools.
 type EntryHandler struct {
-	client *client.Client
+	client *clientpkg.Client
 }
 
 // NewEntryHandler returns a new handler.
-func NewEntryHandler(c *client.Client) *EntryHandler {
+func NewEntryHandler(c *clientpkg.Client) *EntryHandler {
 	return &EntryHandler{client: c}
 }
 
@@ -51,6 +51,16 @@ func (eh *EntryHandler) RegisterTools(s *server.MCPServer) error {
 	)
 	s.AddTool(listEntries, eh.handleListEntries)
 
+	// get_entry (vault scoped)
+	getEntry := mcp.NewTool("get_entry",
+		mcp.WithDescription("Get a single entry by entryId within a memory"),
+		mcp.WithString("user_id", mcp.Required(), mcp.Description("The UUID of the user")),
+		mcp.WithString("vault_id", mcp.Required(), mcp.Description("The UUID of the vault")),
+		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
+		mcp.WithString("entry_id", mcp.Required(), mcp.Description("The UUID of the entry")),
+	)
+	s.AddTool(getEntry, eh.handleGetEntry)
+
 	return nil
 }
 
@@ -74,7 +84,7 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 		Msg("handling add_entry request")
 
 	start := time.Now()
-	ack, err := eh.client.AddEntry(ctx, userID, vaultID, memoryID, client.AddEntryRequest{
+	ack, err := eh.client.AddEntry(ctx, userID, vaultID, memoryID, clientpkg.AddEntryRequest{
 		RawEntry: rawEntry,
 		Summary:  summary,
 		Tags:     tags,
@@ -190,6 +200,37 @@ func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolR
 		"next_after":    nextAfter,
 	}
 	b, _ := json.MarshalIndent(payload, "", "  ")
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (eh *EntryHandler) handleGetEntry(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID, _ := req.RequireString("user_id")
+	vaultID, _ := req.RequireString("vault_id")
+	memoryID, _ := req.RequireString("memory_id")
+	entryID, _ := req.RequireString("entry_id")
+
+	log.Debug().
+		Str("user_id", userID).
+		Str("vault_id", vaultID).
+		Str("memory_id", memoryID).
+		Str("entry_id", entryID).
+		Msg("handling get_entry request")
+
+	start := time.Now()
+	e, err := eh.client.GetEntry(ctx, userID, vaultID, memoryID, entryID)
+	elapsed := time.Since(start)
+	if err != nil {
+		log.Error().Err(err).
+			Str("user_id", userID).
+			Str("vault_id", vaultID).
+			Str("memory_id", memoryID).
+			Str("entry_id", entryID).
+			Dur("elapsed", elapsed).
+			Msg("get_entry failed")
+		return mcp.NewToolResultError(fmt.Sprintf("failed to get entry: %v", err)), nil
+	}
+
+	b, _ := json.MarshalIndent(e, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil
 }
 

@@ -9,12 +9,14 @@ services:
     image: synapse-mcp-server:dev
     environment:
       - MEMORY_SERVICE_URL=http://host.docker.internal:8080
+      - MEMORY_SERVICE_GRPC_ADDR=host.docker.internal:9090
       - MCP_HTTP=true                    # Force HTTP mode for Cursor streamable endpoint
       - LOG_LEVEL=info
       - MCP_SERVER_NAME=synapse-mcp-server
       - MCP_SERVER_VERSION=0.2.0
     ports:
       - "11546:11546"
+      - "9090:9090"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11546/mcp"]

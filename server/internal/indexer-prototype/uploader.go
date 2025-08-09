@@ -207,6 +207,18 @@ func (u *Uploader) Upsert(ctx context.Context, entries []IndexedEntry) error {
 	return nil
 }
 
+// Delete removes objects from Waviate by entry IDs. Best-effort; ignores 404s.
+func (u *Uploader) Delete(ctx context.Context, userID string, entryIDs []string) error {
+	if u == nil || u.client == nil || len(entryIDs) == 0 {
+		return nil
+	}
+	for _, id := range entryIDs {
+		// ignore errors for now; best-effort cleanup
+		_ = u.client.Data().Deleter().WithClassName(u.className).WithID(id).WithTenant(userID).Do(ctx)
+	}
+	return nil
+}
+
 func toFloat32Slice(in []float32) []float32 { // ensure nil safe
 	if len(in) == 0 {
 		return nil

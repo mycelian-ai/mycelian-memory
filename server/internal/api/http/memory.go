@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/core/memory"
 	"github.com/mycelian/mycelian-memory/server/internal/core/vault"
 	platformHttp "github.com/mycelian/mycelian-memory/server/internal/platform/http"
+	"github.com/mycelian/mycelian-memory/server/internal/search"
 	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
 	"github.com/google/uuid"
@@ -20,6 +22,9 @@ import (
 type MemoryHandler struct {
 	memoryService *memory.Service
 	vaultService  *vault.Service
+
+	// Optional search index connector for best-effort delete propagation
+	search search.Searcher
 }
 
 // NewMemoryHandler creates a new memory handler
@@ -28,6 +33,12 @@ func NewMemoryHandler(memoryService *memory.Service, vaultService *vault.Service
 		memoryService: memoryService,
 		vaultService:  vaultService,
 	}
+}
+
+// WithSearcher wires a searcher into the handler (optional).
+func (h *MemoryHandler) WithSearcher(s search.Searcher) *MemoryHandler {
+	h.search = s
+	return h
 }
 
 // CreateUser handles POST /api/users
@@ -189,7 +200,7 @@ func (h *MemoryHandler) ListMemories(w http.ResponseWriter, r *http.Request) {
 	platformHttp.WriteJSON(w, http.StatusOK, response)
 }
 
-// UpdateMemoryEntryTags handles PATCH /api/users/{userId}/memories/{memoryId}/entries/{creationTime}/tags
+// UpdateMemoryEntryTags handles PATCH /api/users/{userId}/memories/{memoryId}/entries/{entryId}/tags
 func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID := vars["userId"]
@@ -200,17 +211,10 @@ func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Req
 		return
 	}
 	memoryID := vars["memoryId"]
-	creationTimeStr := vars["creationTime"]
-
-	// Parse creation time (try RFC3339Nano first, then RFC3339 for backwards compatibility)
-	creationTime, err := time.Parse(time.RFC3339Nano, creationTimeStr)
-	if err != nil {
-		// Fallback to RFC3339
-		creationTime, err = time.Parse(time.RFC3339, creationTimeStr)
-		if err != nil {
-			platformHttp.WriteBadRequest(w, "Invalid creationTime format, use RFC3339 or RFC3339Nano")
-			return
-		}
+	entryID := vars["entryId"]
+	if entryID == "" {
+		platformHttp.WriteBadRequest(w, "entryId is required")
+		return
 	}
 
 	var req struct {
@@ -234,11 +238,11 @@ func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Req
 
 	// Convert to domain request
 	updateReq := memory.UpdateMemoryEntryTagsRequest{
-		UserID:       userID,
-		VaultID:      vaultID,
-		MemoryID:     memoryID,
-		CreationTime: creationTime,
-		Tags:         req.Tags,
+		UserID:   userID,
+		VaultID:  vaultID,
+		MemoryID: memoryID,
+		EntryID:  entryID,
+		Tags:     req.Tags,
 	}
 
 	entry, err := h.memoryService.UpdateMemoryEntryTags(r.Context(), updateReq)
@@ -469,6 +473,59 @@ func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Re
 	platformHttp.WriteJSON(w, http.StatusOK, ctxObj)
 }
 
+// DeleteMemoryEntryByID handles DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
+func (h *MemoryHandler) DeleteMemoryEntryByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+	entryID := vars["entryId"]
+	if entryID == "" {
+		platformHttp.WriteBadRequest(w, "entryId is required")
+		return
+	}
+	if err := h.memoryService.DeleteMemoryEntryByID(r.Context(), userID, vaultID, memoryID, entryID); err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+	// Best-effort index cleanup (fire-and-forget)
+	if h.search != nil {
+		go func(uid, eid string) { _ = h.search.DeleteEntry(context.Background(), uid, eid) }(userID, entryID)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// DeleteMemoryContextByID handles DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts/{contextId}
+func (h *MemoryHandler) DeleteMemoryContextByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+	contextID := vars["contextId"]
+	if contextID == "" {
+		platformHttp.WriteBadRequest(w, "contextId is required")
+		return
+	}
+	if err := h.memoryService.DeleteMemoryContextByID(r.Context(), userID, vaultID, memoryID, contextID); err != nil {
+		platformHttp.WriteInternalError(w, err.Error())
+		return
+	}
+	if h.search != nil {
+		go func(uid, cid string) { _ = h.search.DeleteContext(context.Background(), uid, cid) }(userID, contextID)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- Title-based endpoints ---
 
 // ListMemoriesByVaultTitle GET /api/users/{userId}/vaults/{vaultTitle}/memories
@@ -510,4 +567,30 @@ func (h *MemoryHandler) GetMemoryByTitle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	platformHttp.WriteJSON(w, http.StatusOK, m)
+}
+
+// GetMemoryEntryByID handles GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
+func (h *MemoryHandler) GetMemoryEntryByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	vaultIDStr := vars["vaultId"]
+	vaultID, err := uuid.Parse(vaultIDStr)
+	if err != nil {
+		platformHttp.WriteBadRequest(w, "invalid vaultId")
+		return
+	}
+	memoryID := vars["memoryId"]
+	entryID := vars["entryId"]
+
+	if entryID == "" {
+		platformHttp.WriteBadRequest(w, "entryId is required")
+		return
+	}
+
+	entry, err := h.memoryService.GetMemoryEntryByID(r.Context(), userID, vaultID, memoryID, entryID)
+	if err != nil {
+		platformHttp.WriteNotFound(w, err.Error())
+		return
+	}
+	platformHttp.WriteJSON(w, http.StatusOK, entry)
 }

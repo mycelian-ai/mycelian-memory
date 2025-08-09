@@ -34,6 +34,9 @@ type Config struct {
 	// HTTP Configuration
 	HTTPPort int `envconfig:"HTTP_PORT" default:"8080"`
 
+	// gRPC Configuration
+	GRPCPort int `envconfig:"GRPC_PORT" default:"9090"`
+
 	// Spanner Configuration
 	SpannerInstanceID   string `envconfig:"SPANNER_INSTANCE_ID" default:"test"`
 	SpannerDatabaseID   string `envconfig:"SPANNER_DATABASE_ID" default:"memories"`
@@ -177,4 +180,9 @@ func (c *Config) GetSpannerEmulatorEndpoint() string {
 // GetHTTPAddr returns the HTTP server address
 func (c *Config) GetHTTPAddr() string {
 	return fmt.Sprintf(":%d", c.HTTPPort)
+}
+
+// GetGRPCAddr returns the gRPC server address
+func (c *Config) GetGRPCAddr() string {
+	return fmt.Sprintf(":%d", c.GRPCPort)
 }

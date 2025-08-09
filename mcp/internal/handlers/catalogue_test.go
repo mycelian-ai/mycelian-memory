@@ -42,6 +42,7 @@ func TestToolCatalogue(t *testing.T) {
 		"create_memory_in_vault",
 		"create_vault",
 		"get_context",
+		"get_entry",
 		"get_memory",
 		"get_user",
 		"list_entries",

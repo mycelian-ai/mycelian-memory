@@ -83,7 +83,7 @@ func (s *SpannerScanner) FetchEntriesSince(ctx context.Context, since time.Time,
 	const baseSQL = `
         SELECT UserId, MemoryId, CreationTime, EntryId, RawEntry, Summary, Metadata, Tags
         FROM MemoryEntries
-        WHERE CreationTime > @since AND DeletionScheduledTime IS NULL
+        WHERE CreationTime > @since
         ORDER BY CreationTime ASC
         LIMIT @limit`
 

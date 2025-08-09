@@ -50,6 +50,7 @@ services:
     container_name: memory-service
     ports:
       - "8080:8080"
+      - "9090:9090"
     environment:
       - SPANNER_EMULATOR_HOST=spanner-emulator:9010
       - MEMORY_BACKEND_GCP_PROJECT_ID=synapse-memory
@@ -57,6 +58,7 @@ services:
       - MEMORY_BACKEND_SPANNER_DATABASE_ID=synapse-memory
       - MEMORY_BACKEND_ENVIRONMENT=development
       - MEMORY_BACKEND_HTTP_PORT=8080
+      - MEMORY_BACKEND_GRPC_PORT=9090
       - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
       - MEMORY_BACKEND_DB_DRIVER=spanner-pg
       - MEMORY_BACKEND_BUILD_TARGET=cloud-dev

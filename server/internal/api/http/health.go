@@ -181,9 +181,10 @@ func (h *HealthHandler) CheckHealth(w http.ResponseWriter, r *http.Request) {
 	platformHttp.WriteJSON(w, http.StatusInternalServerError, response)
 }
 
-// CheckStorageHealth handles GET /api/health/db
+// (Deprecated) CheckStorageHealth handles GET /api/health/db
+// Note: This handler is NOT wired in the public router. It exists only for
+// internal tests and ops scenarios. Public clients should use /api/health.
 func (h *HealthHandler) CheckStorageHealth(w http.ResponseWriter, r *http.Request) {
-	// Perform health check on storage
 	if err := h.storage.HealthCheck(r.Context()); err != nil {
 		response := map[string]interface{}{
 			"status":    "DOWN",
@@ -193,12 +194,10 @@ func (h *HealthHandler) CheckStorageHealth(w http.ResponseWriter, r *http.Reques
 		platformHttp.WriteJSON(w, http.StatusServiceUnavailable, response)
 		return
 	}
-
 	response := map[string]interface{}{
 		"status":    "UP",
 		"message":   "database is healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
-
 	platformHttp.WriteJSON(w, http.StatusOK, response)
 }

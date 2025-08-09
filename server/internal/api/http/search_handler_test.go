@@ -50,6 +50,9 @@ func (m *mockSearch) UpsertContext(ctx context.Context, ctxID string, vec []floa
 	return nil
 }
 
+func (m *mockSearch) DeleteEntry(ctx context.Context, userID, entryID string) error     { return nil }
+func (m *mockSearch) DeleteContext(ctx context.Context, userID, contextID string) error { return nil }
+
 func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}

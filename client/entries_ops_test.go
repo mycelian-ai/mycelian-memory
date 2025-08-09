@@ -37,15 +37,8 @@ func TestListAndDeleteEntries(t *testing.T) {
 	if !getCalled {
 		t.Fatalf("GET not called")
 	}
-	ack, err := c.DeleteEntry(ctx, userID, vaultID, memID, entryID)
-	if err != nil {
+	if err := c.DeleteEntry(ctx, userID, vaultID, memID, entryID); err != nil {
 		t.Fatalf("DeleteEntry error: %v", err)
-	}
-	if ack == nil || ack.Status != "enqueued" {
-		t.Fatalf("DeleteEntry should return enqueue acknowledgment, got: %+v", ack)
-	}
-	if err := c.AwaitConsistency(ctx, memID); err != nil {
-		t.Fatalf("AwaitConsistency: %v", err)
 	}
 	if !deleteCalled {
 		t.Fatalf("DELETE not called")

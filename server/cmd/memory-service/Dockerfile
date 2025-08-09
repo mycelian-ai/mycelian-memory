@@ -27,8 +27,8 @@ WORKDIR /root/
 # Copy the binary from builder stage
 COPY --from=builder /app/memory-service .
 
-# Expose port
-EXPOSE 8080
+# Expose ports
+EXPOSE 8080 9090
 
 # (Removed Docker-level health check to avoid container restarts when dependencies are temporarily unavailable)
 

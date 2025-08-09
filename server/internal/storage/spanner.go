@@ -528,15 +528,63 @@ func (s *SpannerStorage) GetMemoryEntry(ctx context.Context, userID string, vaul
 	return entry, nil
 }
 
+// GetMemoryEntryByID retrieves a single entry by entryId
+func (s *SpannerStorage) GetMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) (*MemoryEntry, error) {
+	// Query by EntryId (globally unique) and return full row
+	stmt := spanner.Statement{
+		SQL: `SELECT UserId, VaultId, MemoryId, CreationTime, EntryId, RawEntry, Summary, Metadata, Tags,
+                     ExpirationTime, CorrectionTime, CorrectedEntryMemoryId, CorrectedEntryCreationTime,
+                     CorrectionReason, LastUpdateTime
+              FROM MemoryEntries WHERE EntryId=@entryId LIMIT 1`,
+		Params: map[string]interface{}{"entryId": entryID},
+	}
+	iter := s.client.Single().Query(ctx, stmt)
+	defer iter.Stop()
+	row, err := iter.Next()
+	if err == iterator.Done {
+		return nil, fmt.Errorf("memory entry not found: %s", entryID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get memory entry by id: %w", err)
+	}
+	var uid, vid, mid string
+	entry := &MemoryEntry{}
+	var metadataJSON, tagsJSON spanner.NullJSON
+	if err := row.Columns(&uid, &vid, &mid, &entry.CreationTime, &entry.EntryID, &entry.RawEntry, &entry.Summary,
+		&metadataJSON, &tagsJSON, &entry.ExpirationTime, &entry.CorrectionTime, &entry.CorrectedEntryMemoryId,
+		&entry.CorrectedEntryCreationTime, &entry.CorrectionReason, &entry.LastUpdateTime); err != nil {
+		return nil, fmt.Errorf("failed to scan memory entry: %w", err)
+	}
+	if v, err := uuid.Parse(vid); err == nil {
+		entry.VaultID = v
+	}
+	entry.UserID = uid
+	entry.MemoryID = mid
+	if metadataJSON.Valid {
+		if m, err := convertJSONToMap(metadataJSON.Value); err == nil {
+			entry.Metadata = m
+		} else {
+			log.Warn().Err(err).Msg("failed to parse metadata JSON")
+		}
+	}
+	if tagsJSON.Valid {
+		if t, err := convertJSONToMap(tagsJSON.Value); err == nil {
+			entry.Tags = t
+		} else {
+			log.Warn().Err(err).Msg("failed to parse tags JSON")
+		}
+	}
+	return entry, nil
+}
+
 // ListMemoryEntries retrieves memory entries with optional filtering
 func (s *SpannerStorage) ListMemoryEntries(ctx context.Context, req ListMemoryEntriesRequest) ([]*MemoryEntry, error) {
 	query := `SELECT UserId, VaultId, MemoryId, CreationTime, EntryId, RawEntry, Summary, 
-			         Metadata, Tags, CorrectionTime, CorrectedEntryMemoryId, 
-			         CorrectedEntryCreationTime, CorrectionReason, LastUpdateTime,
-			         DeletionScheduledTime, ExpirationTime 
-			  FROM MemoryEntries 
-			  WHERE UserId = @userId AND VaultId = @vaultId AND MemoryId = @memoryId 
-			  AND DeletionScheduledTime IS NULL` // 🔒 INVARIANT: Never show soft-deleted entries
+                 Metadata, Tags, CorrectionTime, CorrectedEntryMemoryId, 
+                 CorrectedEntryCreationTime, CorrectionReason, LastUpdateTime,
+                 ExpirationTime 
+              FROM MemoryEntries 
+              WHERE UserId = @userId AND VaultId = @vaultId AND MemoryId = @memoryId`
 	params := map[string]interface{}{
 		"userId":   req.UserID,
 		"vaultId":  req.VaultID.String(),
@@ -587,7 +635,7 @@ func (s *SpannerStorage) ListMemoryEntries(ctx context.Context, req ListMemoryEn
 			&entry.EntryID, &entry.RawEntry, &entry.Summary,
 			&metadataJSON, &tagsJSON, &entry.CorrectionTime, &entry.CorrectedEntryMemoryId,
 			&entry.CorrectedEntryCreationTime, &entry.CorrectionReason,
-			&entry.LastUpdateTime, &entry.DeletionScheduledTime, &entry.ExpirationTime)
+			&entry.LastUpdateTime, &entry.ExpirationTime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan memory entry: %w", err)
 		}
@@ -634,10 +682,9 @@ func (s *SpannerStorage) CorrectMemoryEntry(ctx context.Context, req CorrectMemo
 
 		// Step 1: Verify original entry exists and is correctable
 		checkStmt := spanner.Statement{
-			SQL: `SELECT UserId, MemoryId, CreationTime, EntryId, RawEntry, CorrectionTime, 
-					     DeletionScheduledTime
-				  FROM MemoryEntries 
-				  WHERE UserId = @userId AND MemoryId = @memoryId AND CreationTime = @creationTime`,
+			SQL: `SELECT UserId, MemoryId, CreationTime, EntryId, RawEntry, CorrectionTime
+                  FROM MemoryEntries 
+                  WHERE UserId = @userId AND MemoryId = @memoryId AND CreationTime = @creationTime`,
 			Params: map[string]interface{}{
 				"userId":       req.UserID,
 				"memoryId":     req.MemoryID,
@@ -657,18 +704,17 @@ func (s *SpannerStorage) CorrectMemoryEntry(ctx context.Context, req CorrectMemo
 		}
 
 		var originalEntry struct {
-			UserID                string
-			MemoryID              string
-			CreationTime          time.Time
-			EntryID               string
-			RawEntry              string
-			CorrectionTime        *time.Time
-			DeletionScheduledTime *time.Time
+			UserID         string
+			MemoryID       string
+			CreationTime   time.Time
+			EntryID        string
+			RawEntry       string
+			CorrectionTime *time.Time
 		}
 
 		err = row.Columns(&originalEntry.UserID, &originalEntry.MemoryID,
 			&originalEntry.CreationTime, &originalEntry.EntryID, &originalEntry.RawEntry,
-			&originalEntry.CorrectionTime, &originalEntry.DeletionScheduledTime)
+			&originalEntry.CorrectionTime)
 		if err != nil {
 			return fmt.Errorf("failed to scan original entry: %w", err)
 		}
@@ -679,10 +725,7 @@ func (s *SpannerStorage) CorrectMemoryEntry(ctx context.Context, req CorrectMemo
 				*originalEntry.CorrectionTime)
 		}
 
-		if originalEntry.DeletionScheduledTime != nil {
-			return fmt.Errorf("IMMUTABILITY_VIOLATION: entry was deleted at %v",
-				*originalEntry.DeletionScheduledTime)
-		}
+		// hard-deleted rows no longer exist; no soft-delete guard needed
 
 		// Step 2: Create the correction entry (new entry with corrected content)
 		now := time.Now()
@@ -713,7 +756,7 @@ func (s *SpannerStorage) CorrectMemoryEntry(ctx context.Context, req CorrectMemo
 		correctionMutation := spanner.Insert("MemoryEntries",
 			[]string{"UserId", "MemoryId", "CreationTime", "EntryId", "RawEntry",
 				"Summary", "Metadata", "Tags"},
-			[]interface{}{correctionEntry.UserID, correctionEntry.MemoryID,
+			[]interface{}{req.UserID, req.MemoryID,
 				spanner.CommitTimestamp, correctionEntry.EntryID, correctionEntry.RawEntry,
 				correctionEntry.Summary, metadataJSON, tagsJSON},
 		)
@@ -751,16 +794,11 @@ func (s *SpannerStorage) UpdateMemoryEntrySummary(ctx context.Context, req Updat
 	// Use ReadWriteTransaction for validation + update
 	_, err := s.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 
-		// Verify entry exists and is updatable
+		// Verify entry exists and is updatable (lookup by EntryId)
 		checkStmt := spanner.Statement{
-			SQL: `SELECT CorrectionTime, DeletionScheduledTime
-				  FROM MemoryEntries 
-				  WHERE UserId = @userId AND VaultId = @vaultId AND MemoryId = @memoryId AND CreationTime = @creationTime`,
+			SQL: `SELECT CorrectionTime FROM MemoryEntries WHERE EntryId = @entryId`,
 			Params: map[string]interface{}{
-				"userId":       req.UserID,
-				"vaultId":      req.VaultID.String(),
-				"memoryId":     req.MemoryID,
-				"creationTime": req.CreationTime,
+				"entryId": req.EntryID,
 			},
 		}
 
@@ -775,8 +813,8 @@ func (s *SpannerStorage) UpdateMemoryEntrySummary(ctx context.Context, req Updat
 			return fmt.Errorf("failed to check entry: %w", err)
 		}
 
-		var correctionTime, deletionTime *time.Time
-		err = row.Columns(&correctionTime, &deletionTime)
+		var correctionTime *time.Time
+		err = row.Columns(&correctionTime)
 		if err != nil {
 			return fmt.Errorf("failed to scan entry state: %w", err)
 		}
@@ -786,18 +824,21 @@ func (s *SpannerStorage) UpdateMemoryEntrySummary(ctx context.Context, req Updat
 			return fmt.Errorf("IMMUTABILITY_VIOLATION: cannot update summary of corrected entry")
 		}
 
-		if deletionTime != nil {
-			return fmt.Errorf("IMMUTABILITY_VIOLATION: cannot update summary of deleted entry")
+		// hard-deleted rows do not appear here
+
+		// Update summary and lastUpdateTime using DML keyed by EntryId
+		stmt := spanner.Statement{
+			SQL: `UPDATE MemoryEntries
+                  SET Summary = @summary,
+                      LastUpdateTime = PENDING_COMMIT_TIMESTAMP()
+                  WHERE EntryId = @entryId`,
+			Params: map[string]interface{}{
+				"summary": req.Summary,
+				"entryId": req.EntryID,
+			},
 		}
-
-		// Update summary and lastUpdateTime
-		updateMutation := spanner.Update("MemoryEntries",
-			[]string{"UserId", "VaultId", "MemoryId", "CreationTime", "Summary", "LastUpdateTime"},
-			[]interface{}{req.UserID, req.VaultID.String(), req.MemoryID, req.CreationTime,
-				req.Summary, spanner.CommitTimestamp},
-		)
-
-		return txn.BufferWrite([]*spanner.Mutation{updateMutation})
+		_, err = txn.Update(ctx, stmt)
+		return err
 	})
 
 	if err != nil {
@@ -805,7 +846,7 @@ func (s *SpannerStorage) UpdateMemoryEntrySummary(ctx context.Context, req Updat
 	}
 
 	// Return updated entry
-	return s.GetMemoryEntry(ctx, req.UserID, req.VaultID, req.MemoryID, req.CreationTime)
+	return s.GetMemoryEntryByID(ctx, req.UserID, req.VaultID, req.MemoryID, req.EntryID)
 }
 
 // UpdateMemoryEntryTags updates only the tags field (mutable operational metadata)
@@ -814,16 +855,11 @@ func (s *SpannerStorage) UpdateMemoryEntryTags(ctx context.Context, req UpdateMe
 	// Use ReadWriteTransaction for validation + update
 	_, err := s.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 
-		// Verify entry exists and is updatable
+		// Verify entry exists and is updatable (lookup by EntryId)
 		checkStmt := spanner.Statement{
-			SQL: `SELECT CorrectionTime, DeletionScheduledTime
-				  FROM MemoryEntries 
-				  WHERE UserId = @userId AND VaultId = @vaultId AND MemoryId = @memoryId AND CreationTime = @creationTime`,
+			SQL: `SELECT CorrectionTime FROM MemoryEntries WHERE EntryId = @entryId`,
 			Params: map[string]interface{}{
-				"userId":       req.UserID,
-				"vaultId":      req.VaultID.String(),
-				"memoryId":     req.MemoryID,
-				"creationTime": req.CreationTime,
+				"entryId": req.EntryID,
 			},
 		}
 
@@ -838,8 +874,8 @@ func (s *SpannerStorage) UpdateMemoryEntryTags(ctx context.Context, req UpdateMe
 			return fmt.Errorf("failed to check entry: %w", err)
 		}
 
-		var correctionTime, deletionTime *time.Time
-		err = row.Columns(&correctionTime, &deletionTime)
+		var correctionTime *time.Time
+		err = row.Columns(&correctionTime)
 		if err != nil {
 			return fmt.Errorf("failed to scan entry state: %w", err)
 		}
@@ -849,9 +885,7 @@ func (s *SpannerStorage) UpdateMemoryEntryTags(ctx context.Context, req UpdateMe
 			return fmt.Errorf("IMMUTABILITY_VIOLATION: cannot update tags of corrected entry")
 		}
 
-		if deletionTime != nil {
-			return fmt.Errorf("IMMUTABILITY_VIOLATION: cannot update tags of deleted entry")
-		}
+		// hard-deleted rows do not appear here
 
 		// Convert tags to JSON
 		var tagsJSON spanner.NullJSON
@@ -859,14 +893,19 @@ func (s *SpannerStorage) UpdateMemoryEntryTags(ctx context.Context, req UpdateMe
 			tagsJSON = spanner.NullJSON{Value: req.Tags, Valid: true}
 		}
 
-		// Update tags and lastUpdateTime
-		updateMutation := spanner.Update("MemoryEntries",
-			[]string{"UserId", "VaultId", "MemoryId", "CreationTime", "Tags", "LastUpdateTime"},
-			[]interface{}{req.UserID, req.VaultID.String(), req.MemoryID, req.CreationTime,
-				tagsJSON, spanner.CommitTimestamp},
-		)
-
-		return txn.BufferWrite([]*spanner.Mutation{updateMutation})
+		// Update tags and lastUpdateTime using DML keyed by EntryId
+		stmt := spanner.Statement{
+			SQL: `UPDATE MemoryEntries
+                  SET Tags = @tags,
+                      LastUpdateTime = PENDING_COMMIT_TIMESTAMP()
+                  WHERE EntryId = @entryId`,
+			Params: map[string]interface{}{
+				"tags":    tagsJSON,
+				"entryId": req.EntryID,
+			},
+		}
+		_, err = txn.Update(ctx, stmt)
+		return err
 	})
 
 	if err != nil {
@@ -874,59 +913,26 @@ func (s *SpannerStorage) UpdateMemoryEntryTags(ctx context.Context, req UpdateMe
 	}
 
 	// Return updated entry
-	return s.GetMemoryEntry(ctx, req.UserID, req.VaultID, req.MemoryID, req.CreationTime)
+	return s.GetMemoryEntryByID(ctx, req.UserID, req.VaultID, req.MemoryID, req.EntryID)
 }
 
 // SoftDeleteMemoryEntry marks an entry for eventual deletion
-func (s *SpannerStorage) SoftDeleteMemoryEntry(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, creationTime time.Time) error {
-
-	// Check if entry exists (idempotent if already deleted)
-	checkStmt := spanner.Statement{
-		SQL: `SELECT DeletionScheduledTime FROM MemoryEntries 
-			  WHERE UserId = @userId AND VaultId = @vaultId AND MemoryId = @memoryId AND CreationTime = @creationTime`,
+// DeleteMemoryEntryByID performs a hard delete by external entryId
+func (s *SpannerStorage) DeleteMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) error {
+	stmt := spanner.Statement{
+		SQL: `DELETE FROM MemoryEntries WHERE UserId=@userId AND VaultId=@vaultId AND MemoryId=@memoryId AND EntryId=@entryId`,
 		Params: map[string]interface{}{
-			"userId":       userID,
-			"vaultId":      vaultID.String(),
-			"memoryId":     memoryID,
-			"creationTime": creationTime,
+			"userId":   userID,
+			"vaultId":  vaultID.String(),
+			"memoryId": memoryID,
+			"entryId":  entryID,
 		},
 	}
-
-	iter := s.client.Single().Query(ctx, checkStmt)
-	defer iter.Stop()
-
-	row, err := iter.Next()
-	if err == iterator.Done {
-		// Entry doesn't exist - idempotent, no error
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("failed to check entry: %w", err)
-	}
-
-	var deletionTime *time.Time
-	err = row.Columns(&deletionTime)
-	if err != nil {
-		return fmt.Errorf("failed to scan deletion time: %w", err)
-	}
-
-	// Already deleted - idempotent
-	if deletionTime != nil {
-		return nil
-	}
-
-	// Mark for deletion
-	mutation := spanner.Update("MemoryEntries",
-		[]string{"UserId", "VaultId", "MemoryId", "CreationTime", "DeletionScheduledTime"},
-		[]interface{}{userID, vaultID.String(), memoryID, creationTime, spanner.CommitTimestamp},
-	)
-
-	_, err = s.client.Apply(ctx, []*spanner.Mutation{mutation})
-	if err != nil {
-		return fmt.Errorf("failed to soft delete entry: %w", err)
-	}
-
-	return nil
+	_, err := s.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		_, err := txn.Update(ctx, stmt)
+		return err
+	})
+	return err
 }
 
 // HealthCheck performs a health check by executing a simple query
@@ -1037,6 +1043,24 @@ func (s *SpannerStorage) GetLatestMemoryContext(ctx context.Context, userID stri
 	}
 
 	return mc, nil
+}
+
+// DeleteMemoryContextByID performs a hard delete of a context snapshot by its contextId
+func (s *SpannerStorage) DeleteMemoryContextByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, contextID string) error {
+	stmt := spanner.Statement{
+		SQL: `DELETE FROM MemoryContexts WHERE UserId=@userId AND VaultId=@vaultId AND MemoryId=@memoryId AND ContextId=@contextId`,
+		Params: map[string]interface{}{
+			"userId":    userID,
+			"vaultId":   vaultID.String(),
+			"memoryId":  memoryID,
+			"contextId": contextID,
+		},
+	}
+	_, err := s.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		_, err := txn.Update(ctx, stmt)
+		return err
+	})
+	return err
 }
 
 // convertJSONToMap attempts to coerce a value returned by Spanner's JSON column

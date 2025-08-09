@@ -46,7 +46,6 @@ type MemoryEntry struct {
 	CorrectedEntryCreationTime *time.Time             `json:"correctedEntryCreationTime,omitempty"`
 	CorrectionReason           *string                `json:"correctionReason,omitempty"`
 	LastUpdateTime             *time.Time             `json:"lastUpdateTime,omitempty"`
-	DeletionScheduledTime      *time.Time             `json:"deletionScheduledTime,omitempty"`
 	ExpirationTime             *time.Time             `json:"expirationTime,omitempty"`
 }
 
@@ -119,20 +118,20 @@ type CorrectMemoryEntryRequest struct {
 
 // UpdateMemoryEntrySummaryRequest represents the request to update entry summary
 type UpdateMemoryEntrySummaryRequest struct {
-	VaultID      uuid.UUID `json:"vaultId"`
-	UserID       string    `json:"userId"`
-	MemoryID     string    `json:"memoryId"`
-	CreationTime time.Time `json:"creationTime"`
-	Summary      string    `json:"summary"`
+	VaultID  uuid.UUID `json:"vaultId"`
+	UserID   string    `json:"userId"`
+	MemoryID string    `json:"memoryId"`
+	EntryID  string    `json:"entryId"`
+	Summary  string    `json:"summary"`
 }
 
 // UpdateMemoryEntryTagsRequest represents the request to update entry tags
 type UpdateMemoryEntryTagsRequest struct {
-	VaultID      uuid.UUID              `json:"vaultId"`
-	UserID       string                 `json:"userId"`
-	MemoryID     string                 `json:"memoryId"`
-	CreationTime time.Time              `json:"creationTime"`
-	Tags         map[string]interface{} `json:"tags"`
+	VaultID  uuid.UUID              `json:"vaultId"`
+	UserID   string                 `json:"userId"`
+	MemoryID string                 `json:"memoryId"`
+	EntryID  string                 `json:"entryId"`
+	Tags     map[string]interface{} `json:"tags"`
 }
 
 // CreateMemoryContextRequest represents the request to insert a new context snapshot
@@ -197,15 +196,20 @@ type Storage interface {
 	// Memory entry operations
 	CreateMemoryEntry(ctx context.Context, req CreateMemoryEntryRequest) (*MemoryEntry, error)
 	GetMemoryEntry(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, creationTime time.Time) (*MemoryEntry, error)
+	// GetMemoryEntryByID retrieves a single entry by its external entryId
+	GetMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) (*MemoryEntry, error)
 	ListMemoryEntries(ctx context.Context, req ListMemoryEntriesRequest) ([]*MemoryEntry, error)
 	CorrectMemoryEntry(ctx context.Context, req CorrectMemoryEntryRequest) (*MemoryEntry, error)
 	UpdateMemoryEntrySummary(ctx context.Context, req UpdateMemoryEntrySummaryRequest) (*MemoryEntry, error)
 	UpdateMemoryEntryTags(ctx context.Context, req UpdateMemoryEntryTagsRequest) (*MemoryEntry, error)
-	SoftDeleteMemoryEntry(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, creationTime time.Time) error
+	// Hard delete by external entryId
+	DeleteMemoryEntryByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, entryID string) error
 
 	// Memory context operations
 	CreateMemoryContext(ctx context.Context, req CreateMemoryContextRequest) (*MemoryContext, error)
 	GetLatestMemoryContext(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string) (*MemoryContext, error)
+	// Hard delete context snapshot by contextId
+	DeleteMemoryContextByID(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string, contextID string) error
 
 	// Vault operations
 	CreateVault(ctx context.Context, req CreateVaultRequest) (*Vault, error)

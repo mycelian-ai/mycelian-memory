@@ -147,7 +147,39 @@ func TestClient_DeleteEntry_Success(t *testing.T) {
 
 	c := client.New(srv.URL)
 	t.Cleanup(func() { _ = c.Close() })
-	if _, err := c.DeleteEntry(context.Background(), userID, vaultID, memID, entryID); err != nil {
+	if err := c.DeleteEntry(context.Background(), userID, vaultID, memID, entryID); err != nil {
 		t.Fatalf("delete entry: %v", err)
+	}
+}
+
+func TestClient_GetEntry_Success(t *testing.T) {
+	t.Parallel()
+	userID, vaultID, memID, entryID := "u1", "v1", "m1", "e1"
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"entryId":      entryID,
+			"userId":       userID,
+			"vaultId":      vaultID,
+			"memoryId":     memID,
+			"creationTime": time.Now().UTC().Format(time.RFC3339),
+			"rawEntry":     "hello",
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := client.New(srv.URL)
+	t.Cleanup(func() { _ = c.Close() })
+	got, err := c.GetEntry(context.Background(), userID, vaultID, memID, entryID)
+	if err != nil {
+		t.Fatalf("get entry: %v", err)
+	}
+	if got == nil || got.ID != entryID || got.MemoryID != memID {
+		t.Fatalf("unexpected entry: %+v", got)
 	}
 }

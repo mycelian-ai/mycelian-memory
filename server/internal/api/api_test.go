@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
@@ -282,16 +281,7 @@ func TestAPI_HealthEndpoints(t *testing.T) {
 		assert.NotNil(t, result["timestamp"])
 	})
 
-	t.Run("Spanner Health Check", func(t *testing.T) {
-		resp := makeRequest(t, "GET", "/api/health/db", nil)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-		var result map[string]interface{}
-		parseResponse(t, resp, &result)
-		assert.Equal(t, "UP", result["status"])
-		assert.Contains(t, result["message"], "database")
-		assert.NotNil(t, result["timestamp"])
-	})
+	// Removed: storage health endpoint no longer exposed
 }
 
 func TestAPI_UserOperations(t *testing.T) {
@@ -509,6 +499,17 @@ func TestAPI_MemoryEntryOperations(t *testing.T) {
 		assert.NotNil(t, createdEntry.Metadata)
 	})
 
+	// New: Get Memory Entry by ID
+	t.Run("Get Memory Entry by ID", func(t *testing.T) {
+		url := baseVaultPath + "/memories/" + memory.MemoryID + "/entries/" + createdEntry.EntryID
+		resp := makeRequest(t, "GET", url, nil)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var got storage.MemoryEntry
+		parseResponse(t, resp, &got)
+		assert.Equal(t, createdEntry.EntryID, got.EntryID)
+		assert.Equal(t, createdEntry.MemoryID, got.MemoryID)
+	})
+
 	t.Run("List Memory Entries", func(t *testing.T) {
 		// Create another entry
 		createReq := map[string]interface{}{
@@ -638,8 +639,7 @@ func TestAPI_TagsOperations(t *testing.T) {
 			},
 		}
 
-		creationTime := entry.CreationTime.Format(time.RFC3339Nano)
-		updateURL := baseVaultPath + "/memories/" + memory.MemoryID + "/entries/" + creationTime + "/tags"
+		updateURL := baseVaultPath + "/memories/" + memory.MemoryID + "/entries/" + entry.EntryID + "/tags"
 
 		resp = makeRequest(t, "PATCH", updateURL, updateTagsReq)
 
@@ -659,25 +659,15 @@ func TestAPI_TagsOperations(t *testing.T) {
 		assert.NotNil(t, updatedEntry.LastUpdateTime)
 	})
 
-	t.Run("Update Tags - Invalid Creation Time", func(t *testing.T) {
-		updateTagsReq := map[string]interface{}{
-			"tags": map[string]interface{}{"status": "test"},
-		}
-
-		updateURL := baseVaultPath + "/memories/" + memory.MemoryID + "/entries/invalid-time/tags"
-
-		resp := makeRequest(t, "PATCH", updateURL, updateTagsReq)
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	})
+	// removed: invalid creation time test (path uses entryId)
 
 	t.Run("Update Tags - Nonexistent Entry", func(t *testing.T) {
 		updateTagsReq := map[string]interface{}{
 			"tags": map[string]interface{}{"status": "test"},
 		}
 
-		// Use a valid RFC3339 timestamp that doesn't exist
-		nonexistentTime := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
-		updateURL := baseVaultPath + "/memories/" + memory.MemoryID + "/entries/" + nonexistentTime + "/tags"
+		// Use a non-existent entryId
+		updateURL := baseVaultPath + "/memories/" + memory.MemoryID + "/entries/00000000-0000-0000-0000-000000000000/tags"
 
 		resp := makeRequest(t, "PATCH", updateURL, updateTagsReq)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
