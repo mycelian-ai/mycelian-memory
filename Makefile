@@ -34,7 +34,7 @@ backend-logs:
 # ------------------------------------------------------------------------------
 # Binary building
 # ------------------------------------------------------------------------------
-.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin
+.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-memoryctl build-outbox-worker build-waviate-tool
 
 # Create bin directory
 bin:
@@ -48,8 +48,20 @@ build-mycelian-cli: bin
 build-mcp-server: bin
 	go build -o bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
 
+# Build memoryctl tool
+build-memoryctl: bin
+	cd tools/memoryctl && GOWORK=off go build -o ../../bin/memoryctl .
+
+# Build outbox-worker app
+build-outbox-worker: bin
+	cd cmd/outbox-worker && GOWORK=off go build -o ../../bin/outbox-worker .
+
+# Build waviate-tool app
+build-waviate-tool: bin
+	cd cmd/waviate-tool && GOWORK=off go build -o ../../bin/waviate-tool .
+
 # Build all binaries
-build-all: build-mycelian-cli build-mcp-server
+build-all: build-mycelian-cli build-mcp-server build-memoryctl build-outbox-worker build-waviate-tool
 
 # Alias for build-all
 build: build-all

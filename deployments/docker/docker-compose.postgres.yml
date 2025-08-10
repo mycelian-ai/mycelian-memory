@@ -86,7 +86,7 @@ services:
   outbox-worker:
     container_name: outbox-worker
     build:
-      context: ../../server
+      context: ../..
       dockerfile: cmd/outbox-worker/Dockerfile
     environment:
       - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
@@ -108,8 +108,8 @@ services:
   user-bootstrap:
     container_name: user-bootstrap
     build:
-      context: ../../server
-      dockerfile: cmd/memoryctl/Dockerfile
+      context: ../..
+      dockerfile: tools/memoryctl/Dockerfile
     depends_on:
       memory-service:
         condition: service_started
