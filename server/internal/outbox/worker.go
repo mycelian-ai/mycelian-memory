@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -114,6 +115,14 @@ func (w *Worker) processOnce(ctx context.Context) error {
 
 	for _, j := range jobs {
 		if err := w.handle(ctx, j); err != nil {
+			// Surface per-row failures with enough context to debug
+			w.log.Error().
+				Err(err).
+				Int64("id", j.id).
+				Str("op", j.op).
+				Str("aggregate_id", j.aggregateID).
+				Msg("outbox handle error; marking failed")
+
 			if e := w.markFailed(ctx, tx, j.id, err); e != nil {
 				w.log.Error().Err(e).Int64("id", j.id).Msg("markFailed error")
 			}
@@ -161,6 +170,7 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 		if err != nil {
 			return err
 		}
+		normalizeEntryTags(j.payload)
 		return w.index.UpsertEntry(ctx, j.aggregateID, vec, j.payload)
 	case OpDeleteEntry:
 		return w.index.DeleteEntry(ctx, stringField(j.payload, "userId"), j.aggregateID)
@@ -214,4 +224,41 @@ func preferredText(m map[string]interface{}, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+// normalizeEntryTags ensures the payload["tags"] is a []string of tag keys
+// so that Weaviate schema (text[]) can store and filter via ContainsAny.
+func normalizeEntryTags(m map[string]interface{}) {
+	v, ok := m["tags"]
+	if !ok || v == nil {
+		return
+	}
+	switch t := v.(type) {
+	case map[string]interface{}:
+		keys := make([]string, 0, len(t))
+		for k, val := range t {
+			switch vv := val.(type) {
+			case bool:
+				if vv {
+					keys = append(keys, k)
+				}
+			case string:
+				if strings.EqualFold(vv, "true") {
+					keys = append(keys, k)
+				}
+			default:
+				// ignore non-bool marker values
+			}
+		}
+		m["tags"] = keys
+	case []interface{}:
+		// convert to []string
+		keys := make([]string, 0, len(t))
+		for _, it := range t {
+			if s, ok := it.(string); ok {
+				keys = append(keys, s)
+			}
+		}
+		m["tags"] = keys
+	}
 }

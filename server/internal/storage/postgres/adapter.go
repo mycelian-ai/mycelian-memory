@@ -443,6 +443,7 @@ func (s *PostgresStorage) CreateMemoryEntry(ctx context.Context, req storage.Cre
 		"entryId":      entryID,
 		"rawEntry":     req.RawEntry,
 		"summary":      req.Summary,
+		"tags":         req.Tags,
 		"creationTime": creation,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_entry", entryID, payload); err != nil {
@@ -685,6 +686,7 @@ func (s *PostgresStorage) CorrectMemoryEntry(ctx context.Context, req storage.Co
 		"entryId":      req.CorrectedEntryID,
 		"rawEntry":     req.CorrectedContent,
 		"summary":      req.CorrectedSummary,
+		"tags":         req.Tags,
 		"creationTime": created,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_entry", req.CorrectedEntryID, payload); err != nil {

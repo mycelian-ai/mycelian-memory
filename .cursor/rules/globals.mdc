@@ -7,6 +7,7 @@ alwaysApply: true
 description: Universal communication style and global etiquette
 alwaysApply: true
 ---
+Use on writting well principles while communicating
 • Be concise, professional; prefer bullet lists, no superlatives.
 • One small feature at a time; fix root causes, not symptoms.
 • Conventional commit format: type(scope): subject (≤50 chars, imperative).

@@ -38,6 +38,12 @@ func main() {
 		log.Warn().Err(err).Msg("embedder unavailable – vectors will be empty")
 		emb = nil
 	}
+
+	// Ensure schema is bootstrapped with multi-tenancy enabled before any writes
+	if err := search.BootstrapWaviate(context.Background(), cfg.WaviateURL); err != nil {
+		log.Error().Err(err).Msg("waviate bootstrap")
+	}
+
 	wav, err := search.NewWaviateSearcher(cfg.WaviateURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("waviate")

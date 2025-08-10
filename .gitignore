@@ -106,9 +106,6 @@ secrets/
 config.local.yml
 config.local.yaml
 
-# Memory service binary
-memory-bank
-
 # Test coverage
 coverage.out
 coverage.html
@@ -116,5 +113,3 @@ coverage.html
 # Data
 data/
 
-# Claude.ai generated files
-CLAUDE.md

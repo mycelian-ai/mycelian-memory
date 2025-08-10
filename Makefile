@@ -80,7 +80,7 @@ help:
 	@echo "Test Commands:"
 	@echo "  client-coverage-check  Run client tests and assert >= 78% coverage"
 	@echo "  protogen               Generate gRPC code from api/proto via buf"
-	@echo "  test-all               Run server tests, start postgres backend, then client tests (unit+integration)"
+	@echo "  test-all-postgres      Run server tests, start postgres backend, then client tests (unit+integration)"
 
 mcp-streamable-up:
 	docker compose -f $(MCP_COMPOSE_FILE) up -d --build --force-recreate
@@ -101,7 +101,7 @@ protogen:
 # ------------------------------------------------------------------------------
 # End-to-end developer test pipeline
 # ------------------------------------------------------------------------------
-.PHONY: server-test server-e2e client-test client-test-integration wait-backend-health test-all
+.PHONY: server-test server-e2e client-test client-test-integration wait-backend-health test-all-postgres
 
 server-test:
 	$(MAKE) -C server test
@@ -125,7 +125,7 @@ wait-backend-health:
 	done; \
 	echo "Backend is healthy."
 
-test-all:
+test-all-postgres:
 	@set -euo pipefail; \
 	cleanup() { $(MAKE) backend-down; }; \
 	trap 'cleanup' EXIT INT TERM; \
@@ -135,20 +135,6 @@ test-all:
 	$(MAKE) server-e2e; \
 	$(MAKE) client-test; \
 	$(MAKE) client-test-integration; \
-	trap - EXIT INT TERM; \
-	cleanup; \
-	echo "ALL TESTS COMPLETED SUCCESSFULLY"
-
-.PHONY: test-all-postgres
-test-all-postgres:
-	@set -e; \
-	cleanup() { $(MAKE) backend-down; }; \
-	trap 'cleanup' EXIT INT TERM; \
-	$(MAKE) server-test; \
-	$(MAKE) backend-postgres-up; \
-	$(MAKE) wait-backend-health; \
-	$(MAKE) server-e2e; \
-	$(MAKE) client-test; \
 	trap - EXIT INT TERM; \
 	cleanup; \
 	echo "ALL POSTGRES TESTS COMPLETED SUCCESSFULLY"

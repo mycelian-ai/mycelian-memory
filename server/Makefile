@@ -80,15 +80,15 @@ help:
 # Build backend binary for macOS
 build-local:
 	@echo "🔨 Building memory-service for macOS (local target)..."
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o bin/memory-service ./cmd/memory-service
-	@echo "✅ Built bin/memory-service"
+	cd .. && GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o server/bin/memory-service ./cmd/memory-service
+	@echo "✅ Built server/bin/memory-service"
 
 # Run backend in local mode
 run-local: build-local
 	@echo "🛑 Stopping any existing memory-service ..."
-	- pkill -f "bin/memory-service" || true
+	- pkill -f "server/bin/memory-service" || true
 	@echo "🚀 Starting memory-service (local build target)"
-	BUILD_TARGET=local ./bin/memory-service
+	MEMORY_BACKEND_BUILD_TARGET=local ./bin/memory-service
 
 build-tools: build-schema-manager
 

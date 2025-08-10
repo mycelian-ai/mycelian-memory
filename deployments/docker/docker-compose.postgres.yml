@@ -39,7 +39,7 @@ services:
 
   memory-service:
     build:
-      context: ../../server
+      context: ../..
       dockerfile: cmd/memory-service/Dockerfile
     container_name: memory-service
     ports:
@@ -52,8 +52,8 @@ services:
       - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
       - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
       - MEMORY_BACKEND_EMBED_PROVIDER=ollama
-      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
-      - OLLAMA_URL=http://localhost:11434
+      - MEMORY_BACKEND_EMBED_MODEL=mxbai-embed-large
+      - OLLAMA_URL=http://host.docker.internal:11434
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -61,7 +61,7 @@ services:
       - memory-network
     restart: unless-stopped
     extra_hosts:
-      - "localhost:host-gateway"
+      - "host.docker.internal:host-gateway"
 
   weaviate:
     container_name: weaviate
@@ -92,8 +92,8 @@ services:
       - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
       - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
       - MEMORY_BACKEND_EMBED_PROVIDER=ollama
-      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
-      - OLLAMA_URL=http://localhost:11434
+      - MEMORY_BACKEND_EMBED_MODEL=mxbai-embed-large
+      - OLLAMA_URL=http://host.docker.internal:11434
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -103,7 +103,7 @@ services:
       - memory-network
     restart: unless-stopped
     extra_hosts:
-      - "localhost:host-gateway"
+      - "host.docker.internal:host-gateway"
 
   user-bootstrap:
     container_name: user-bootstrap

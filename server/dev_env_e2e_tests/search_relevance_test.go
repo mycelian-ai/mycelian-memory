@@ -288,7 +288,7 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 		}
 	}
 
-	_, _ = indexer.NewProvider("ollama", env("EMBED_MODEL", "mxbai-embed-large"))
+	// Indexer provider initialization removed; embedding provider is configured via service env
 
 	// user/memory
 	email := fmt.Sprintf("meta-%d@example.com", time.Now().UnixNano())
