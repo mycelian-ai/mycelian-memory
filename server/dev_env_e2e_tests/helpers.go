@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,6 +46,7 @@ func mustJSON(t *testing.T, resp *http.Response, v interface{}) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("http %d: %s", resp.StatusCode, string(body))
 	}
+	// Strict decode; call sites handle any schema variation
 	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
 		t.Fatalf("decode json: %v", err)
 	}
@@ -72,4 +74,75 @@ func waitForHealthy(t *testing.T, baseURL string, timeout time.Duration) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatalf("memory-service not healthy within %s", timeout)
+}
+
+// ensureWaviateTenants adds the given tenant to both MemoryEntry and MemoryContext classes.
+func ensureWaviateTenants(t *testing.T, waviateURL, tenant string) {
+	// Fallback approach: trigger tenant creation implicitly by creating a dummy object then deleting it
+	// This works in older Waviate without explicit tenant endpoints
+	for _, class := range []string{"MemoryEntry", "MemoryContext"} {
+		// Minimal payload with required fields
+		id := "00000000-0000-0000-0000-000000000000"
+		payload := fmt.Sprintf(`{"userId":%q}`, tenant)
+		// Create
+		url := fmt.Sprintf("%s/v1/objects", waviateURL)
+		body := fmt.Sprintf(`{"class":"%s","id":%q,"tenant":%q,"properties":%s}`, class, id, tenant, payload)
+		req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		// Delete best-effort
+		delURL := fmt.Sprintf("%s/v1/objects/%s/%s?tenant=%s", waviateURL, class, id, tenant)
+		_, _ = http.DefaultClient.Do(mustNewRequest(http.MethodDelete, delURL))
+	}
+}
+
+func mustNewRequest(method, url string) *http.Request {
+	req, _ := http.NewRequest(method, url, nil)
+	return req
+}
+
+// ensureUser makes sure a specific user exists; creates it if missing.
+// Returns the userId to be used by tests.
+func ensureUser(t *testing.T, memSvc, userID, email string) string {
+	// Fast path: exists
+	r, err := http.Get(fmt.Sprintf("%s/api/users/%s", memSvc, userID))
+	if err == nil && r.StatusCode == http.StatusOK {
+		_ = r.Body.Close()
+		return userID
+	}
+	if r != nil {
+		_ = r.Body.Close()
+	}
+	// Create user
+	payload := fmt.Sprintf(`{"userId":"%s","email":"%s","timeZone":"UTC","displayName":"Test User"}`, userID, email)
+	resp, err := http.Post(memSvc+"/api/users", "application/json", bytes.NewBufferString(payload))
+	if err != nil {
+		t.Fatalf("create user %s: %v", userID, err)
+	}
+	// If created, decode; otherwise tolerate duplicate by verifying via GET
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		var out struct {
+			UserID string `json:"userId"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("decode user create: %v", err)
+		}
+		_ = resp.Body.Close()
+		return out.UserID
+	}
+	// Fallback: check again
+	_ = resp.Body.Close()
+	r2, err := http.Get(fmt.Sprintf("%s/api/users/%s", memSvc, userID))
+	if err == nil && r2.StatusCode == http.StatusOK {
+		_ = r2.Body.Close()
+		return userID
+	}
+	if r2 != nil {
+		_ = r2.Body.Close()
+	}
+	t.Fatalf("failed to ensure user %s: status %d", userID, resp.StatusCode)
+	return ""
 }

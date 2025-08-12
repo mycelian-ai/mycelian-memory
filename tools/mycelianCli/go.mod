@@ -1,6 +1,6 @@
 module github.com/mycelian/mycelian-memory/tools/mycelianCli
 
-go 1.24.5
+go 1.24.6
 
 require (
 	github.com/mycelian/mycelian-memory/client v0.0.0

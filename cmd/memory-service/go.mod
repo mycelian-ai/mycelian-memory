@@ -1,6 +1,6 @@
 module github.com/mycelian/mycelian-memory/cmd/memory-service
 
-go 1.24.5
+go 1.24.6
 
 require (
 	github.com/mycelian/mycelian-memory/server v0.0.0
@@ -19,7 +19,6 @@ require (
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
-	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -38,6 +37,9 @@ require (
 	github.com/weaviate/weaviate v1.31.4 // indirect
 	github.com/weaviate/weaviate-go-client/v5 v5.2.1 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
+	go.opentelemetry.io/otel/metric v1.36.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.36.0 // indirect
+	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect

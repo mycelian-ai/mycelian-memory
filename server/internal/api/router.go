@@ -3,81 +3,22 @@ package api
 import (
 	httpHandlers "github.com/mycelian/mycelian-memory/server/internal/api/http"
 	"github.com/mycelian/mycelian-memory/server/internal/api/recovery"
-	"github.com/mycelian/mycelian-memory/server/internal/config"
-	"github.com/mycelian/mycelian-memory/server/internal/core/memory"
-	vaultcore "github.com/mycelian/mycelian-memory/server/internal/core/vault"
-	"github.com/mycelian/mycelian-memory/server/internal/search"
-	"github.com/mycelian/mycelian-memory/server/internal/storage"
 
 	"github.com/gorilla/mux"
 )
 
 // NewRouter creates a new HTTP router with all API routes using clean architecture
-func NewRouter(storage storage.Storage) *mux.Router {
+func NewRouter() *mux.Router {
 	router := mux.NewRouter()
 
 	// Global middlewares
 	router.Use(recovery.Middleware)
 
-	// Create domain service
-	memoryService := memory.NewService(storage)
-	vaultService := vaultcore.NewService(storage)
-
 	// Create handlers
-	healthHandler := httpHandlers.NewHealthHandler(storage)
-	memoryHandler := httpHandlers.NewMemoryHandler(memoryService, vaultService)
-	vaultHandler := httpHandlers.NewVaultHandler(vaultService)
-
-	// Shared configuration & search components
-	cfg, _ := config.New() // ignore err for now; assumed validated on startup
-	emb, _ := search.NewProvider(cfg.EmbedProvider, cfg.EmbedModel)
-	wavSearcher, _ := search.NewWaviateSearcher(cfg.WaviateURL)
-	searchHandler := httpHandlers.NewSearchHandler(emb, wavSearcher, cfg.SearchAlpha)
-	// Wire searcher into memory handler for best-effort delete propagation
-	if wavSearcher != nil {
-		_ = memoryHandler.WithSearcher(wavSearcher)
-	}
-
-	// Health endpoints
+	healthHandler := httpHandlers.NewHealthHandler()
 	router.HandleFunc("/api/health", healthHandler.CheckHealth).Methods("GET")
 
-	// User endpoints
-	router.HandleFunc("/api/users", memoryHandler.CreateUser).Methods("POST")
-	router.HandleFunc("/api/users/{userId}", memoryHandler.GetUser).Methods("GET")
-
-	// Memory endpoints under vaults (UUID-based)
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories", memoryHandler.CreateMemory).Methods("POST")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories", memoryHandler.ListMemories).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}", memoryHandler.GetMemory).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}", memoryHandler.DeleteMemory).Methods("DELETE")
-
-	// Memory entry endpoints
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries", memoryHandler.CreateMemoryEntry).Methods("POST")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries", memoryHandler.ListMemoryEntries).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{entryId}", memoryHandler.GetMemoryEntryByID).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{entryId}", memoryHandler.DeleteMemoryEntryByID).Methods("DELETE")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/entries/{entryId}/tags", memoryHandler.UpdateMemoryEntryTags).Methods("PATCH")
-
-	// Memory context endpoint
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/contexts", memoryHandler.PutMemoryContext).Methods("PUT")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/contexts", memoryHandler.GetLatestMemoryContext).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/contexts/{contextId}", memoryHandler.DeleteMemoryContextByID).Methods("DELETE")
-
-	// Search endpoint
-	router.HandleFunc("/api/search", searchHandler.HandleSearch).Methods("POST")
-
-	// Vault endpoints
-	router.HandleFunc("/api/users/{userId}/vaults", vaultHandler.CreateVault).Methods("POST")
-	router.HandleFunc("/api/users/{userId}/vaults", vaultHandler.ListVaults).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}", vaultHandler.GetVault).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}", vaultHandler.DeleteVault).Methods("DELETE")
-
-	// Cross-vault: attach/move memory to a target vault (no request body)
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultId:[0-9a-fA-F-]{36}}/memories/{memoryId:[0-9a-fA-F-]{36}}/attach", memoryHandler.AttachMemoryToVault).Methods("POST")
-
-	// Title-based memory access routes (registered after UUID routes, rely on UUID regex to disambiguate)
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultTitle}/memories/{memoryTitle}", memoryHandler.GetMemoryByTitle).Methods("GET")
-	router.HandleFunc("/api/users/{userId}/vaults/{vaultTitle}/memories", memoryHandler.ListMemoriesByVaultTitle).Methods("GET")
+	// Legacy router trimmed to health only; v2 routes wired in composition root.
 
 	return router
 }

@@ -42,7 +42,7 @@ type Config struct {
 
 	// Embedding / Search Configuration
 	EmbedProvider string  `envconfig:"EMBED_PROVIDER" default:"ollama"`
-	EmbedModel    string  `envconfig:"EMBED_MODEL" default:"mxbai-embed-large"`
+	EmbedModel    string  `envconfig:"EMBED_MODEL" default:"nomic-embed-text"`
 	SearchAlpha   float32 `envconfig:"SEARCH_ALPHA" default:"0.6"`
 
 	// SQLite support removed
@@ -136,7 +136,7 @@ func NewForTesting() *Config {
 	// spanner removed
 
 	cfg.EmbedProvider = "ollama"
-	cfg.EmbedModel = "mxbai-embed-large"
+	cfg.EmbedModel = "nomic-embed-text"
 	cfg.SearchAlpha = 0.6
 	cfg.WaviateURL = "localhost:8082"
 

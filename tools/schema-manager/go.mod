@@ -1,6 +1,6 @@
 module github.com/mycelian/mycelian-memory/tools/schema-manager
 
-go 1.24.5
+go 1.24.6
 
 require (
 	cloud.google.com/go/spanner v1.83.0

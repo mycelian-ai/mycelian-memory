@@ -6,17 +6,13 @@ import (
 	"testing"
 )
 
-// Deprecated: storage health endpoint removed; keep a minimal test to ensure handler compiles
-func TestCheckStorageHealth_Deprecated(t *testing.T) {
-	h := NewHealthHandler(nil)
-
-	// Call the handler directly without asserting route exposure
-	req := httptest.NewRequest(http.MethodGet, "/api/health/db", nil)
+// Ensure NewHealthHandler constructs without args and CheckHealth responds
+func TestHealthHandler_CheckHealth(t *testing.T) {
+	h := NewHealthHandler()
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	w := httptest.NewRecorder()
-	h.CheckStorageHealth(w, req)
-
-	// Accept either 200 or 503 response; routing no longer exposes this endpoint
-	if code := w.Result().StatusCode; code != http.StatusOK && code != http.StatusServiceUnavailable {
+	h.CheckHealth(w, req)
+	if code := w.Result().StatusCode; code != http.StatusOK && code != http.StatusInternalServerError {
 		t.Fatalf("unexpected status code: %d", code)
 	}
 }

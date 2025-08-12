@@ -1,6 +1,6 @@
 module github.com/mycelian/mycelian-memory/mcp
 
-go 1.24.5
+go 1.24.6
 
 require (
 	github.com/mark3labs/mcp-go v0.36.0
@@ -25,6 +25,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect

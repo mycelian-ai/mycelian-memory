@@ -1,5 +1,5 @@
 # Multi-stage build for MCP server
-FROM golang:1.24.5-alpine AS builder
+FROM golang:1.24.6-alpine AS builder
 
 WORKDIR /app
 

@@ -11,20 +11,13 @@ import (
 	"time"
 
 	platformHttp "github.com/mycelian/mycelian-memory/server/internal/platform/http"
-	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // HealthHandler handles health check endpoints
-type HealthHandler struct {
-	storage storage.Storage
-}
+type HealthHandler struct{}
 
 // NewHealthHandler creates a new health handler
-func NewHealthHandler(storage storage.Storage) *HealthHandler {
-	return &HealthHandler{
-		storage: storage,
-	}
-}
+func NewHealthHandler() *HealthHandler { return &HealthHandler{} }
 
 // global health flag (1 = healthy, 0 = unhealthy)
 var healthyFlag atomic.Int32
@@ -37,20 +30,15 @@ func init() {
 	lastProbeErr.Store("")
 }
 
-// StartHealthMonitor launches a background goroutine that probes Spanner (via storage),
-// Waviate vector store, and (if provider==ollama) Ollama model every `interval`.
+// StartHealthMonitor launches a background goroutine that probes Waviate vector store
+// and (if provider==ollama) Ollama model every `interval`.
 // vectorStore must be "waviate" (others ignored).
-func StartHealthMonitor(ctx context.Context, storage storage.Storage, waviateURL, embedProvider, embedModel string, interval time.Duration) {
+func StartHealthMonitor(ctx context.Context, waviateURL, embedProvider, embedModel string, interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		probe := func() {
-			// Spanner check (short timeout)
-			ctxProbe, cancel := context.WithTimeout(ctx, 5*time.Second)
-			errStorage := storage.HealthCheck(ctxProbe)
-			cancel()
-
 			// Vector store check (only waviate supported)
 			var errVector error
 			if waviateURL != "" {
@@ -65,9 +53,6 @@ func StartHealthMonitor(ctx context.Context, storage storage.Storage, waviateURL
 
 			// Collect error details
 			errs := []string{}
-			if errStorage != nil {
-				errs = append(errs, fmt.Sprintf("storage: %v", errStorage))
-			}
 			if errVector != nil {
 				errs = append(errs, fmt.Sprintf("waviate %s: %v", waviateURL, errVector))
 			}
@@ -181,33 +166,4 @@ func (h *HealthHandler) CheckHealth(w http.ResponseWriter, r *http.Request) {
 	platformHttp.WriteJSON(w, http.StatusInternalServerError, response)
 }
 
-// (Deprecated) CheckStorageHealth handles GET /api/health/db
-// Note: This handler is NOT wired in the public router. It exists only for
-// internal tests and ops scenarios. Public clients should use /api/health.
-func (h *HealthHandler) CheckStorageHealth(w http.ResponseWriter, r *http.Request) {
-	// Allow nil storage for deprecated/ops-only path in tests
-	if h.storage == nil {
-		response := map[string]interface{}{
-			"status":    "UP",
-			"message":   "database health check disabled",
-			"timestamp": time.Now().Format(time.RFC3339),
-		}
-		platformHttp.WriteJSON(w, http.StatusOK, response)
-		return
-	}
-	if err := h.storage.HealthCheck(r.Context()); err != nil {
-		response := map[string]interface{}{
-			"status":    "DOWN",
-			"message":   "database health check failed: " + err.Error(),
-			"timestamp": time.Now().Format(time.RFC3339),
-		}
-		platformHttp.WriteJSON(w, http.StatusServiceUnavailable, response)
-		return
-	}
-	response := map[string]interface{}{
-		"status":    "UP",
-		"message":   "database is healthy",
-		"timestamp": time.Now().Format(time.RFC3339),
-	}
-	platformHttp.WriteJSON(w, http.StatusOK, response)
-}
+// Deprecated storage health route removed.

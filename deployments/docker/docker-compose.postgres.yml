@@ -52,7 +52,7 @@ services:
       - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
       - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
       - MEMORY_BACKEND_EMBED_PROVIDER=ollama
-      - MEMORY_BACKEND_EMBED_MODEL=mxbai-embed-large
+      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
       - OLLAMA_URL=http://host.docker.internal:11434
     depends_on:
       migrations:
@@ -92,7 +92,7 @@ services:
       - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
       - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
       - MEMORY_BACKEND_EMBED_PROVIDER=ollama
-      - MEMORY_BACKEND_EMBED_MODEL=mxbai-embed-large
+      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
       - OLLAMA_URL=http://host.docker.internal:11434
     depends_on:
       migrations:

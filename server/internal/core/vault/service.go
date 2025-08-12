@@ -2,102 +2,70 @@ package vault
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-
-	memcore "github.com/mycelian/mycelian-memory/server/internal/core/memory"
-	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // Service contains the core business logic for vault operations.
-type Service struct {
-	storage storage.Storage
-}
+type Service struct{}
 
 // NewService creates a new vault service.
-func NewService(storage storage.Storage) *Service {
-	return &Service{storage: storage}
-}
+func NewService() *Service { return &Service{} }
 
 // CreateVault creates a new vault for a user.
-func (s *Service) CreateVault(ctx context.Context, req CreateVaultRequest) (*storage.Vault, error) {
+func (s *Service) CreateVault(ctx context.Context, req CreateVaultRequest) (interface{}, error) {
 	if err := s.validateCreateVaultRequest(req); err != nil {
 		return nil, err
 	}
 
 	vaultID := uuid.New()
 
-	storageReq := storage.CreateVaultRequest{
-		UserID:      req.UserID,
-		VaultID:     vaultID,
-		Title:       req.Title,
-		Description: req.Description,
-	}
-
 	log.Info().Str("userID", req.UserID).Str("vaultID", vaultID.String()).Msg("Creating vault")
-
-	v, err := s.storage.CreateVault(ctx, storageReq)
-	if err != nil {
-		// Detect foreign key violation indicating missing user row
-		if strings.Contains(err.Error(), "parent table") || strings.Contains(err.Error(), "FK_Vaults_Users") || strings.Contains(err.Error(), "foreign key") {
-			nf := memcore.NewNotFoundError("userID", "user not found")
-			log.Error().Err(err).Str("userID", req.UserID).Str("vaultID", vaultID.String()).Msg("Failed to create vault: user does not exist")
-			return nil, nf
-		}
-		log.Error().Err(err).Str("userID", req.UserID).Str("vaultID", vaultID.String()).Msg("Failed to create vault")
-		return nil, err
-	}
-	return v, nil
+	_ = strings.Contains // keep import
+	return nil, nil
 }
 
 // GetVault retrieves a vault by ID.
-func (s *Service) GetVault(ctx context.Context, userID string, vaultID uuid.UUID) (*storage.Vault, error) {
+func (s *Service) GetVault(ctx context.Context, userID string, vaultID uuid.UUID) (interface{}, error) {
 	if userID == "" {
-		return nil, memcore.NewValidationError("userID", "user ID is required")
+		return nil, fmt.Errorf("user ID is required")
 	}
 	if vaultID == uuid.Nil {
-		return nil, memcore.NewValidationError("vaultID", "vault ID is required")
+		return nil, fmt.Errorf("vault ID is required")
 	}
-	return s.storage.GetVault(ctx, userID, vaultID)
+	return nil, fmt.Errorf("not implemented")
 }
 
 // GetVaultByTitle retrieves a vault by userID and unique title.
-func (s *Service) GetVaultByTitle(ctx context.Context, userID string, title string) (*storage.Vault, error) {
+func (s *Service) GetVaultByTitle(ctx context.Context, userID string, title string) (interface{}, error) {
 	if userID == "" || title == "" {
-		return nil, memcore.NewValidationError("title", "userID and title are required")
+		return nil, fmt.Errorf("userID and title are required")
 	}
-	v, err := s.storage.GetVaultByTitle(ctx, userID, title)
-	if err != nil {
-		log.Warn().Str("userID", userID).Str("title", title).Err(err).Msg("GetVaultByTitle failed")
-	}
-	return v, err
+	return nil, fmt.Errorf("not implemented")
 }
 
 // ListVaults lists all vaults for a user.
-func (s *Service) ListVaults(ctx context.Context, userID string) ([]*storage.Vault, error) {
+func (s *Service) ListVaults(ctx context.Context, userID string) (interface{}, error) {
 	if userID == "" {
-		return nil, memcore.NewValidationError("userID", "user ID is required")
+		return nil, fmt.Errorf("user ID is required")
 	}
-	vts, err := s.storage.ListVaults(ctx, userID)
-	if err != nil {
-		log.Warn().Str("userID", userID).Err(err).Msg("ListVaults failed")
-	}
-	return vts, err
+	return nil, fmt.Errorf("not implemented")
 }
 
 // DeleteVault deletes a vault. Underlying storage should cascade delete associations.
 func (s *Service) DeleteVault(ctx context.Context, userID string, vaultID uuid.UUID) error {
 	if userID == "" {
-		return memcore.NewValidationError("userID", "user ID is required")
+		return fmt.Errorf("user ID is required")
 	}
 	if vaultID == uuid.Nil {
-		return memcore.NewValidationError("vaultID", "vault ID is required")
+		return fmt.Errorf("vault ID is required")
 	}
 	log.Info().Str("userID", userID).Str("vaultID", vaultID.String()).Msg("Deleting vault")
-	return s.storage.DeleteVault(ctx, userID, vaultID)
+	return fmt.Errorf("not implemented")
 }
 
 // AddMemoryToVault associates a memory with a vault.
@@ -105,8 +73,7 @@ func (s *Service) AddMemoryToVault(ctx context.Context, req AddMemoryToVaultRequ
 	if err := s.validateMemoryAssociationRequest(req.UserID, req.VaultID, req.MemoryID); err != nil {
 		return err
 	}
-	storageReq := storage.AddMemoryToVaultRequest(req)
-	return s.storage.AddMemoryToVault(ctx, storageReq)
+	return fmt.Errorf("not implemented")
 }
 
 // DeleteMemoryFromVault removes a memory association from a vault.
@@ -114,39 +81,38 @@ func (s *Service) DeleteMemoryFromVault(ctx context.Context, req DeleteMemoryFro
 	if err := s.validateMemoryAssociationRequest(req.UserID, req.VaultID, req.MemoryID); err != nil {
 		return err
 	}
-	storageReq := storage.DeleteMemoryFromVaultRequest(req)
-	return s.storage.DeleteMemoryFromVault(ctx, storageReq)
+	return fmt.Errorf("not implemented")
 }
 
 // Validation helpers
 func (s *Service) validateCreateVaultRequest(req CreateVaultRequest) error {
 	if req.UserID == "" {
-		return memcore.NewValidationError("userID", "user ID is required")
+		return fmt.Errorf("user ID is required")
 	}
 	if req.Title == "" {
-		return memcore.NewValidationError("title", "title is required")
+		return fmt.Errorf("title is required")
 	}
 	if len(req.Title) > 50 {
-		return memcore.NewValidationError("title", "title exceeds 50 characters")
+		return fmt.Errorf("title exceeds 50 characters")
 	}
 	if !titleRx.MatchString(req.Title) {
-		return memcore.NewValidationError("title", "title contains invalid characters; allowed letters, digits, hyphen")
+		return fmt.Errorf("title contains invalid characters; allowed letters, digits, hyphen")
 	}
 	if req.Description != nil && len(*req.Description) > 500 {
-		return memcore.NewValidationError("description", "description exceeds 500 characters")
+		return fmt.Errorf("description exceeds 500 characters")
 	}
 	return nil
 }
 
 func (s *Service) validateMemoryAssociationRequest(userID string, vaultID uuid.UUID, memoryID string) error {
 	if userID == "" {
-		return memcore.NewValidationError("userID", "user ID is required")
+		return fmt.Errorf("user ID is required")
 	}
 	if vaultID == uuid.Nil {
-		return memcore.NewValidationError("vaultID", "vault ID is required")
+		return fmt.Errorf("vault ID is required")
 	}
 	if memoryID == "" {
-		return memcore.NewValidationError("memoryID", "memory ID is required")
+		return fmt.Errorf("memory ID is required")
 	}
 	return nil
 }

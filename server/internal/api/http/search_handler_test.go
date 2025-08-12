@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mycelian/mycelian-memory/server/internal/search"
+	"github.com/mycelian/mycelian-memory/server/internal/model"
 )
 
 type mockEmbedder struct {
@@ -25,12 +25,12 @@ type mockSearch struct {
 	empty bool
 }
 
-func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, k int, a float32) ([]search.Result, error) {
+func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, k int, a float32) ([]model.SearchHit, error) {
 	m.calls++
 	if m.empty {
-		return []search.Result{}, nil
+		return []model.SearchHit{}, nil
 	}
-	return []search.Result{{EntryID: "e1", MemoryID: "m1", Summary: "s", UserID: uid}}, nil
+	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9}}, nil
 }
 
 func (m *mockSearch) LatestContext(ctx context.Context, uid, mid string) (string, time.Time, error) {
@@ -52,11 +52,13 @@ func (m *mockSearch) UpsertContext(ctx context.Context, ctxID string, vec []floa
 
 func (m *mockSearch) DeleteEntry(ctx context.Context, userID, entryID string) error     { return nil }
 func (m *mockSearch) DeleteContext(ctx context.Context, userID, contextID string) error { return nil }
+func (m *mockSearch) DeleteMemory(ctx context.Context, userID, memoryID string) error   { return nil }
+func (m *mockSearch) DeleteVault(ctx context.Context, userID, vaultID string) error     { return nil }
 
 func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}
-	h := NewSearchHandler(emb, srch, 0.6)
+	h := &SearchV2Handler{emb: emb, idx: srch, alpha: 0.6}
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hello","topK":3}`)
 	req := httptest.NewRequest("POST", "/api/search", body)
@@ -75,18 +77,12 @@ func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	}
 }
 
-func TestBuildHybridProperties(t *testing.T) {
-	vec := []float32{1.0}
-	hy := buildHybrid("foo", vec, 0.6)
-	if hy == nil {
-		t.Fatalf("hybrid builder nil")
-	}
-}
+// Removed v1 hybrid builder test as v2 handler uses native index directly
 
 func TestHandleSearch_ResponseMapping(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}
-	h := NewSearchHandler(emb, srch, 0.6)
+	h := &SearchV2Handler{emb: emb, idx: srch, alpha: 0.6}
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
 	req := httptest.NewRequest("POST", "/api/search", body)
@@ -97,10 +93,10 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 		t.Fatalf("expected 200")
 	}
 	var resp struct {
-		Entries       []search.Result `json:"entries"`
-		Count         int             `json:"count"`
-		LatestContext string          `json:"latestContext"`
-		BestContext   string          `json:"bestContext"`
+		Entries       []model.SearchHit `json:"entries"`
+		Count         int               `json:"count"`
+		LatestContext string            `json:"latestContext"`
+		BestContext   string            `json:"bestContext"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -116,7 +112,7 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 func TestHandleSearch_NoResults(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{empty: true}
-	h := NewSearchHandler(emb, srch, 0.6)
+	h := &SearchV2Handler{emb: emb, idx: srch, alpha: 0.6}
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
 	req := httptest.NewRequest("POST", "/api/search", body)

@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,27 +39,27 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		}
 	}
 
-	// 1. Create user
-	email := fmt.Sprintf("ingest-%d@example.com", time.Now().UnixNano())
-	var userResp struct {
+	// 1. Ensure dedicated test user and create waviate tenant
+	userResp := struct {
 		UserID string `json:"userId"`
-	}
-	resp, err := http.Post(memSvc+"/api/users", "application/json", bytes.NewBufferString(fmt.Sprintf(`{"email":"%s"}`, email)))
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	mustJSON(t, resp, &userResp)
+	}{UserID: ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")}
+	ensureWaviateTenants(t, waviate, userResp.UserID)
 
-	// 2. Create vault then memory
+	// 2. Create vault then memory (unique per run) and ensure cleanup
 	var vaultResp struct {
 		VaultID string `json:"vaultId"`
 	}
-	vPayload := `{"title":"BmVault"}`
+	vPayload := fmt.Sprintf(`{"title":"BmVault-%d"}`, time.Now().UnixNano())
 	vResp, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 	mustJSON(t, vResp, &vaultResp)
+	// Cleanup vault at end
+	defer func() {
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
+		_, _ = http.DefaultClient.Do(req)
+	}()
 
 	baseVaultPath := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
 
@@ -66,12 +67,12 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	var memResp struct {
 		MemoryID string `json:"memoryId"`
 	}
-	body := `{"memoryType":"CONVERSATION","title":"BmSmoke"}`
-	resp, err = http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
+	body := fmt.Sprintf(`{"memoryType":"CONVERSATION","title":"BmSmoke-%d"}`, time.Now().UnixNano())
+	respM, err := http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
-	mustJSON(t, resp, &memResp)
+	mustJSON(t, respM, &memResp)
 
 	// 2b. Verify default context snapshot exists immediately after memory creation
 	ctxURL := fmt.Sprintf("%s/memories/%s/contexts", baseVaultPath, memResp.MemoryID)
@@ -79,27 +80,49 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get default context: %v", err)
 	}
-	var ctxBody struct {
-		Context map[string]interface{} `json:"context"`
-	}
-	mustJSON(t, ctxResp, &ctxBody)
-	active, _ := ctxBody.Context["activeContext"].(string)
+	// Accept either string or object for the `context` field
+	var raw map[string]interface{}
+	mustJSON(t, ctxResp, &raw)
 	expectedDefault := "This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."
-	if active != expectedDefault {
-		t.Fatalf("default context mismatch. want %q, got %q", expectedDefault, active)
+	ctxVal, ok := raw["context"]
+	if !ok {
+		t.Fatalf("missing context field in response: %+v", raw)
+	}
+	switch v := ctxVal.(type) {
+	case string:
+		// Attempt base64 decode; if JSON with activeContext, extract and compare
+		if dec, err := base64.StdEncoding.DecodeString(v); err == nil {
+			var m map[string]interface{}
+			if json.Unmarshal(dec, &m) == nil {
+				if s, _ := m["activeContext"].(string); s == expectedDefault {
+					break
+				}
+				t.Fatalf("default context mismatch. want %q, got decoded %+v", expectedDefault, m)
+			}
+		}
+		if v != expectedDefault {
+			t.Fatalf("default context mismatch. want %q, got %q", expectedDefault, v)
+		}
+	case map[string]interface{}:
+		active, _ := v["activeContext"].(string)
+		if active != expectedDefault {
+			t.Fatalf("default context mismatch. want %q, got %q", expectedDefault, active)
+		}
+	default:
+		t.Fatalf("unexpected context type %T", v)
 	}
 
 	// 3. Create entry
 	entryText := fmt.Sprintf("BM25 smoke test %d", time.Now().UnixNano())
 	entryBody := fmt.Sprintf(`{"rawEntry":"%s","summary":"smoke summary"}`, entryText)
-	resp, err = http.Post(fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memResp.MemoryID), "application/json", bytes.NewBufferString(entryBody))
+	respE, err := http.Post(fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memResp.MemoryID), "application/json", bytes.NewBufferString(entryBody))
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
 	}
 	var entryResp struct {
 		EntryID string `json:"entryId"`
 	}
-	mustJSON(t, resp, &entryResp)
+	mustJSON(t, respE, &entryResp)
 
 	// DEBUG: print identifiers so we can reproduce with curl
 	t.Logf("BM25 smoke: userID=%s memoryID=%s entryID=%s", userResp.UserID, memResp.MemoryID, entryResp.EntryID)
@@ -151,7 +174,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	memSvc := env("MEMORY_API", "http://localhost:8080")
 	waviate := env("WAVIATE_URL", "http://localhost:8082")
 	ollama := env("OLLAMA_URL", "http://localhost:11434")
-	embedMod := env("EMBED_MODEL", "mxbai-embed-large")
+	embedMod := env("EMBED_MODEL", "nomic-embed-text")
 
 	// Ensure services are reachable
 	waitForHealthy(t, memSvc, 3*time.Second)
@@ -165,27 +188,28 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Fatalf("ollama model %s not available", embedMod)
 	}
 
-	// 1. user
-	email := fmt.Sprintf("search-e2e-%d@example.com", time.Now().UnixNano())
+	// 1. ensure test_user and create waviate tenant
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	resp, err := http.Post(memSvc+"/api/users", "application/json", bytes.NewBufferString(fmt.Sprintf(`{"email":"%s"}`, email)))
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	mustJSON(t, resp, &userResp)
+	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
+	ensureWaviateTenants(t, waviate, userResp.UserID)
 
 	// 2. vault then memory
 	var vaultResp struct {
 		VaultID string `json:"vaultId"`
 	}
-	vPayload := `{"title":"SearchVault"}`
+	vPayload := fmt.Sprintf(`{"title":"SearchVault-%d"}`, time.Now().UnixNano())
 	vResp, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 	mustJSON(t, vResp, &vaultResp)
+	// Cleanup vault at end
+	defer func() {
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
+		_, _ = http.DefaultClient.Do(req)
+	}()
 
 	baseVaultPath := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
 
@@ -193,8 +217,8 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	var memResp struct {
 		MemoryID string `json:"memoryId"`
 	}
-	body := `{"memoryType":"CONVERSATION","title":"SearchSmoke"}`
-	resp, err = http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
+	body := fmt.Sprintf(`{"memoryType":"CONVERSATION","title":"SearchSmoke-%d"}`, time.Now().UnixNano())
+	resp, err := http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
@@ -234,13 +258,13 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("search API did not return expected entry within timeout")
 		}
-		resp, err = http.Post(memSvc+"/api/search", "application/json", bytes.NewBufferString(searchBody))
+		rs, err := http.Post(memSvc+"/api/search", "application/json", bytes.NewBufferString(searchBody))
 		if err != nil {
 			t.Fatalf("search request: %v", err)
 		}
-		data, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if resp.StatusCode == http.StatusOK && bytes.Contains(data, []byte(entryResp.EntryID)) {
+		data, _ := io.ReadAll(rs.Body)
+		_ = rs.Body.Close()
+		if rs.StatusCode == http.StatusOK && bytes.Contains(data, []byte(entryResp.EntryID)) {
 			// quick sanity: verify latestContext keys present (optional)
 			if !bytes.Contains(data, []byte("latestContext")) || !bytes.Contains(data, []byte("entries")) {
 				t.Fatalf("search API response missing expected fields: %s", string(data))
@@ -266,16 +290,11 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	// Ensure service reachable
 	waitForHealthy(t, memSvc, 3*time.Second)
 
-	// 1. user
-	email := fmt.Sprintf("ctx-%d@example.com", time.Now().UnixNano())
+	// 1. ensure test_user
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	resp, err := http.Post(memSvc+"/api/users", "application/json", bytes.NewBufferString(fmt.Sprintf(`{"email":"%s"}`, email)))
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	mustJSON(t, resp, &userResp)
+	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
 
 	// 2. vault
 	vResp2, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(`{"title":"CtxVault"}`))
@@ -287,6 +306,11 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	}
 	mustJSON(t, vResp2, &v2)
 	baseVaultPath2 := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID)
+	// Cleanup vault at end
+	defer func() {
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID), nil)
+		_, _ = http.DefaultClient.Do(req)
+	}()
 
 	// memory under new vault
 	var memResp struct {
@@ -305,7 +329,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	ctxPayload := `{"context":{"note":"smoke-test"}}`
 	req, _ := http.NewRequest(http.MethodPut, putURL, bytes.NewBufferString(ctxPayload))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err = http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("put context: %v", err)
 	}

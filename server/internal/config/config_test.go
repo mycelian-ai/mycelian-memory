@@ -15,7 +15,7 @@ func TestConfigLoad_EmbedDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config load: %v", err)
 	}
-	if cfg.EmbedProvider != "ollama" || cfg.EmbedModel != "mxbai-embed-large" || cfg.SearchAlpha != 0.6 {
+	if cfg.EmbedProvider != "ollama" || cfg.EmbedModel != "nomic-embed-text" || cfg.SearchAlpha != 0.6 {
 		t.Fatalf("unexpected default embed config: %+v", cfg)
 	}
 }

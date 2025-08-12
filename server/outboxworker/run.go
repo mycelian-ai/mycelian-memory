@@ -3,6 +3,7 @@ package outboxworker
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,8 +14,9 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/mycelian/mycelian-memory/server/internal/config"
+	"github.com/mycelian/mycelian-memory/server/internal/embeddings/ollama"
 	"github.com/mycelian/mycelian-memory/server/internal/outbox"
-	"github.com/mycelian/mycelian-memory/server/internal/search"
+	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 )
 
 // Run starts the outbox worker and blocks until shutdown or error.
@@ -32,23 +34,27 @@ func Run() error {
 		log.Fatal().Err(err).Msg("postgres ping")
 	}
 
-	emb, err := search.NewProvider(cfg.EmbedProvider, cfg.EmbedModel)
+	var emb interface {
+		Embed(context.Context, string) ([]float32, error)
+	}
+	if cfg.EmbedProvider == "ollama" || cfg.EmbedProvider == "" {
+		emb = ollama.New(cfg.EmbedModel)
+	}
+	// Validate embedder readiness at startup
+	if emb != nil {
+		if vec, err := emb.Embed(context.Background(), "worker-startup-check"); err != nil || len(vec) == 0 {
+			return fmt.Errorf("embedder not ready: provider=%s model=%s err=%v len=%d", cfg.EmbedProvider, cfg.EmbedModel, err, len(vec))
+		}
+	}
+
+	// Ensure schema exists in dev/e2e; safe to call repeatedly.
+	_ = searchindex.BootstrapWaviate(context.Background(), cfg.WaviateURL)
+	idx, err := searchindex.NewWaviateNativeIndex(cfg.WaviateURL)
 	if err != nil {
-		log.Warn().Err(err).Msg("embedder unavailable – vectors will be empty")
-		emb = nil
+		log.Fatal().Err(err).Msg("search index")
 	}
 
-	// Ensure schema is bootstrapped with multi-tenancy enabled before any writes
-	if err := search.BootstrapWaviate(context.Background(), cfg.WaviateURL); err != nil {
-		log.Error().Err(err).Msg("waviate bootstrap")
-	}
-
-	wav, err := search.NewWaviateSearcher(cfg.WaviateURL)
-	if err != nil {
-		log.Fatal().Err(err).Msg("waviate")
-	}
-
-	w := outbox.NewWorker(db, emb, wav, outbox.Config{
+	w := outbox.NewWorker(db, emb, idx, outbox.Config{
 		PostgresDSN: cfg.PostgresDSN,
 		BatchSize:   100,
 		Interval:    2 * time.Second,

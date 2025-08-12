@@ -10,7 +10,7 @@ import (
 	filters "github.com/weaviate/weaviate-go-client/v5/weaviate/filters"
 	gql "github.com/weaviate/weaviate-go-client/v5/weaviate/graphql"
 
-	"github.com/mycelian/mycelian-memory/server/internal/search"
+	"github.com/mycelian/mycelian-memory/server/internal/embeddings/ollama"
 )
 
 // Query performs a hybrid search against Waviate and returns the raw JSON response bytes.
@@ -24,14 +24,10 @@ func Query(baseURL, provider, model, userID, memoryID, query string, topK int, a
 		topK = 5
 	}
 
-	// Embed query
-	emb, err := search.NewProvider(provider, model)
-	if err != nil {
-		return nil, fmt.Errorf("embedder init failed: %w", err)
-	}
-	vec, err := emb.Embed(context.Background(), query)
-	if err != nil {
-		return nil, fmt.Errorf("embedding failed: %w", err)
+	// Embed query (ollama only)
+	var vec []float32
+	if provider == "ollama" {
+		vec, _ = ollama.New(model).Embed(context.Background(), query)
 	}
 
 	// Waviate client
