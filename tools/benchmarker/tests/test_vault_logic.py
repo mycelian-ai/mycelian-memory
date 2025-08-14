@@ -20,7 +20,7 @@ class TestVaultTitleValidation(unittest.TestCase):
     def setUp(self):
         """Set up a mock client for testing."""
         with patch('subprocess.run'):
-            self.client = SynapseMemoryClient("http://localhost:8080", "test_user")
+            self.client = SynapseMemoryClient("http://localhost:11545", "test_user")
 
     def test_valid_vault_titles(self):
         """Test valid vault titles that should pass validation."""
@@ -124,7 +124,7 @@ class TestVaultCreation(unittest.TestCase):
     def setUp(self):
         """Set up mock client for testing."""
         with patch('subprocess.run'):
-            self.client = SynapseMemoryClient("http://localhost:8080", "test_user")
+            self.client = SynapseMemoryClient("http://localhost:11545", "test_user")
 
     @patch('subprocess.run')
     def test_create_vault_cli_success(self, mock_run):
@@ -186,7 +186,7 @@ class TestMemoryCreationWithVault(unittest.TestCase):
     def setUp(self):
         """Set up mock client for testing."""
         with patch('subprocess.run'):
-            self.client = SynapseMemoryClient("http://localhost:8080", "test_user")
+            self.client = SynapseMemoryClient("http://localhost:11545", "test_user")
 
     @patch.object(SynapseMemoryClient, '_run_cli')
     @patch.object(SynapseMemoryClient, 'create_vault')

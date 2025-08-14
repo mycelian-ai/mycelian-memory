@@ -20,7 +20,7 @@ import (
 func TestSearchE2E(t *testing.T) {
 	baseURL := os.Getenv("TEST_BACKEND_URL")
 	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+		baseURL = "http://localhost:11545"
 	}
 
 	c := client.New(baseURL)

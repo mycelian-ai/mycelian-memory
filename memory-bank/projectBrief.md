@@ -16,7 +16,7 @@ Build a SaaS multi-agent memory management system that enables AI assistants and
 - **Simplified Architecture**: Single PostgreSQL dialect for focus and simplicity
 
 ## Key Components
-1. **Memory Service API**: RESTful backend for memory management (port 8080)
+1. **Memory Service API**: RESTful backend for memory management (port 11545)
 2. **Go Client SDK**: Type-safe client library for memory operations
 3. **MCP Server**: Tool server implementing Model Context Protocol
 4. **CLI Tools**: mycelianCli for management, mycelian-service-tools for operations

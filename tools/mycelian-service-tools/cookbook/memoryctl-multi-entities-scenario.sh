@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 MEMORYCTL="${MEMORYCTL:-./bin/mycelian-service-tools}"
-API_ENDPOINT="${API_ENDPOINT:-http://localhost:8080}"
+API_ENDPOINT="${API_ENDPOINT:-http://localhost:11545}"
 
 echo -e "${BLUE}=== Memory Service E2E Test Cookbook ===${NC}"
 echo -e "${YELLOW}Using API endpoint: ${API_ENDPOINT}${NC}"

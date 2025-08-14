@@ -52,7 +52,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget -qO- http://localhost:8081/ || exit 1
 
 # Set default environment variables
-ENV MEMORY_SERVICE_URL=http://localhost:8080
+ENV MEMORY_SERVICE_URL=http://localhost:11545
 
 # Run the binary
 ENTRYPOINT ["./mycelian-mcp-server"] 

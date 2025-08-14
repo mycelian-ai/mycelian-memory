@@ -18,7 +18,7 @@ import (
 func TestUserVaultMemoryCRUD(t *testing.T) {
 	baseURL := os.Getenv("TEST_BACKEND_URL")
 	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+		baseURL = "http://localhost:11545"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

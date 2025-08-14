@@ -5,7 +5,7 @@
 // interrupted. On any startup or runtime error, the process logs the
 // error and exits with status 1.
 //
-// Health endpoint: GET /api/health. For full routing, see
+// Health endpoint: GET /v0/health. For full routing, see
 // server/memoryservice.Run.
 package main
 

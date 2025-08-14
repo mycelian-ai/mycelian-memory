@@ -19,7 +19,7 @@ var (
 )
 
 func main() {
-	rootCmd.PersistentFlags().StringVarP(&apiFlag, "api", "a", "http://localhost:8080", "Memory service base URL")
+	rootCmd.PersistentFlags().StringVarP(&apiFlag, "api", "a", "http://localhost:11545", "Memory service base URL")
 	rootCmd.PersistentFlags().StringVarP(&vaultFlag, "vault", "v", "", "Vault ID (required for memory operations)")
 
 	// search subcommand

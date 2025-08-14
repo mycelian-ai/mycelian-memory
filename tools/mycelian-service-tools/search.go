@@ -20,7 +20,7 @@ func runSearch(apiURL, userID, memoryID, query string, topK int, out io.Writer) 
 		"topK":     topK,
 	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, apiURL+"/api/search", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, apiURL+"/v0/search", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

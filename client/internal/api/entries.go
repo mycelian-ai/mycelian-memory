@@ -36,7 +36,7 @@ func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client,
 		if err != nil {
 			return err
 		}
-		url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries", baseURL, userID, vaultID, memID)
+		url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries", baseURL, userID, vaultID, memID)
 		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodPost, url, bytes.NewBuffer(body))
 		if err != nil {
 			return err
@@ -89,7 +89,7 @@ func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 		}
 		query += fmt.Sprintf("%s=%s", k, v)
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries%s", baseURL, userID, vaultID, memID, query)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries%s", baseURL, userID, vaultID, memID, query)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func DeleteEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err

@@ -38,7 +38,7 @@ func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Clien
 		if err != nil {
 			return err
 		}
-		url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/contexts", baseURL, userID, vaultID, memID)
+		url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/contexts", baseURL, userID, vaultID, memID)
 		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodPut, url, bytes.NewBuffer(body))
 		if err != nil {
 			return err
@@ -79,7 +79,7 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, v
 	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/contexts", baseURL, userID, vaultID, memID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/contexts", baseURL, userID, vaultID, memID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func DeleteContext(ctx context.Context, httpClient *http.Client, baseURL, userID
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/contexts/%s", baseURL, userID, vaultID, memID, contextID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/contexts/%s", baseURL, userID, vaultID, memID, contextID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err

@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 func TestCreateUserAndMemory(t *testing.T) {
 	serviceURL := os.Getenv("MEMORY_SERVICE_URL")
 	if serviceURL == "" {
-		serviceURL = "http://localhost:8080"
+		serviceURL = "http://localhost:11545"
 	}
 
 	// 1) create user

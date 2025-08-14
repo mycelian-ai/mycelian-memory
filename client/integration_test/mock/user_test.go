@@ -12,7 +12,7 @@ import (
 func TestClient_CreateUser_Success(t *testing.T) {
 	t.Parallel()
 	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/users" {
+		if r.Method != http.MethodPost || r.URL.Path != "/v0/users" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -42,7 +42,7 @@ func TestClient_CreateUser_Success(t *testing.T) {
 func TestClient_GetUser_Success(t *testing.T) {
 	t.Parallel()
 	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/users/u123" {
+		if r.Method != http.MethodGet || r.URL.Path != "/v0/users/u123" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -72,7 +72,7 @@ func TestClient_GetUser_Success(t *testing.T) {
 func TestClient_DeleteUser_Success(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/users/u1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v0/users/u1", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("expected DELETE, got %s", r.Method)
 		}

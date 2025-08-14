@@ -21,7 +21,7 @@ func Search(ctx context.Context, httpClient *http.Client, baseURL string, req ty
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/search", baseURL)
+	url := fmt.Sprintf("%s/v0/search", baseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err

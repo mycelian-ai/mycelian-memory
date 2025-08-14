@@ -65,7 +65,7 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	defaultURL := getEnv("MEMORY_SERVICE_URL", "http://localhost:8080")
+	defaultURL := getEnv("MEMORY_SERVICE_URL", "http://localhost:11545")
 	rootCmd.PersistentFlags().StringVar(&serviceURL, "service-url", defaultURL, "Base URL of Mycelian memory service")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable verbose debug output")
 

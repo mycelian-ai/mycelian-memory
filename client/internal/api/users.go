@@ -24,7 +24,7 @@ func CreateUser(ctx context.Context, httpClient *http.Client, baseURL string, re
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users", baseURL)
+	url := fmt.Sprintf("%s/v0/users", baseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func GetUser(ctx context.Context, httpClient *http.Client, baseURL, userID strin
 	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s", baseURL, userID)
+	url := fmt.Sprintf("%s/v0/users/%s", baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func DeleteUser(ctx context.Context, httpClient *http.Client, baseURL, userID st
 	if err := types.ValidateUserID(userID); err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/api/users/%s", baseURL, userID)
+	url := fmt.Sprintf("%s/v0/users/%s", baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err

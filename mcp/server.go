@@ -34,7 +34,7 @@ type config struct {
 func loadConfig() *config {
 	cfg := &config{
 		// Default values
-		MemoryServiceURL: getEnvOrDefault("MEMORY_SERVICE_URL", "http://localhost:8080"),
+		MemoryServiceURL: getEnvOrDefault("MEMORY_SERVICE_URL", "http://localhost:11545"),
 		ContextDataDir:   getEnvOrDefault("CONTEXT_DATA_DIR", "./data/context"),
 		ServerName:       getEnvOrDefault("MCP_SERVER_NAME", "mycelian-mcp-server"),
 		ServerVersion:    getEnvOrDefault("MCP_SERVER_VERSION", "0.2.0"),

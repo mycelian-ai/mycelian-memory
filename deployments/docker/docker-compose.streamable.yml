@@ -8,7 +8,7 @@ services:
     container_name: mycelian-memory-mcp-server
     image: synapse-mcp-server:dev
     environment:
-      - MEMORY_SERVICE_URL=http://host.docker.internal:8080
+      - MEMORY_SERVICE_URL=http://host.docker.internal:11545
       - MEMORY_SERVICE_GRPC_ADDR=host.docker.internal:9090
       - MCP_HTTP=true                    # Force HTTP mode for Cursor streamable endpoint
       - LOG_LEVEL=info

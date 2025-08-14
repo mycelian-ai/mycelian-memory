@@ -32,7 +32,7 @@ func CreateMemory(ctx context.Context, httpClient *http.Client, baseURL, userID,
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories", baseURL, userID, vaultID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories", baseURL, userID, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func ListMemories(ctx context.Context, httpClient *http.Client, baseURL, userID,
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories", baseURL, userID, vaultID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories", baseURL, userID, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func GetMemory(ctx context.Context, httpClient *http.Client, baseURL, userID, va
 	if err := types.ValidateIDPresent(memoryID, "memoryId"); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s", baseURL, userID, vaultID, memoryID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s", baseURL, userID, vaultID, memoryID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func DeleteMemory(ctx context.Context, httpClient *http.Client, baseURL, userID,
 	if err := types.ValidateIDPresent(memoryID, "memoryId"); err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s", baseURL, userID, vaultID, memoryID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s", baseURL, userID, vaultID, memoryID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err

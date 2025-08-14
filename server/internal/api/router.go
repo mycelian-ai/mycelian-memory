@@ -13,7 +13,7 @@ func NewRouter() *mux.Router {
 
 	// Create handlers
 	healthHandler := NewHealthHandler()
-	router.HandleFunc("/api/health", healthHandler.CheckHealth).Methods("GET")
+	router.HandleFunc("/v0/health", healthHandler.CheckHealth).Methods("GET")
 
 	// Legacy router trimmed to health only; routes wired in composition root.
 

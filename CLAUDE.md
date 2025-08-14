@@ -73,7 +73,7 @@ Agent (Claude) → MCP Protocol → mycelian-mcp-server → Go Client SDK → Me
 ```
 
 ### Key Components
-1. **Memory Service API** (server/): RESTful backend on port 8080
+1. **Memory Service API** (server/): RESTful backend on port 11545
 2. **Go Client SDK** (clients/go/): Type-safe client library  
 3. **MCP Server** (clients/go/cmd/mycelian-mcp-server/): Model Context Protocol server
 4. **CLI Tools**: mycelianCli for management, mycelian-service-tools for operations
@@ -139,7 +139,7 @@ Before any commit touching **Critical** code (HTTP handlers, transaction logic, 
 ### Health Checks
 ```bash
 # Service health
-curl http://localhost:8080/health
+curl http://localhost:11545/health
 
 # Weaviate health  
 curl http://localhost:8082/v1/.well-known/ready

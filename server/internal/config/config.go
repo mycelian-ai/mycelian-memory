@@ -28,7 +28,7 @@ type Config struct {
 	Environment Environment `envconfig:"ENVIRONMENT" default:"development"`
 
 	// HTTP Configuration
-	HTTPPort int `envconfig:"HTTP_PORT" default:"8080"`
+	HTTPPort int `envconfig:"HTTP_PORT" default:"11545"`
 
 	// gRPC Configuration
 	GRPCPort int `envconfig:"GRPC_PORT" default:"9090"`
@@ -128,7 +128,7 @@ func NewForTesting() *Config {
 		Environment: EnvTesting,
 	}
 
-	cfg.HTTPPort = 8080
+	cfg.HTTPPort = 11545
 
 	cfg.EmbedProvider = "ollama"
 	cfg.EmbedModel = "nomic-embed-text"

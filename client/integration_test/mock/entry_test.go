@@ -136,7 +136,7 @@ func TestClient_DeleteEntry_Success(t *testing.T) {
 	t.Parallel()
 	userID, vaultID, memID, entryID := "u1", "v1", "m1", "e1"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v0/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("expected DELETE, got %s", r.Method)
 		}
@@ -156,7 +156,7 @@ func TestClient_GetEntry_Success(t *testing.T) {
 	t.Parallel()
 	userID, vaultID, memID, entryID := "u1", "v1", "m1", "e1"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v0/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}

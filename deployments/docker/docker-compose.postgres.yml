@@ -43,10 +43,10 @@ services:
       dockerfile: cmd/memory-service/Dockerfile
     container_name: memory-service
     ports:
-      - "8080:8080"
+      - "11545:11545"
     environment:
       - MEMORY_SERVER_ENVIRONMENT=development
-      - MEMORY_SERVER_HTTP_PORT=8080
+      - MEMORY_SERVER_HTTP_PORT=11545
       - MEMORY_SERVER_DB_DRIVER=postgres
       - MEMORY_SERVER_BUILD_TARGET=cloud-dev
       - MEMORY_SERVER_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
@@ -154,11 +154,11 @@ services:
     entrypoint: ["sh", "-c"]
     command: >
       "
-        until curl -s http://memory-service:8080/api/health | grep '"status":"healthy"'; do
+        until curl -s http://memory-service:11545/v0/health | grep '"status":"healthy"'; do
           echo 'waiting for memory-service...';
           sleep 2;
         done;
-        ./mycelian-service-tools users create --userId local_user --email local.user@example.com --name 'Local User' --api http://memory-service:8080 || true
+        ./mycelian-service-tools users create --userId local_user --email local.user@example.com --name 'Local User' --api http://memory-service:11545 || true
       "
 
 networks:

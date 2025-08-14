@@ -6,7 +6,7 @@
 # ==============================================================================
 
 MCP_COMPOSE_FILE := deployments/docker/docker-compose.streamable.yml
-API_HEALTH_URL := http://localhost:8080/api/health
+API_HEALTH_URL := http://localhost:11545/v0/health
 
 # ------------------------------------------------------------------------------
 # Backend (server) convenience wrappers
@@ -124,7 +124,7 @@ client-test:
 	cd client && go test -v ./...
 
 client-test-integration:
-	cd client && TEST_BACKEND_URL=http://localhost:8080 go test -v -tags=integration ./integration_test/real
+	cd client && TEST_BACKEND_URL=http://localhost:11545 go test -v -tags=integration ./integration_test/real
 
 wait-backend-health:
 	@echo "Waiting for memory-service to be healthy at $(API_HEALTH_URL) ..."

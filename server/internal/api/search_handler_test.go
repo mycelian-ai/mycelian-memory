@@ -61,7 +61,7 @@ func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	h, _ := NewSearchHandler(emb, srch, 0.6)
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hello","topK":3}`)
-	req := httptest.NewRequest("POST", "/api/search", body)
+	req := httptest.NewRequest("POST", "/v0/search", body)
 	w := httptest.NewRecorder()
 
 	h.HandleSearch(w, req)
@@ -85,7 +85,7 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 	h, _ := NewSearchHandler(emb, srch, 0.6)
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
-	req := httptest.NewRequest("POST", "/api/search", body)
+	req := httptest.NewRequest("POST", "/v0/search", body)
 	w := httptest.NewRecorder()
 	h.HandleSearch(w, req)
 
@@ -115,7 +115,7 @@ func TestHandleSearch_NoResults(t *testing.T) {
 	h, _ := NewSearchHandler(emb, srch, 0.6)
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
-	req := httptest.NewRequest("POST", "/api/search", body)
+	req := httptest.NewRequest("POST", "/v0/search", body)
 	w := httptest.NewRecorder()
 	h.HandleSearch(w, req)
 

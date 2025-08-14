@@ -22,18 +22,18 @@ import (
 // -----------------------------------------------------------------------------
 // Creates a user → memory → entry via public REST API and verifies that the
 // entry is visible via a raw BM25 GraphQL query to Weaviate.  This bypasses the
-// /api/search endpoint to give a quick signal that the indexer pipeline is
+// /v0/search endpoint to give a quick signal that the indexer pipeline is
 // healthy.
 func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
 	}
 
-	memSvc := env("MEMORY_API", "http://localhost:8080")
+	memSvc := env("MEMORY_API", "http://localhost:11545")
 	weaviate := env("WEAVIATE_URL", "http://localhost:8082")
 
 	// quick connectivity checks – skip if the stack isn't up
-	for _, url := range []string{memSvc + "/api/health", weaviate + "/v1/meta"} {
+	for _, url := range []string{memSvc + "/v0/health", weaviate + "/v1/meta"} {
 		if err := ping(url); err != nil {
 			t.Skipf("service %s unreachable: %v", url, err)
 		}
@@ -50,18 +50,18 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		VaultID string `json:"vaultId"`
 	}
 	vPayload := fmt.Sprintf(`{"title":"BmVault-%d"}`, time.Now().UnixNano())
-	vResp, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
+	vResp, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 	mustJSON(t, vResp, &vaultResp)
 	// Cleanup vault at end
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
-	baseVaultPath := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
+	baseVaultPath := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
 
 	// 2. Create memory
 	var memResp struct {
@@ -163,7 +163,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 //
-//	Test 2: /api/search hybrid round-trip (embedding + context enrichment)
+//	Test 2: /v0/search hybrid round-trip (embedding + context enrichment)
 //
 // -----------------------------------------------------------------------------
 func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
@@ -171,14 +171,14 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Skip("skip in short mode")
 	}
 
-	memSvc := env("MEMORY_API", "http://localhost:8080")
+	memSvc := env("MEMORY_API", "http://localhost:11545")
 	weaviate := env("WEAVIATE_URL", "http://localhost:8082")
 	ollama := env("OLLAMA_URL", "http://localhost:11434")
 	embedMod := env("EMBED_MODEL", "nomic-embed-text")
 
 	// Ensure services are reachable
 	waitForHealthy(t, memSvc, 3*time.Second)
-	for _, url := range []string{memSvc + "/api/health", weaviate + "/v1/meta", ollama + "/api/tags"} {
+	for _, url := range []string{memSvc + "/v0/health", weaviate + "/v1/meta", ollama + "/api/tags"} {
 		if err := ping(url); err != nil {
 			t.Skipf("service %s unreachable: %v", url, err)
 		}
@@ -200,18 +200,18 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		VaultID string `json:"vaultId"`
 	}
 	vPayload := fmt.Sprintf(`{"title":"SearchVault-%d"}`, time.Now().UnixNano())
-	vResp, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
+	vResp, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 	mustJSON(t, vResp, &vaultResp)
 	// Cleanup vault at end
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
-	baseVaultPath := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
+	baseVaultPath := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
 
 	// 2. memory
 	var memResp struct {
@@ -258,7 +258,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("search API did not return expected entry within timeout")
 		}
-		rs, err := http.Post(memSvc+"/api/search", "application/json", bytes.NewBufferString(searchBody))
+		rs, err := http.Post(memSvc+"/v0/search", "application/json", bytes.NewBufferString(searchBody))
 		if err != nil {
 			t.Fatalf("search request: %v", err)
 		}
@@ -285,7 +285,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 		t.Skip("skip in short mode")
 	}
 
-	memSvc := env("MEMORY_API", "http://localhost:8080")
+	memSvc := env("MEMORY_API", "http://localhost:11545")
 
 	// Ensure service reachable
 	waitForHealthy(t, memSvc, 3*time.Second)
@@ -297,7 +297,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
 
 	// 2. vault
-	vResp2, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(`{"title":"CtxVault"}`))
+	vResp2, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(`{"title":"CtxVault"}`))
 	if err != nil {
 		t.Fatalf("create vault2: %v", err)
 	}
@@ -305,10 +305,10 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 		VaultID string `json:"vaultId"`
 	}
 	mustJSON(t, vResp2, &v2)
-	baseVaultPath2 := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID)
+	baseVaultPath2 := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID)
 	// Cleanup vault at end
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID), nil)
 		_, _ = http.DefaultClient.Do(req)
 	}()
 

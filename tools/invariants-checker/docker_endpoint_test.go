@@ -24,10 +24,10 @@ import (
 
 // TestDockerEndpointAvailability verifies the Docker service is running and accessible
 func TestDockerEndpointAvailability(t *testing.T) {
-	baseURL := "http://localhost:8080"
+	baseURL := "http://localhost:11545"
 
 	t.Run("🐳 Docker Service Health Check", func(t *testing.T) {
-		resp, err := http.Get(baseURL + "/api/health")
+		resp, err := http.Get(baseURL + "/v0/health")
 		if err != nil {
 			t.Fatalf("❌ Docker service not accessible: %v\n"+
 				"💡 Make sure to run: docker-compose up -d", err)
@@ -43,11 +43,11 @@ func TestDockerEndpointAvailability(t *testing.T) {
 
 // TestDockerEndpointContract verifies all expected endpoints are available
 func TestDockerEndpointContract(t *testing.T) {
-	baseURL := "http://localhost:8080"
+	baseURL := "http://localhost:11545"
 	checker := NewInvariantChecker(baseURL)
 
 	// Ensure service is running
-	resp, err := http.Get(baseURL + "/api/health")
+	resp, err := http.Get(baseURL + "/v0/health")
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode,
 		"Docker service must be running. Run: docker-compose up -d")
@@ -65,39 +65,39 @@ func TestDockerEndpointContract(t *testing.T) {
 			"timeZone":    "UTC",
 		}
 
-		resp := checker.makeRequestNoAssert("POST", "/api/users", createReq)
+		resp := checker.makeRequestNoAssert("POST", "/v0/users", createReq)
 		if resp == nil {
-			missingEndpoints = append(missingEndpoints, "POST /api/users")
-			t.Logf("❌ POST /api/users - Connection failed")
+			missingEndpoints = append(missingEndpoints, "POST /v0/users")
+			t.Logf("❌ POST /v0/users - Connection failed")
 		} else {
 			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusCreated {
-				workingEndpoints = append(workingEndpoints, "POST /api/users")
-				t.Logf("✅ POST /api/users - Working (Status: %d)", resp.StatusCode)
+				workingEndpoints = append(workingEndpoints, "POST /v0/users")
+				t.Logf("✅ POST /v0/users - Working (Status: %d)", resp.StatusCode)
 			} else if resp.StatusCode == http.StatusNotFound {
-				missingEndpoints = append(missingEndpoints, "POST /api/users")
-				t.Logf("❌ POST /api/users - 404 Not Found")
+				missingEndpoints = append(missingEndpoints, "POST /v0/users")
+				t.Logf("❌ POST /v0/users - 404 Not Found")
 			} else {
-				workingEndpoints = append(workingEndpoints, "POST /api/users")
-				t.Logf("⚠️ POST /api/users - Exists but returned %d", resp.StatusCode)
+				workingEndpoints = append(workingEndpoints, "POST /v0/users")
+				t.Logf("⚠️ POST /v0/users - Exists but returned %d", resp.StatusCode)
 			}
 		}
 
 		// Test user retrieval (using a test UUID)
 		testUserID := "test-user-123"
-		resp = checker.makeRequestNoAssert("GET", fmt.Sprintf("/api/users/%s", testUserID), nil)
+		resp = checker.makeRequestNoAssert("GET", fmt.Sprintf("/v0/users/%s", testUserID), nil)
 		if resp != nil {
 			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusNotFound {
-				workingEndpoints = append(workingEndpoints, "GET /api/users/{userId}")
-				t.Logf("✅ GET /api/users/{userId} - Working (404 for non-existent user)")
+				workingEndpoints = append(workingEndpoints, "GET /v0/users/{userId}")
+				t.Logf("✅ GET /v0/users/{userId} - Working (404 for non-existent user)")
 			} else {
-				workingEndpoints = append(workingEndpoints, "GET /api/users/{userId}")
-				t.Logf("✅ GET /api/users/{userId} - Working (Status: %d)", resp.StatusCode)
+				workingEndpoints = append(workingEndpoints, "GET /v0/users/{userId}")
+				t.Logf("✅ GET /v0/users/{userId} - Working (Status: %d)", resp.StatusCode)
 			}
 		} else {
-			missingEndpoints = append(missingEndpoints, "GET /api/users/{userId}")
-			t.Logf("❌ GET /api/users/{userId} - Connection failed")
+			missingEndpoints = append(missingEndpoints, "GET /v0/users/{userId}")
+			t.Logf("❌ GET /v0/users/{userId} - Connection failed")
 		}
 	})
 
@@ -109,13 +109,13 @@ func TestDockerEndpointContract(t *testing.T) {
 			path   string
 			body   interface{}
 		}{
-			{"POST", fmt.Sprintf("/api/users/%s/memories", testUserID), map[string]interface{}{
+			{"POST", fmt.Sprintf("/v0/users/%s/memories", testUserID), map[string]interface{}{
 				"title":      "Test Memory",
 				"memoryType": "CONVERSATION",
 			}},
-			{"GET", fmt.Sprintf("/api/users/%s/memories", testUserID), nil},
-			{"GET", fmt.Sprintf("/api/users/%s/memories/test-memory-123", testUserID), nil},
-			{"DELETE", fmt.Sprintf("/api/users/%s/memories/test-memory-123", testUserID), nil},
+			{"GET", fmt.Sprintf("/v0/users/%s/memories", testUserID), nil},
+			{"GET", fmt.Sprintf("/v0/users/%s/memories/test-memory-123", testUserID), nil},
+			{"DELETE", fmt.Sprintf("/v0/users/%s/memories/test-memory-123", testUserID), nil},
 		}
 
 		for _, endpoint := range endpoints {
@@ -147,11 +147,11 @@ func TestDockerEndpointContract(t *testing.T) {
 			path   string
 			body   interface{}
 		}{
-			{"POST", fmt.Sprintf("/api/users/%s/memories/%s/entries", testUserID, testMemoryID), map[string]interface{}{
+			{"POST", fmt.Sprintf("/v0/users/%s/memories/%s/entries", testUserID, testMemoryID), map[string]interface{}{
 				"rawEntry": "Test entry content",
 				"summary":  "Test summary",
 			}},
-			{"GET", fmt.Sprintf("/api/users/%s/memories/%s/entries", testUserID, testMemoryID), nil},
+			{"GET", fmt.Sprintf("/v0/users/%s/memories/%s/entries", testUserID, testMemoryID), nil},
 		}
 
 		for _, endpoint := range endpoints {
@@ -211,11 +211,11 @@ func TestDockerEndpointContract(t *testing.T) {
 
 // TestDockerSystemInvariants runs the full invariant test suite against Docker service
 func TestDockerSystemInvariants(t *testing.T) {
-	baseURL := "http://localhost:8080"
+	baseURL := "http://localhost:11545"
 	checker := NewInvariantChecker(baseURL)
 
 	// Verify service is running
-	resp, err := http.Get(baseURL + "/api/health")
+	resp, err := http.Get(baseURL + "/v0/health")
 	require.NoError(t, err, "Docker service must be running. Run: docker-compose up -d")
 	require.Equal(t, http.StatusOK, resp.StatusCode, "Service health check failed")
 	_ = resp.Body.Close()
@@ -237,7 +237,7 @@ func TestDockerSystemInvariants(t *testing.T) {
 
 		// Skip if correction endpoints don't exist
 		testResp := checker.makeRequestNoAssert("POST",
-			fmt.Sprintf("/api/users/%s/memories/%s/entries/correct", userID1, "test-memory"),
+			fmt.Sprintf("/v0/users/%s/memories/%s/entries/correct", userID1, "test-memory"),
 			map[string]interface{}{
 				"originalCreationTime": time.Now(),
 				"correctedContent":     "test",
@@ -284,11 +284,11 @@ func TestDockerSystemInvariants(t *testing.T) {
 
 // TestDockerCRUDWorkflow tests the basic CRUD workflow we demonstrated manually
 func TestDockerCRUDWorkflow(t *testing.T) {
-	baseURL := "http://localhost:8080"
+	baseURL := "http://localhost:11545"
 	checker := NewInvariantChecker(baseURL)
 
 	// Verify service is running
-	resp, err := http.Get(baseURL + "/api/health")
+	resp, err := http.Get(baseURL + "/v0/health")
 	require.NoError(t, err, "Docker service must be running. Run: docker-compose up -d")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
@@ -302,7 +302,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 			"timeZone":    "UTC",
 		}
 
-		userResp := checker.makeRequest(t, "POST", "/api/users", createUserReq, http.StatusCreated)
+		userResp := checker.makeRequest(t, "POST", "/v0/users", createUserReq, http.StatusCreated)
 
 		var user map[string]interface{}
 		err := json.Unmarshal(userResp, &user)
@@ -319,7 +319,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 		}
 
 		memoryResp := checker.makeRequest(t, "POST",
-			fmt.Sprintf("/api/users/%s/memories", userID),
+			fmt.Sprintf("/v0/users/%s/memories", userID),
 			createMemoryReq, http.StatusCreated)
 
 		var memory map[string]interface{}
@@ -340,7 +340,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 		}
 
 		entryResp := checker.makeRequest(t, "POST",
-			fmt.Sprintf("/api/users/%s/memories/%s/entries", userID, memoryID),
+			fmt.Sprintf("/v0/users/%s/memories/%s/entries", userID, memoryID),
 			createEntryReq, http.StatusCreated)
 
 		var entry map[string]interface{}
@@ -351,7 +351,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 
 		// Step 4: Retrieve the user
 		getUserResp := checker.makeRequest(t, "GET",
-			fmt.Sprintf("/api/users/%s", userID),
+			fmt.Sprintf("/v0/users/%s", userID),
 			nil, http.StatusOK)
 
 		var retrievedUser map[string]interface{}
@@ -364,7 +364,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 
 		// Step 5: Retrieve the memory
 		getMemoryResp := checker.makeRequest(t, "GET",
-			fmt.Sprintf("/api/users/%s/memories/%s", userID, memoryID),
+			fmt.Sprintf("/v0/users/%s/memories/%s", userID, memoryID),
 			nil, http.StatusOK)
 
 		var retrievedMemory map[string]interface{}
@@ -377,7 +377,7 @@ func TestDockerCRUDWorkflow(t *testing.T) {
 
 		// Step 6: Retrieve the memory entries
 		getEntriesResp := checker.makeRequest(t, "GET",
-			fmt.Sprintf("/api/users/%s/memories/%s/entries", userID, memoryID),
+			fmt.Sprintf("/v0/users/%s/memories/%s/entries", userID, memoryID),
 			nil, http.StatusOK)
 
 		var entriesList map[string]interface{}
@@ -406,7 +406,7 @@ func createDockerTestUser(t *testing.T, checker *InvariantChecker, email string)
 		"timeZone": "UTC",
 	}
 
-	resp := checker.makeRequest(t, "POST", "/api/users", createReq, http.StatusCreated)
+	resp := checker.makeRequest(t, "POST", "/v0/users", createReq, http.StatusCreated)
 
 	var user map[string]interface{}
 	err := json.Unmarshal(resp, &user)

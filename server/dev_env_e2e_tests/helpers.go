@@ -52,14 +52,14 @@ func mustJSON(t *testing.T, resp *http.Response, v interface{}) {
 	}
 }
 
-// waitForHealthy polls /api/health until the memory-service responds HTTP 200
+// waitForHealthy polls /v0/health until the memory-service responds HTTP 200
 // with a JSON body containing a non-empty status field ("healthy" or "unhealthy"),
 // or the timeout elapses. This endpoint is non-blocking on live checks.
 func waitForHealthy(t *testing.T, baseURL string, timeout time.Duration) {
-	t.Logf("Checking memory-service health at %s/api/health (timeout %s)", baseURL, timeout)
+	t.Logf("Checking memory-service health at %s/v0/health (timeout %s)", baseURL, timeout)
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(baseURL + "/api/health")
+		resp, err := http.Get(baseURL + "/v0/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
 			var data struct {
 				Status string `json:"status"`
@@ -74,7 +74,7 @@ func waitForHealthy(t *testing.T, baseURL string, timeout time.Duration) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("memory-service /api/health not responding within %s", timeout)
+	t.Fatalf("memory-service /v0/health not responding within %s", timeout)
 }
 
 // ensureWeaviateTenants adds the given tenant to both MemoryEntry and MemoryContext classes.
@@ -109,7 +109,7 @@ func mustNewRequest(method, url string) *http.Request {
 // Returns the userId to be used by tests.
 func ensureUser(t *testing.T, memSvc, userID, email string) string {
 	// Fast path: exists
-	r, err := http.Get(fmt.Sprintf("%s/api/users/%s", memSvc, userID))
+	r, err := http.Get(fmt.Sprintf("%s/v0/users/%s", memSvc, userID))
 	if err == nil && r.StatusCode == http.StatusOK {
 		_ = r.Body.Close()
 		return userID
@@ -119,7 +119,7 @@ func ensureUser(t *testing.T, memSvc, userID, email string) string {
 	}
 	// Create user
 	payload := fmt.Sprintf(`{"userId":"%s","email":"%s","timeZone":"UTC","displayName":"Test User"}`, userID, email)
-	resp, err := http.Post(memSvc+"/api/users", "application/json", bytes.NewBufferString(payload))
+	resp, err := http.Post(memSvc+"/v0/users", "application/json", bytes.NewBufferString(payload))
 	if err != nil {
 		t.Fatalf("create user %s: %v", userID, err)
 	}
@@ -136,7 +136,7 @@ func ensureUser(t *testing.T, memSvc, userID, email string) string {
 	}
 	// Fallback: check again
 	_ = resp.Body.Close()
-	r2, err := http.Get(fmt.Sprintf("%s/api/users/%s", memSvc, userID))
+	r2, err := http.Get(fmt.Sprintf("%s/v0/users/%s", memSvc, userID))
 	if err == nil && r2.StatusCode == http.StatusOK {
 		_ = r2.Body.Close()
 		return userID

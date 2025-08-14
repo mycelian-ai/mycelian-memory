@@ -30,7 +30,7 @@ var serviceIsHealthy func() bool = func() bool { return healthyFlag.Load() == 1 
 
 func BindServiceHealth(f func() bool) { serviceIsHealthy = f }
 
-// CheckHealth handles GET /api/health
+// CheckHealth handles GET /v0/health
 // Always returns 200; body reports healthy/unhealthy. 500 indicates handler failure only.
 func (h *HealthHandler) CheckHealth(w http.ResponseWriter, r *http.Request) {
 	status := "unhealthy"

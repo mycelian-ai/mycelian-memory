@@ -19,7 +19,7 @@ func TestCreateUser_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/api/users" {
+		if r.URL.Path != "/v0/users" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		// echo minimal user

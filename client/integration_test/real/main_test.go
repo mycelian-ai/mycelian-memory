@@ -15,7 +15,7 @@ import (
 func TestMain(m *testing.M) {
 	baseURL := os.Getenv("TEST_BACKEND_URL")
 	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+		baseURL = "http://localhost:11545"
 	}
 	waitForHealthy(baseURL, 30*time.Second)
 	os.Exit(m.Run())
@@ -24,12 +24,12 @@ func TestMain(m *testing.M) {
 func waitForHealthy(baseURL string, timeout time.Duration) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(baseURL + "/api/health")
+		resp, err := http.Get(baseURL + "/v0/health")
 		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 			var body struct {
 				Status string `json:"status"`
 			}
-			if err := json.NewDecoder(resp.Body).Decode(&body); err == nil && body.Status == "UP" {
+			if err := json.NewDecoder(resp.Body).Decode(&body); err == nil && body.Status == "healthy" {
 				_ = resp.Body.Close()
 				return
 			}
@@ -38,5 +38,5 @@ func waitForHealthy(baseURL string, timeout time.Duration) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	// If not healthy within timeout, fail fast
-	panic("memory-service not healthy at /api/health within timeout")
+	panic("memory-service not healthy at /v0/health within timeout")
 }

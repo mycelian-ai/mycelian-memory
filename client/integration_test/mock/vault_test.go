@@ -26,16 +26,16 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/users/"+userID+"/vaults":
+		case r.Method == http.MethodPost && r.URL.Path == "/v0/users/"+userID+"/vaults":
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults":
 			_ = json.NewEncoder(w).Encode(&vaultListRes)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultTitle:
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultTitle:
 			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID:
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID:
 			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodDelete && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID:
+		case r.Method == http.MethodDelete && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID:
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			w.WriteHeader(http.StatusNotFound)

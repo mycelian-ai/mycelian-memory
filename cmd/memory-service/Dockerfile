@@ -18,7 +18,7 @@ RUN apk --no-cache add ca-certificates curl
 WORKDIR /root/
 COPY --from=builder /app/memory-service .
 
-EXPOSE 8080 9090
+EXPOSE 11545 9090
 CMD ["./memory-service"]
 
 

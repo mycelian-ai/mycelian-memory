@@ -19,7 +19,7 @@ class TestSynapseClientUserCreation:
         mock_create_user.return_value = "new-user-id"
         
         # Create client without specifying user_id
-        client = SynapseMemoryClient("http://localhost:8080")
+        client = SynapseMemoryClient("http://localhost:11545")
         
         # Should use local_user
         assert client.user_id == "local_user"
@@ -34,7 +34,7 @@ class TestSynapseClientUserCreation:
         mock_create_user.return_value = "new-user-123"
         
         # Create client without specifying user_id
-        client = SynapseMemoryClient("http://localhost:8080")
+        client = SynapseMemoryClient("http://localhost:11545")
         
         # Should create new user
         assert client.user_id == "new-user-123"
@@ -47,7 +47,7 @@ class TestSynapseClientUserCreation:
              patch('benchmarks.python.synapse_client.SynapseMemoryClient._create_user_via_cli') as mock_create_user:
             
             # Create client with explicit user_id
-            client = SynapseMemoryClient("http://localhost:8080", user_id="explicit-user")
+            client = SynapseMemoryClient("http://localhost:11545", user_id="explicit-user")
             
             # Should use provided user_id
             assert client.user_id == "explicit-user"
@@ -61,11 +61,11 @@ class TestSynapseClientUserCreation:
         mock_response.status_code = 200
         mock_get.return_value = mock_response
         
-        client = SynapseMemoryClient("http://localhost:8080", user_id="test-user")
+        client = SynapseMemoryClient("http://localhost:11545", user_id="test-user")
         result = client._check_local_user_exists()
         
         assert result is True
-        mock_get.assert_called_once_with("http://localhost:8080/api/users/local_user", timeout=10)
+        mock_get.assert_called_once_with("http://localhost:11545/v0/users/local_user", timeout=10)
 
     @patch('requests.Session.get')
     def test_check_local_user_exists_not_found(self, mock_get):
@@ -74,22 +74,22 @@ class TestSynapseClientUserCreation:
         mock_response.status_code = 404
         mock_get.return_value = mock_response
         
-        client = SynapseMemoryClient("http://localhost:8080", user_id="test-user")
+        client = SynapseMemoryClient("http://localhost:11545", user_id="test-user")
         result = client._check_local_user_exists()
         
         assert result is False
-        mock_get.assert_called_once_with("http://localhost:8080/api/users/local_user", timeout=10)
+        mock_get.assert_called_once_with("http://localhost:11545/v0/users/local_user", timeout=10)
 
     @patch('requests.Session.get')
     def test_check_local_user_exists_handles_exception(self, mock_get):
         """_check_local_user_exists should return False when API call fails."""
         mock_get.side_effect = requests.RequestException("Connection error")
         
-        client = SynapseMemoryClient("http://localhost:8080", user_id="test-user")
+        client = SynapseMemoryClient("http://localhost:11545", user_id="test-user")
         result = client._check_local_user_exists()
         
         assert result is False
-        mock_get.assert_called_once_with("http://localhost:8080/api/users/local_user", timeout=10)
+        mock_get.assert_called_once_with("http://localhost:11545/v0/users/local_user", timeout=10)
 
     @patch('benchmarks.python.synapse_client.SynapseMemoryClient._run_cli')
     @patch('benchmarks.python.synapse_client.uuid.uuid4')
@@ -104,7 +104,7 @@ class TestSynapseClientUserCreation:
         # The CLI should return the user ID that matches our regex pattern
         mock_run_cli.return_value = "User created: 12345678-1234-1234-1234-123456789abc (benchmark-abc12345@example.com)"
         
-        client = SynapseMemoryClient("http://localhost:8080", user_id="test-user")
+        client = SynapseMemoryClient("http://localhost:11545", user_id="test-user")
         result = client._create_user_via_cli()
         
         assert result == "12345678-1234-1234-1234-123456789abc"

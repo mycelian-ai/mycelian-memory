@@ -27,7 +27,7 @@ func CreateVault(ctx context.Context, httpClient *http.Client, baseURL, userID s
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults", baseURL, userID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults", baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func ListVaults(ctx context.Context, httpClient *http.Client, baseURL, userID st
 	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults", baseURL, userID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults", baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func GetVault(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s", baseURL, userID, vaultID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s", baseURL, userID, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func DeleteVault(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 	if err := types.ValidateUserID(userID); err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s", baseURL, userID, vaultID)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s", baseURL, userID, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func GetVaultByTitle(ctx context.Context, httpClient *http.Client, baseURL, user
 	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s", baseURL, userID, vaultTitle)
+	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s", baseURL, userID, vaultTitle)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

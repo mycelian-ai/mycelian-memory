@@ -14,7 +14,7 @@ func TestRunContextPut_Smoke(t *testing.T) {
 		if r.Method != http.MethodPut {
 			t.Fatalf("expected PUT, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, "/api/users/u1/vaults/v1/memories/m1/contexts") {
+		if !strings.HasPrefix(r.URL.Path, "/v0/users/u1/vaults/v1/memories/m1/contexts") {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body struct {
@@ -48,7 +48,7 @@ func TestRunContextGet_Smoke(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, "/api/users/u1/vaults/v1/memories/m1/contexts") {
+		if !strings.HasPrefix(r.URL.Path, "/v0/users/u1/vaults/v1/memories/m1/contexts") {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")

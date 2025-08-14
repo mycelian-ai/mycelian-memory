@@ -14,8 +14,8 @@ func TestClient_Search_Success(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method != http.MethodPost || r.URL.Path != "/api/search" {
-			t.Fatalf("expected POST /api/search")
+		if r.Method != http.MethodPost || r.URL.Path != "/v0/search" {
+			t.Fatalf("expected POST /v0/search")
 		}
 		resp := client.SearchResponse{Entries: []client.SearchEntry{{Entry: client.Entry{ID: "e1"}}}, Count: 1}
 		_ = json.NewEncoder(w).Encode(&resp)

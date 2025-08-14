@@ -26,14 +26,14 @@ func TestClient_MemoryCRUD(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
+		case r.Method == http.MethodPost && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID+"/memories":
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(&m)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID+"/memories":
 			_ = json.NewEncoder(w).Encode(&memListRes)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memoryID:
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID+"/memories/"+memoryID:
 			_ = json.NewEncoder(w).Encode(&m)
-		case r.Method == http.MethodDelete && r.URL.Path == "/api/users/"+userID+"/vaults/"+vaultID+"/memories/"+memoryID:
+		case r.Method == http.MethodDelete && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID+"/memories/"+memoryID:
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			w.WriteHeader(http.StatusNotFound)

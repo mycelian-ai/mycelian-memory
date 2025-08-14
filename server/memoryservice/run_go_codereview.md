@@ -11,7 +11,7 @@ Plan → Act:
 ```136:138:server/memoryservice/run.go
 // Search (reuse embeddings and index from factory)
 search := api.NewSearchHandler(embedding, searchIdx, cfg.SearchAlpha)
-root.HandleFunc("/api/search", search.HandleSearch).Methods("POST")
+root.HandleFunc("/v0/search", search.HandleSearch).Methods("POST")
 ```
   - Fix: either change factory to return `emb.EmbeddingProvider`, or assert before use:
 ```go
@@ -36,7 +36,7 @@ if embedding == nil {
     return fmt.Errorf("embedding provider not configured")
 }
 ```
-  - These should log and continue. Let the `/api/search` route return 503 when unconfigured (it already does), or only register the route when both are present.
+  - These should log and continue. Let the `/v0/search` route return 503 when unconfigured (it already does), or only register the route when both are present.
 
 ### Correctness and robustness
 - Tie background goroutines to a cancelable root context
@@ -92,7 +92,7 @@ if embedProvider == nil {
 ```go
 if embedProvider != nil && searchIdx != nil {
     search := api.NewSearchHandler(embedProvider, searchIdx, cfg.SearchAlpha)
-    root.HandleFunc("/api/search", search.HandleSearch).Methods("POST")
+    root.HandleFunc("/v0/search", search.HandleSearch).Methods("POST")
 }
 ```
 
@@ -105,7 +105,7 @@ ReadHeaderTimeout: 10 * time.Second,
 ```
 
 - Test additions
-  - Add a build check or unit test that instantiates the server without Weaviate/embeddings to ensure startup succeeds and `/api/health` returns healthy once store is OK.
+  - Add a build check or unit test that instantiates the server without Weaviate/embeddings to ensure startup succeeds and `/v0/health` returns healthy once store is OK.
 
 - Status: Completed scan; identified a compile error, optional-dependency startup blockers, and shutdown context leak. Proposed concrete code changes to fix build, make optional deps truly optional, and improve shutdown and logging.
 
@@ -113,5 +113,5 @@ ReadHeaderTimeout: 10 * time.Second,
   - Fix `NewSearchHandler` arg type or factory return type.
   - Don’t return errors when search/embeddings are missing; log and continue.
   - Use a cancelable root context for health checker goroutines.
-  - Optional: register `/api/search` only when both deps exist.
+  - Optional: register `/v0/search` only when both deps exist.
   - Optional: unify embedding interfaces and add `ReadHeaderTimeout`.

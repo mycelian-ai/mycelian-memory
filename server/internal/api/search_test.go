@@ -25,7 +25,7 @@ func TestSearchRequestValidateError(t *testing.T) {
 
 func TestDecodeSearchRequest(t *testing.T) {
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"foo","topK":5}`)
-	r := httptest.NewRequest("POST", "/api/search", body)
+	r := httptest.NewRequest("POST", "/v0/search", body)
 	sr, err := decodeSearchRequest(nil, r)
 	if err != nil {
 		t.Fatalf("decode error: %v", err)

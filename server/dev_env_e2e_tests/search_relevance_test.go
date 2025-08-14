@@ -98,7 +98,7 @@ func waitForObjects(t *testing.T, cl *wvClient, tenant string, want int, timeout
 // createVault returns vaultID and base path for further requests
 func createVault(t *testing.T, memSvc, userID, title string) (string, string) {
 	payload := fmt.Sprintf(`{"title":"%s"}`, title)
-	resp, err := http.Post(fmt.Sprintf("%s/api/users/%s/vaults", memSvc, userID), "application/json", bytes.NewBufferString(payload))
+	resp, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userID), "application/json", bytes.NewBufferString(payload))
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
@@ -109,7 +109,7 @@ func createVault(t *testing.T, memSvc, userID, title string) (string, string) {
 	if _, err := uuid.Parse(v.VaultID); err != nil {
 		t.Fatalf("invalid vaultID")
 	}
-	base := fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userID, v.VaultID)
+	base := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userID, v.VaultID)
 	return v.VaultID, base
 }
 
@@ -143,7 +143,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		t.Skip("short mode")
 	}
 
-	memSvc := env("MEMORY_API", "http://localhost:8080")
+	memSvc := env("MEMORY_API", "http://localhost:11545")
 	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
@@ -180,7 +180,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	title := fmt.Sprintf("alphavault-%d", time.Now().UnixNano())
 	vid, baseVaultPath := createVault(t, memSvc, userResp.UserID, title)
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, userResp.UserID, vid), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vid), nil)
 		_, _ = http.DefaultClient.Do(req)
 	}()
 	var memResp struct {
@@ -247,7 +247,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 		t.Skip("short mode")
 	}
 
-	memSvc := env("MEMORY_API", "http://localhost:8080")
+	memSvc := env("MEMORY_API", "http://localhost:11545")
 	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
@@ -280,7 +280,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	// vault then memory
 	vidT, baseVaultPathT := createVault(t, memSvc, user.UserID, "tagvault")
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, user.UserID, vidT), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, user.UserID, vidT), nil)
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
@@ -333,7 +333,7 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 		t.Skip("short mode")
 	}
 
-	memSvc := env("MEMORY_API", "http://localhost:8080")
+	memSvc := env("MEMORY_API", "http://localhost:11545")
 	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
@@ -357,7 +357,7 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 	}
 	vidM, baseVaultPathM := createVault(t, memSvc, user.UserID, "metavault")
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/api/users/%s/vaults/%s", memSvc, user.UserID, vidM), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, user.UserID, vidM), nil)
 		_, _ = http.DefaultClient.Do(req)
 	}()
 	respM2, _ := http.Post(baseVaultPathM+"/memories", "application/json", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"meta"}`))

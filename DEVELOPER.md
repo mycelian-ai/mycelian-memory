@@ -76,7 +76,7 @@ Before you begin, ensure you have the following installed:
 ```mermaid
 graph TB
     subgraph "API Layer"
-        API[Memory Service API<br/>:8080]
+        API[Memory Service API<br/>:11545]
     end
     
     subgraph "Storage Layer"
@@ -380,7 +380,7 @@ go tool cover -html=coverage.out
 
 # Run specific package tests
 go test ./internal/core/memory/...
-go test ./internal/api/...
+go test ./internal/v0/...
 
 # Run specific test
 go test -run TestMemoryService_Create ./internal/core/memory/
@@ -423,7 +423,7 @@ go test -v -run TestConcurrency
 
 ```bash
 # Run load tests
-go test -bench=. -benchtime=10s ./internal/api/...
+go test -bench=. -benchtime=10s ./internal/v0/...
 
 # Memory profiling
 go test -memprofile=mem.prof ./internal/core/memory/
@@ -442,7 +442,7 @@ go tool pprof cpu.prof
 
 ```bash
 # Service health
-curl -s http://localhost:8080/health | jq .
+curl -s http://localhost:11545/health | jq .
 
 # Weaviate health
 curl -s http://localhost:8082/v1/.well-known/ready
@@ -471,7 +471,7 @@ The system automatically creates a default local user for development:
 You can verify the local user exists:
 ```bash
 # Check if local user was created
-curl -s http://localhost:8080/api/users/local_user | jq .
+curl -s http://localhost:11545/v0/users/local_user | jq .
 
 # Expected response:
 {
@@ -488,32 +488,32 @@ curl -s http://localhost:8080/api/users/local_user | jq .
 
 ```bash
 # Set up environment
-export API="http://localhost:8080"
+export API="http://localhost:11545"
 export EMAIL="debug-$(date +%s)@test.com"
 
 # 1. Create user
-USER_RESPONSE=$(curl -s -X POST "$API/api/users" \
+USER_RESPONSE=$(curl -s -X POST "$API/v0/users" \
   -H 'Content-Type: application/json' \
   -d '{"email":"'"$EMAIL"'","name":"Debug User"}')
 echo "$USER_RESPONSE" | jq .
 export USER_ID=$(echo "$USER_RESPONSE" | jq -r '.userId')
 
 # 2. Create vault
-VAULT_RESPONSE=$(curl -s -X POST "$API/api/users/$USER_ID/vaults" \
+VAULT_RESPONSE=$(curl -s -X POST "$API/v0/users/$USER_ID/vaults" \
   -H 'Content-Type: application/json' \
   -d '{"title":"Debug Vault","description":"Testing vault"}')
 echo "$VAULT_RESPONSE" | jq .
 export VAULT_ID=$(echo "$VAULT_RESPONSE" | jq -r '.vaultId')
 
 # 3. Create memory
-MEMORY_RESPONSE=$(curl -s -X POST "$API/api/users/$USER_ID/vaults/$VAULT_ID/memories" \
+MEMORY_RESPONSE=$(curl -s -X POST "$API/v0/users/$USER_ID/vaults/$VAULT_ID/memories" \
   -H 'Content-Type: application/json' \
   -d '{"title":"Debug Memory","description":"Testing memory"}')
 echo "$MEMORY_RESPONSE" | jq .
 export MEMORY_ID=$(echo "$MEMORY_RESPONSE" | jq -r '.memoryId')
 
 # 4. Add entry
-ENTRY_RESPONSE=$(curl -s -X POST "$API/api/users/$USER_ID/vaults/$VAULT_ID/memories/$MEMORY_ID/entries" \
+ENTRY_RESPONSE=$(curl -s -X POST "$API/v0/users/$USER_ID/vaults/$VAULT_ID/memories/$MEMORY_ID/entries" \
   -H 'Content-Type: application/json' \
   -d '{"rawText":"The quick brown fox jumps over the lazy dog","summary":"Test entry"}')
 echo "$ENTRY_RESPONSE" | jq .
@@ -524,7 +524,7 @@ echo "Waiting for indexer..."
 sleep 3
 
 # 6. Search
-SEARCH_RESPONSE=$(curl -s -X POST "$API/api/search" \
+SEARCH_RESPONSE=$(curl -s -X POST "$API/v0/search" \
   -H 'Content-Type: application/json' \
   -d '{"userId":"'"$USER_ID"'","memoryId":"'"$MEMORY_ID"'","query":"fox","topK":5}')
 echo "$SEARCH_RESPONSE" | jq .
@@ -620,7 +620,7 @@ curl -s -X POST http://localhost:8082/v1/graphql \
 
 ```bash
 # Find process using port
-lsof -i :8080
+lsof -i :11545
 # or
 netstat -tulpn | grep 8080
 
@@ -758,9 +758,9 @@ To add a new storage backend:
 
 ### Extending the API
 
-1. **Define the endpoint** in `internal/api/router.go`
-2. **Create handler** in `internal/api/http/`
-3. **Add validation** in `internal/api/validate/`
+1. **Define the endpoint** in `internal/v0/router.go`
+2. **Create handler** in `internal/v0/http/`
+3. **Add validation** in `internal/v0/validate/`
 4. **Implement business logic** in `internal/core/`
 5. **Add tests** at each layer
 6. **Update API documentation**
@@ -779,10 +779,10 @@ Example profiling:
 ENABLE_PROFILING=true ./bin/memory-service
 
 # Capture CPU profile
-go tool pprof http://localhost:8080/debug/pprof/profile
+go tool pprof http://localhost:11545/debug/pprof/profile
 
 # Capture memory profile
-go tool pprof http://localhost:8080/debug/pprof/heap
+go tool pprof http://localhost:11545/debug/pprof/heap
 ```
 
 ## Community
