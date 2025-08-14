@@ -33,8 +33,6 @@ type Config struct {
 	// gRPC Configuration
 	GRPCPort int `envconfig:"GRPC_PORT" default:"9090"`
 
-	// Spanner removed
-
 	// Postgres Configuration
 	PostgresDSN string `envconfig:"POSTGRES_DSN" default:""`
 
@@ -42,9 +40,6 @@ type Config struct {
 	EmbedProvider string  `envconfig:"EMBED_PROVIDER" default:"ollama"`
 	EmbedModel    string  `envconfig:"EMBED_MODEL" default:"nomic-embed-text"`
 	SearchAlpha   float32 `envconfig:"SEARCH_ALPHA" default:"0.6"`
-
-	// SQLite support removed
-	// SQLitePath string `envconfig:"SQLITE_PATH" default:""`
 
 	// Vector search index endpoint (provider-agnostic)
 	SearchIndexURL string `envconfig:"SEARCH_INDEX_URL" default:""`
@@ -81,8 +76,6 @@ func (c *Config) ResolveDefaults() error {
 		c.DBDriver = defaultDB
 	}
 
-	// SQLite removed: no local file path derivation
-
 	allowedDB := map[string]bool{"postgres": true}
 	if !allowedDB[c.DBDriver] {
 		return fmt.Errorf("unsupported DB_DRIVER: %s", c.DBDriver)
@@ -109,11 +102,9 @@ func New() (*Config, error) {
 		Str("db_driver", cfg.DBDriver).
 		Str("environment", string(cfg.Environment)).
 		Int("port", cfg.HTTPPort).
-		// spanner removed
 		Str("embed_provider", cfg.EmbedProvider).
 		Str("embed_model", cfg.EmbedModel).
 		Float32("search_alpha", cfg.SearchAlpha).
-		// sqlite removed
 		Str("postgres_dsn_present", func() string {
 			if cfg.PostgresDSN != "" {
 				return "true"
@@ -139,8 +130,6 @@ func NewForTesting() *Config {
 
 	cfg.HTTPPort = 8080
 
-	// spanner removed
-
 	cfg.EmbedProvider = "ollama"
 	cfg.EmbedModel = "nomic-embed-text"
 	cfg.SearchAlpha = 0.6
@@ -165,8 +154,6 @@ func (c *Config) IsTesting() bool {
 func (c *Config) IsProduction() bool {
 	return c.Environment == EnvProduction
 }
-
-// spanner helpers removed
 
 // GetHTTPAddr returns the HTTP server address
 func (c *Config) GetHTTPAddr() string {

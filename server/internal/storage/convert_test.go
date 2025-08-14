@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// convertJSONToMap was part of Spanner adapter; ensure a minimal local copy for the test.
 func convertJSONToMap(v interface{}) (map[string]interface{}, error) {
 	switch val := v.(type) {
 	case map[string]interface{}:

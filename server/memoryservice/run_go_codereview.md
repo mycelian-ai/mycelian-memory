@@ -51,7 +51,7 @@ if embedding == nil {
   - There are two identical embedding interfaces: `embeddings.EmbeddingProvider` and `searchindex.Embeddings`. Pick one (recommend `embeddings.EmbeddingProvider`) and standardize factory/handlers to it to avoid type assertions and reduce confusion.
 
 - Logging clarity for optional deps
-  - On startup, log whether search index and embeddings are enabled/disabled with key config (provider, model, Waviate URL). Replace hard errors with `Info`/`Warn` as appropriate.
+  - On startup, log whether search index and embeddings are enabled/disabled with key config (provider, model, Weaviate URL). Replace hard errors with `Info`/`Warn` as appropriate.
 
 - Improve HTTP server hardening (minor)
   - Consider adding `ReadHeaderTimeout` and, if desired, `MaxHeaderBytes`. Current read/write/idle timeouts are fine.
@@ -105,7 +105,7 @@ ReadHeaderTimeout: 10 * time.Second,
 ```
 
 - Test additions
-  - Add a build check or unit test that instantiates the server without Waviate/embeddings to ensure startup succeeds and `/api/health` returns healthy once store is OK.
+  - Add a build check or unit test that instantiates the server without Weaviate/embeddings to ensure startup succeeds and `/api/health` returns healthy once store is OK.
 
 - Status: Completed scan; identified a compile error, optional-dependency startup blockers, and shutdown context leak. Proposed concrete code changes to fix build, make optional deps truly optional, and improve shutdown and logging.
 

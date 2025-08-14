@@ -30,20 +30,20 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:8080")
-	waviate := env("WAVIATE_URL", "http://localhost:8082")
+	weaviate := env("WEAVIATE_URL", "http://localhost:8082")
 
 	// quick connectivity checks – skip if the stack isn't up
-	for _, url := range []string{memSvc + "/api/health", waviate + "/v1/meta"} {
+	for _, url := range []string{memSvc + "/api/health", weaviate + "/v1/meta"} {
 		if err := ping(url); err != nil {
 			t.Skipf("service %s unreachable: %v", url, err)
 		}
 	}
 
-	// 1. Ensure dedicated test user and create waviate tenant
+	// 1. Ensure dedicated test user and create weaviate tenant
 	userResp := struct {
 		UserID string `json:"userId"`
 	}{UserID: ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")}
-	ensureWaviateTenants(t, waviate, userResp.UserID)
+	ensureWeaviateTenants(t, weaviate, userResp.UserID)
 
 	// 2. Create vault then memory (unique per run) and ensure cleanup
 	var vaultResp struct {
@@ -138,7 +138,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("entry %s not visible in Weaviate within timeout", entryResp.EntryID)
 		}
-		r, err := http.Post(waviate+"/v1/graphql", "application/json", bytes.NewBuffer(buf))
+		r, err := http.Post(weaviate+"/v1/graphql", "application/json", bytes.NewBuffer(buf))
 		if err == nil && r.StatusCode == http.StatusOK {
 			var out struct {
 				Data struct {
@@ -172,13 +172,13 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:8080")
-	waviate := env("WAVIATE_URL", "http://localhost:8082")
+	weaviate := env("WEAVIATE_URL", "http://localhost:8082")
 	ollama := env("OLLAMA_URL", "http://localhost:11434")
 	embedMod := env("EMBED_MODEL", "nomic-embed-text")
 
 	// Ensure services are reachable
 	waitForHealthy(t, memSvc, 3*time.Second)
-	for _, url := range []string{memSvc + "/api/health", waviate + "/v1/meta", ollama + "/api/tags"} {
+	for _, url := range []string{memSvc + "/api/health", weaviate + "/v1/meta", ollama + "/api/tags"} {
 		if err := ping(url); err != nil {
 			t.Skipf("service %s unreachable: %v", url, err)
 		}
@@ -188,12 +188,12 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Fatalf("ollama model %s not available", embedMod)
 	}
 
-	// 1. ensure test_user and create waviate tenant
+	// 1. ensure test_user and create weaviate tenant
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
 	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
-	ensureWaviateTenants(t, waviate, userResp.UserID)
+	ensureWeaviateTenants(t, weaviate, userResp.UserID)
 
 	// 2. vault then memory
 	var vaultResp struct {
@@ -237,7 +237,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	mustJSON(t, resp, &entryResp)
 
 	// 4. Wait until the object is ingested into Weaviate
-	objectURL := fmt.Sprintf("%s/v1/objects/MemoryEntry/%s?tenant=%s", waviate, entryResp.EntryID, userResp.UserID)
+	objectURL := fmt.Sprintf("%s/v1/objects/MemoryEntry/%s?tenant=%s", weaviate, entryResp.EntryID, userResp.UserID)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		r, err := http.Get(objectURL)

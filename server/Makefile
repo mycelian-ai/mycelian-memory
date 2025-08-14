@@ -1,15 +1,14 @@
 # ==============================================================================
-# Synapse Memory Backend - Makefile
+# Mycelian Memory Backend - Makefile
 # ==============================================================================
 #
-# This Makefile provides build automation for the Synapse Memory Backend project.
+# This Makefile provides build automation for the Mycelian Memory Backend project.
 # It handles both application binaries and development tools.
 #
 # QUICK START:
 #   make build                    - Build all application code
 #   make test                     - Run all tests
-#   make build-tools              - Build development tools
-#   (Spanner emulator removed)
+#   make run-postgres             - Start Postgres backend stack
 #   make help                     - Show all available targets
 #
 # PROJECT STRUCTURE:
@@ -17,16 +16,18 @@
 #   internal/                     - Shared internal packages
 #
 # DEPENDENCIES:
-#   - Go 1.24.3 or later
-#   - Postgres (for local development)
+#   - Go 1.24.6 or later
+#   - Docker Desktop (for Postgres stack)
 #   - Make sure GOPATH and GOROOT are properly configured
 #
 # DEVELOPMENT WORKFLOW:
 #   1. Build and test: make build test
-#   4. Run service: ./bin/memory-service (after building)
+#   2. Start backend: make run-postgres
+#   3. Run service: ./bin/memory-service (after building)
 #
 # PRODUCTION DEPLOYMENT:
 #   - Build binaries with appropriate GOOS/GOARCH for target platform
+#   - Use Aurora Serverless V2 for production Postgres
 #
 # ==============================================================================
 
@@ -54,13 +55,14 @@ help:
 	@echo "  make docker-status            - Show Docker service status"
 	@echo "  make docker-help              - Show detailed Docker commands"
 	@echo ""
-	@echo "🔧 DEVELOPMENT TOOLS:"
-	@echo "  (schema-manager removed)"
-	@echo ""
-	@echo "🗄️  DATABASE SCHEMA: (Spanner removed)"
+	@echo "🔧 POSTGRES BACKEND:"
+	@echo "  make run-postgres             - Start Postgres + Weaviate stack"
+	@echo "  make clean-postgres-data      - Reset Postgres data (DANGEROUS)"
 	@echo ""
 	@echo "💡 QUICK START:"
 	@echo "  1. make build test"
+	@echo "  2. make run-postgres"
+	@echo "  3. ./bin/memory-service"
 	@echo ""
 	@echo "📚 For more details, see the file header comments in this Makefile"
 
@@ -138,8 +140,7 @@ docker-logs:
 docker-clean:
 	./scripts/start-headless.sh --clean 
 
-# Short concise local run targets
- # spanner run target removed
+# Postgres backend targets
 
 
 .PHONY: run-postgres
@@ -156,6 +157,5 @@ clean-postgres-data:
 	rm -rf ../data/postgres && mkdir -p ../data/postgres && echo "Postgres data directory reset."
 
 
-# Map previous long form targets to new concise names (for backwards compatibility)
-# spanner aliases removed
+# Backwards compatibility aliases
 docker-run-postgres: run-postgres

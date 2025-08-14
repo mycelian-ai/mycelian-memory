@@ -80,8 +80,7 @@ graph TB
     end
     
     subgraph "Storage Layer"
-        SQLite[SQLite<br/>Local Dev]
-        Spanner[Spanner<br/>Production]
+        Postgres[Postgres<br/>:5432]
     end
     
     subgraph "Search Layer"
@@ -91,34 +90,29 @@ graph TB
     
     subgraph "CLI Tools"
         ServiceTools[mycelian-service-tools]
-        ServiceTools[mycelian-service-tools]
     end
     
-    API --> SQLite
-    API --> Spanner
-    Indexer --> SQLite
-    Indexer --> Spanner
+    API --> Postgres
+    Indexer --> Postgres
     Indexer --> Weaviate
     API --> Weaviate
     
-    MemCtl --> API
-    Schema --> Spanner
+    ServiceTools --> API
 ```
 
 ### Data Flow
 
-1. **Write Path**: Client → API → Storage (SQLite/Spanner) → Event Bus → Indexer → Weaviate
-2. **Read Path**: Client → API → Storage (for metadata) + Weaviate (for search)
+1. **Write Path**: Client → API → Postgres → Event Bus → Indexer → Weaviate
+2. **Read Path**: Client → API → Postgres (for metadata) + Weaviate (for search)
 3. **Search Path**: Client → API → Weaviate → Ranked Results
 
-### Storage Backends
+### Storage Backend
 
-The system supports multiple storage backends:
+The system uses Postgres as its primary storage backend:
 
 | Backend | Use Case | Configuration |
 |---------|----------|---------------|
-| SQLite | Local development, testing | `DB_ENGINE=sqlite` |
-| Spanner | Production, high scale | `DB_ENGINE=spanner` |
+| Postgres | All environments | `DB_ENGINE=postgres` |
 
 ## Local Development
 
@@ -163,16 +157,15 @@ make --version
    PORT=8080
    LOG_LEVEL=debug
    
-   # Database Selection
-   DB_ENGINE=sqlite  # or 'spanner'
+   # Database Configuration
+   DB_ENGINE=postgres
    
-   # SQLite Configuration
-   SQLITE_PATH=~/.mycelian-memory/memory.db
-   
-   # Spanner Configuration (if using)
-   SPANNER_PROJECT=test-project
-   SPANNER_INSTANCE=test-instance
-   SPANNER_DATABASE=memory-backend
+   # Postgres Configuration
+   POSTGRES_HOST=localhost
+   POSTGRES_PORT=5432
+   POSTGRES_USER=mycelian_user
+   POSTGRES_PASSWORD=mycelian_password
+   POSTGRES_DATABASE=mycelian_memory
    
    # Weaviate Configuration
    WEAVIATE_URL=http://localhost:8082
@@ -181,7 +174,7 @@ make --version
 3. **Local Development User**: The system automatically creates a default local user for development:
    - **User ID**: `local_user`
    - **Email**: `dev@localhost`
-   - **Display Name**: `Local Developer` (SQLite local) / `Local User` (Docker)
+   - **Display Name**: `Local Developer`
    - **Time Zone**: `UTC`
    - **Status**: `ACTIVE`
 
@@ -200,20 +193,17 @@ make backend-status
 make backend-logs
 ```
 
-#### Production-like Setup (Spanner + Weaviate)
+#### Production Setup (Postgres + Weaviate)
 
 ```bash
-# Start Spanner emulator first
-gcloud emulators spanner start
-
-# Create schema
-make schema-create-emulator
-
 # Start all services
-make docker-run-spanner
+make backend-postgres-up
 
 # Verify services
-make docker-status
+make backend-status
+
+# View logs
+make backend-logs
 ```
 
 ## Development Workflow
@@ -256,7 +246,7 @@ memory-backend/
    ```bash
    # Format: type(scope): subject
    git commit -m "feat(memory): add context validation"
-   git commit -m "fix(storage): handle nil pointer in spanner client"
+   git commit -m "fix(storage): handle nil pointer in postgres client"
    git commit -m "docs(api): update search endpoint documentation"
    ```
 
@@ -316,13 +306,13 @@ GOOS=linux GOARCH=amd64 go build -o bin/memory-service-linux ./cmd/memory-servic
 #### Local Development (No Docker)
 
 ```bash
-# Build and run with SQLite
+# Build and run locally
 make run-local
 
 # Or manually with custom settings
 BUILD_TARGET=local \
-  DB_ENGINE=sqlite \
-  SQLITE_PATH=./test.db \
+  DB_ENGINE=postgres \
+  POSTGRES_HOST=localhost \
   PORT=8080 \
   ./bin/memory-service
 ```
@@ -465,7 +455,7 @@ curl -s http://localhost:8082/v1/.well-known/ready
 
 The system automatically creates a default local user for development:
 
-**SQLite Local Development**: Uses `EnsureDefaultUser()` function
+**Local Development**: Uses `EnsureDefaultUser()` function
 - Creates user if Users table is empty
 - User ID: `local_user`
 - Email: `dev@localhost`
@@ -476,7 +466,7 @@ The system automatically creates a default local user for development:
 - Uses `mycelian-service-tools` CLI to create user via API
 - User ID: `local_user`
 - Email: `dev@localhost`
-- Display Name: `Local User`
+- Display Name: `Local Developer`
 
 You can verify the local user exists:
 ```bash
@@ -542,17 +532,16 @@ echo "$SEARCH_RESPONSE" | jq .
 
 ### Database Debugging
 
-#### SQLite Debugging
+#### Postgres Debugging
 
 ```bash
 # Connect to database
-sqlite3 ~/.mycelian-memory/memory.db
+psql postgresql://mycelian_user:mycelian_password@localhost:5432/mycelian_memory
 
 # Useful queries
-.tables
-.schema users
-.mode column
-.headers on
+\dt                           # List tables
+\d users                      # Describe users table
+\d+ memories                  # Describe memories table with details
 
 SELECT * FROM users ORDER BY created_at DESC LIMIT 5;
 SELECT * FROM vaults WHERE user_id = 'YOUR_USER_ID';
@@ -560,19 +549,10 @@ SELECT * FROM memories WHERE vault_id = 'YOUR_VAULT_ID';
 SELECT COUNT(*) as entry_count, memory_id 
   FROM entries 
   GROUP BY memory_id;
-```
 
-#### Spanner Debugging
-
-```bash
-# Using gcloud CLI
-gcloud spanner databases execute-sql memory-backend \
-  --instance=test-instance \
-  --sql="SELECT * FROM users LIMIT 10"
-
-# Check schema
-gcloud spanner databases ddl describe memory-backend \
-  --instance=test-instance
+# Check database size and activity
+SELECT pg_size_pretty(pg_database_size('mycelian_memory'));
+SELECT * FROM pg_stat_activity WHERE datname = 'mycelian_memory';
 ```
 
 ### Search Debugging
@@ -668,20 +648,18 @@ docker stats
 
 #### Database Connection Issues
 
-1. **SQLite**: Check file permissions
+1. **Postgres**: Check connection and permissions
    ```bash
-   ls -la ~/.mycelian-memory/
-   chmod 755 ~/.mycelian-memory
-   chmod 644 ~/.mycelian-memory/memory.db
-   ```
-
-2. **Spanner**: Verify emulator is running
-   ```bash
-   # Check if emulator is running
-   ps aux | grep spanner
+   # Test database connection
+   psql postgresql://mycelian_user:mycelian_password@localhost:5432/mycelian_memory -c "SELECT version();"
    
-   # Test connection
-   gcloud spanner instances list --project=test-project
+   # Check if Postgres is running
+   ps aux | grep postgres
+   docker ps | grep postgres
+   
+   # Check port availability
+   netstat -tulpn | grep 5432
+   lsof -i :5432
    ```
 
 #### Search Not Working

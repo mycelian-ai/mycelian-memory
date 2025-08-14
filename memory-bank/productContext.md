@@ -46,7 +46,7 @@ Mycelian Memory provides a universal, persistent memory layer that:
 
 ### For Operations Teams
 - **Observable**: Metrics, logging, and health checks built-in
-- **Scalable**: Proven architecture (Cloud Spanner) for enterprise scale
+- **Scalable**: Proven architecture (Aurora Serverless V2) for enterprise scale
 - **Secure**: No hardcoded credentials, environment-based config
 - **Maintainable**: Clean separation of concerns, comprehensive documentation
 

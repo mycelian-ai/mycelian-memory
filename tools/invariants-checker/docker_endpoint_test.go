@@ -39,15 +39,6 @@ func TestDockerEndpointAvailability(t *testing.T) {
 		t.Logf("✅ Docker service is running and healthy")
 	})
 
-	t.Run("🐳 Spanner Emulator Connection", func(t *testing.T) {
-		resp, err := http.Get(baseURL + "/api/health/spanner")
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		require.Equal(t, http.StatusOK, resp.StatusCode,
-			"Spanner emulator connection failed")
-		t.Logf("✅ Spanner emulator connection is healthy")
-	})
 }
 
 // TestDockerEndpointContract verifies all expected endpoints are available

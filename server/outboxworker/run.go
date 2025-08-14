@@ -48,8 +48,8 @@ func Run() error {
 	}
 
 	// Ensure schema exists in dev/e2e; safe to call repeatedly.
-	_ = searchindex.BootstrapWaviate(context.Background(), cfg.SearchIndexURL)
-	idx, err := searchindex.NewWaviateNativeIndex(cfg.SearchIndexURL)
+	_ = searchindex.BootstrapWeaviate(context.Background(), cfg.SearchIndexURL)
+	idx, err := searchindex.NewWeaviateNativeIndex(cfg.SearchIndexURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("search index")
 	}

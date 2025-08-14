@@ -2,17 +2,11 @@
 """
 Delete all memories and related data within a vault by vault ID.
 
-Supports Postgres (primary) and legacy SQLite (deprecated).
-
 Usage:
-    # Postgres (recommended)
     python delete_vault_memories.py <vault_id> --pg-dsn "postgres://user:pass@host:5432/db?sslmode=disable" [--delete-vault] [--yes]
     
-    # or rely on environment (MEMORY_SERVER_POSTGRES_DSN)
-    MEMORY_SERVER_POSTGRES_DSN=postgres://... python delete_vault_memories.py <vault_id> [--delete-vault] [--yes]
-
-    # Legacy SQLite (deprecated)
-    python delete_vault_memories.py <vault_id> --db-path /path/to/memory.db [--delete-vault] [--yes]
+    # or rely on environment (MEMORY_BACKEND_POSTGRES_DSN)
+    MEMORY_BACKEND_POSTGRES_DSN=postgres://... python delete_vault_memories.py <vault_id> [--delete-vault] [--yes]
 
 Examples:
     # Preview what will be deleted (safe)
@@ -27,9 +21,7 @@ Examples:
 
 import argparse
 import os
-import sqlite3
 import sys
-from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
 try:
@@ -39,99 +31,6 @@ except Exception:
 
 
 class VaultMemoryDeleter:
-    def __init__(self, db_path: str):
-        self.db_path = Path(db_path)
-        if not self.db_path.exists():
-            raise FileNotFoundError(f"Database file not found: {db_path}")
-    
-    def get_vault_info(self, vault_id: str) -> Dict[str, Any]:
-        """Get vault information and statistics."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            # Get vault info
-            cursor.execute(
-                "SELECT UserId, Title, Description, CreationTime FROM Vaults WHERE VaultId = ?",
-                (vault_id,)
-            )
-            vault = cursor.fetchone()
-            
-            if not vault:
-                return None
-            
-            # Get counts
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM Memories WHERE VaultId = ?",
-                (vault_id,)
-            )
-            memory_count = cursor.fetchone()['count']
-            
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM MemoryEntries WHERE VaultId = ?",
-                (vault_id,)
-            )
-            entry_count = cursor.fetchone()['count']
-            
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM MemoryContexts WHERE VaultId = ?",
-                (vault_id,)
-            )
-            context_count = cursor.fetchone()['count']
-            
-            return {
-                'vault': dict(vault),
-                'memory_count': memory_count,
-                'entry_count': entry_count,
-                'context_count': context_count
-            }
-    
-    def get_memories_list(self, vault_id: str) -> List[Tuple[str, str, str]]:
-        """Get list of memories in the vault."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT Title, MemoryType, Description FROM Memories WHERE VaultId = ? ORDER BY Title",
-                (vault_id,)
-            )
-            return cursor.fetchall()
-    
-    def delete_vault_memories(self, vault_id: str, delete_vault: bool = False) -> Dict[str, int]:
-        """Delete all memories and related data from the vault."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Delete in proper order to maintain referential integrity
-            
-            # 1. Delete memory entries
-            cursor.execute("DELETE FROM MemoryEntries WHERE VaultId = ?", (vault_id,))
-            entries_deleted = cursor.rowcount
-            
-            # 2. Delete memory contexts
-            cursor.execute("DELETE FROM MemoryContexts WHERE VaultId = ?", (vault_id,))
-            contexts_deleted = cursor.rowcount
-            
-            # 3. Delete memories
-            cursor.execute("DELETE FROM Memories WHERE VaultId = ?", (vault_id,))
-            memories_deleted = cursor.rowcount
-            
-            # 4. Optionally delete the vault itself
-            vault_deleted = 0
-            if delete_vault:
-                cursor.execute("DELETE FROM Vaults WHERE VaultId = ?", (vault_id,))
-                vault_deleted = cursor.rowcount
-            
-            conn.commit()
-            
-            return {
-                'entries_deleted': entries_deleted,
-                'contexts_deleted': contexts_deleted,
-                'memories_deleted': memories_deleted,
-                'vault_deleted': vault_deleted
-            }
-
-
-class PostgresVaultMemoryDeleter:
     """Postgres deleter for vault data using DSN connection string."""
 
     def __init__(self, pg_dsn: str):
@@ -268,16 +167,12 @@ def main():
         help='UUID of the vault to delete memories from'
     )
     
-    parser.add_argument(
-        '--db-path',
-        default='',
-        help='(Deprecated) Path to legacy SQLite database file if still present'
-    )
+
 
     parser.add_argument(
         '--pg-dsn',
-        default=os.getenv('MEMORY_SERVER_POSTGRES_DSN', ''),
-        help='Postgres DSN (e.g., postgres://user:pass@host:5432/db?sslmode=disable). Defaults to MEMORY_SERVER_POSTGRES_DSN'
+        default=os.getenv('MEMORY_BACKEND_POSTGRES_DSN', ''),
+        help='Postgres DSN (e.g., postgres://user:pass@host:5432/db?sslmode=disable). Defaults to MEMORY_BACKEND_POSTGRES_DSN'
     )
     
     parser.add_argument(
@@ -295,14 +190,11 @@ def main():
     args = parser.parse_args()
     
     try:
-        # Initialize deleter (prefer Postgres)
-        deleter_obj = None
-        if args.pg_dsn:
-            deleter_obj = PostgresVaultMemoryDeleter(args.pg_dsn)
-        elif args.db_path:
-            deleter_obj = VaultMemoryDeleter(args.db_path)
-        else:
-            raise ValueError("Provide --pg-dsn (recommended) or --db-path (legacy SQLite)")
+        # Initialize Postgres deleter
+        if not args.pg_dsn:
+            raise ValueError("Postgres DSN is required. Provide --pg-dsn or set MEMORY_BACKEND_POSTGRES_DSN environment variable")
+        
+        deleter_obj = VaultMemoryDeleter(args.pg_dsn)
         
         # Get vault info
         vault_info = deleter_obj.get_vault_info(args.vault_id)

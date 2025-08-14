@@ -19,7 +19,7 @@ func NewSearchIndex(ctx context.Context, cfg *config.Config, log zerolog.Logger)
 	}
 
 	// Create Weaviate index client
-	idx, err := searchindex.NewWaviateNativeIndex(cfg.SearchIndexURL)
+	idx, err := searchindex.NewWeaviateNativeIndex(cfg.SearchIndexURL)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func NewSearchIndex(ctx context.Context, cfg *config.Config, log zerolog.Logger)
 		bootstrapCtx, cancel := context.WithTimeout(ctx, bootstrapTimeout)
 		defer cancel()
 
-		if err := searchindex.BootstrapWaviate(bootstrapCtx, cfg.SearchIndexURL); err != nil {
+		if err := searchindex.BootstrapWeaviate(bootstrapCtx, cfg.SearchIndexURL); err != nil {
 			log.Warn().Err(err).Str("url", cfg.SearchIndexURL).Msg("search index bootstrap failed")
 		} else {
 			log.Debug().Str("url", cfg.SearchIndexURL).Msg("search index bootstrap completed")

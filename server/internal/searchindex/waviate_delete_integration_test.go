@@ -9,19 +9,19 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 )
 
-// TestWaviateDeleteSuite validates delete operations on the search index implementation.
-// Requires a running Waviate instance (set WAVIATE_URL to host:port). Skipped otherwise.
-func TestWaviateDeleteSuite(t *testing.T) {
-	host := os.Getenv("WAVIATE_URL")
+// TestWeaviateDeleteSuite validates delete operations on the search index implementation.
+// Requires a running Weaviate instance (set WEAVIATE_URL to host:port). Skipped otherwise.
+func TestWeaviateDeleteSuite(t *testing.T) {
+	host := os.Getenv("WEAVIATE_URL")
 	if host == "" {
-		t.Skip("WAVIATE_URL not set; skipping search index delete suite")
+		t.Skip("WEAVIATE_URL not set; skipping search index delete suite")
 	}
 
-	if err := searchindex.BootstrapWaviate(context.Background(), host); err != nil {
-		t.Fatalf("bootstrap waviate: %v", err)
+	if err := searchindex.BootstrapWeaviate(context.Background(), host); err != nil {
+		t.Fatalf("bootstrap weaviate: %v", err)
 	}
 
-	idx, err := searchindex.NewWaviateNativeIndex(host)
+	idx, err := searchindex.NewWeaviateNativeIndex(host)
 	if err != nil {
 		t.Fatalf("new index: %v", err)
 	}

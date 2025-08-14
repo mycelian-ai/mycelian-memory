@@ -34,16 +34,13 @@ go fmt ./... && go vet ./... && go test -race ./... && go mod tidy && go build .
 
 ### Service Management
 ```bash
-# SQLite backend (local development)
-make backend-sqlite-up        # Start SQLite + Weaviate stack
-make backend-down            # Stop all services
-make backend-status          # Show service status
-
-# Spanner backend (production-like)
-make backend-spanner-up      # Start Spanner emulator stack
+# Postgres backend (local development)
+make backend-postgres-up     # Start Postgres + Weaviate stack
+make backend-down           # Stop all services
+make backend-status         # Show service status
 
 # MCP Server (for Claude integration)
-make mcp-streamable-up       # Start MCP server on streamable HTTP
+make mcp-streamable-up      # Start MCP server on streamable HTTP
 ```
 
 ## Architecture Overview
@@ -72,7 +69,7 @@ Vault (tenant) → Memory (context) → Entry (data)
 Agent (Claude) → MCP Protocol → mycelian-mcp-server → Go Client SDK → Memory Service API
                                                                    ↓
                                                                Storage Layer
-                                                          (SQLite/Spanner + Weaviate)
+                                                            (Postgres + Weaviate)
 ```
 
 ### Key Components
@@ -88,11 +85,10 @@ Agent (Claude) → MCP Protocol → mycelian-mcp-server → Go Client SDK → Me
 The system auto-creates a default user for development:
 - **User ID**: `local_user`
 - **Email**: `dev@localhost` 
-- **Display Name**: `Local Developer` (SQLite) / `Local User` (Docker)
+- **Display Name**: `Local Developer`
 
 ### Storage Backends
-- **SQLite**: Local development (`DB_ENGINE=sqlite`, uses ~/.mycelian-memory/)
-- **Spanner**: Production scale (`DB_ENGINE=spanner`, requires emulator setup)
+- **Postgres**: Primary relational storage (`DB_ENGINE=postgres`)
 - **Weaviate**: Vector search (port 8082)
 
 ### Multi-Agent Memory Support
@@ -123,7 +119,7 @@ Before any commit touching **Critical** code (HTTP handlers, transaction logic, 
 - **Types**: feat, fix, docs, style, refactor, test, chore
 - **Examples**: 
   - `feat(memory): add context validation`
-  - `fix(storage): handle nil pointer in spanner client`
+  - `fix(storage): handle nil pointer in postgres client`
 
 ### Pre-commit Checklist
 1. `go fmt ./...` - Format code
@@ -154,11 +150,11 @@ curl http://localhost:8082/v1/.well-known/ready
 
 ### Database Management
 ```bash
-# Create Spanner schema (requires emulator)
-make schema-create-emulator
+# Start Postgres backend (includes schema initialization)
+make backend-postgres-up
 
-# SQLite inspection
-sqlite3 ~/.mycelian-memory/memory.db
+# Postgres inspection
+psql postgresql://user:password@localhost:5432/mycelian_memory
 ```
 
 ### Live Schema Management
@@ -194,6 +190,6 @@ Claude can store and retrieve context across sessions, maintaining continuity of
 
 - **Python Environment**: Always activate venv and set PATH before Python operations
 - **Build Targets**: All binaries go to `bin/` directory for deterministic paths
-- **Docker Compose**: Different files for SQLite vs Spanner backends
+- **Docker Compose**: Postgres backend with Weaviate vector search
 - **MCP Integration**: Streamable HTTP for Cursor, standard JSON-RPC for other clients
 - **Workspace Coordination**: Use `go work` commands for cross-module operations

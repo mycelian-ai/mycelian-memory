@@ -9,9 +9,9 @@ import (
 	"github.com/weaviate/weaviate/entities/models"
 )
 
-// BootstrapWaviate ensures required classes exist with multi-tenancy enabled.
+// BootstrapWeaviate ensures required classes exist with multi-tenancy enabled.
 // In dev/e2e, if classes exist without MT enabled, they are dropped and recreated.
-func BootstrapWaviate(ctx context.Context, baseURL string) error {
+func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 	cfg := weaviate.Config{Scheme: "http", Host: baseURL}
 	cl, err := weaviate.NewClient(cfg)
 	if err != nil {

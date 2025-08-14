@@ -144,13 +144,13 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:8080")
-	waviateURL := env("WAVIATE_URL", "http://localhost:8082")
+	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
 	// connectivity checks
 	waitForHealthy(t, memSvc, 3*time.Second)
-	// Always require Waviate; only ping Ollama if provider is ollama
-	urls := []string{waviateURL + "/v1/meta"}
+	// Always require Weaviate; only ping Ollama if provider is ollama
+	urls := []string{weaviateURL + "/v1/meta"}
 	if strings.EqualFold(os.Getenv("MEMORY_SERVER_EMBED_PROVIDER"), "ollama") {
 		urls = append(urls, ollamaURL+"/api/tags")
 	}
@@ -160,21 +160,21 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		}
 	}
 
-	// Embedder is configured in the service; tests call Waviate directly here.
+	// Embedder is configured in the service; tests call Weaviate directly here.
 	// Keep a light bootstrap to ensure classes exist.
-	_ = searchindex.BootstrapWaviate
+	_ = searchindex.BootstrapWeaviate
 	embedder := newTestEmbedder()
 	// quick health check (skip test if local model isn't loaded)
 	if _, err := embedder.Embed(context.Background(), "healthcheck"); err != nil {
 		t.Skipf("ollama not responding: %v", err)
 	}
 
-	// 1. ensure test_user and waviate tenant
+	// 1. ensure test_user and weaviate tenant
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
 	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
-	ensureWaviateTenants(t, waviateURL, userResp.UserID)
+	ensureWeaviateTenants(t, weaviateURL, userResp.UserID)
 
 	// 2. vault and memory (unique per run) with cleanup
 	title := fmt.Sprintf("alphavault-%d", time.Now().UnixNano())
@@ -199,7 +199,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		createEntry(t, baseVaultPath, userResp.UserID, memResp.MemoryID, fmt.Sprintf("Solar generator model %d backup power.", i), fmt.Sprintf("Solar note %d", i), nil)
 	}
 
-	cl, err := newWeaviateClient(waviateURL)
+	cl, err := newWeaviateClient(weaviateURL)
 	if err != nil {
 		t.Fatalf("wv client: %v", err)
 	}
@@ -248,11 +248,11 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:8080")
-	waviateURL := env("WAVIATE_URL", "http://localhost:8082")
+	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
 	waitForHealthy(t, memSvc, 3*time.Second)
-	urls := []string{waviateURL + "/v1/meta"}
+	urls := []string{weaviateURL + "/v1/meta"}
 	if strings.EqualFold(os.Getenv("MEMORY_SERVER_EMBED_PROVIDER"), "ollama") {
 		urls = append(urls, ollamaURL+"/api/tags")
 	}
@@ -273,7 +273,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 		UserID string `json:"userId"`
 	}
 	user.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
-	ensureWaviateTenants(t, waviateURL, user.UserID)
+	ensureWeaviateTenants(t, weaviateURL, user.UserID)
 	var mem struct {
 		MemoryID string `json:"memoryId"`
 	}
@@ -299,7 +299,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 		createEntry(t, baseVaultPathT, user.UserID, mem.MemoryID, fmt.Sprintf("Dog entry %d barking", i), "Dog summary", map[string]interface{}{"tags": dogTags})
 	}
 
-	cl, _ := newWeaviateClient(waviateURL)
+	cl, _ := newWeaviateClient(weaviateURL)
 	waitForObjects(t, cl, user.UserID, 10, 5*time.Second)
 
 	query := "playful cat"
@@ -334,11 +334,11 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:8080")
-	waviateURL := env("WAVIATE_URL", "http://localhost:8082")
+	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
 	waitForHealthy(t, memSvc, 3*time.Second)
-	for _, url := range []string{waviateURL + "/v1/meta", ollamaURL + "/api/tags"} {
+	for _, url := range []string{weaviateURL + "/v1/meta", ollamaURL + "/api/tags"} {
 		if err := ping(url); err != nil {
 			t.Skipf("service %s unreachable: %v", url, err)
 		}
@@ -351,7 +351,7 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 		UserID string `json:"userId"`
 	}
 	user.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
-	ensureWaviateTenants(t, waviateURL, user.UserID)
+	ensureWeaviateTenants(t, weaviateURL, user.UserID)
 	var mem struct {
 		MemoryID string `json:"memoryId"`
 	}

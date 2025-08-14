@@ -17,24 +17,24 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 )
 
-// wavNative is a native implementation of Index using the Weaviate Go client.
-type wavNative struct {
+// weavNative is a native implementation of Index using the Weaviate Go client.
+type weavNative struct {
 	client  *weaviate.Client
 	baseURL string // host:port without scheme
 }
 
-// NewWaviateNativeIndex constructs an Index backed by Weaviate at baseURL.
+// NewWeaviateNativeIndex constructs an Index backed by Weaviate at baseURL.
 // baseURL should be host:port (without scheme), e.g., "localhost:8081".
-func NewWaviateNativeIndex(baseURL string) (Index, error) {
+func NewWeaviateNativeIndex(baseURL string) (Index, error) {
 	cfg := weaviate.Config{Scheme: "http", Host: baseURL}
 	cl, err := weaviate.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &wavNative{client: cl, baseURL: baseURL}, nil
+	return &weavNative{client: cl, baseURL: baseURL}, nil
 }
 
-func (w *wavNative) Search(ctx context.Context, userID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
+func (w *weavNative) Search(ctx context.Context, userID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
 	hy := (&gql.HybridArgumentBuilder{}).
 		WithQuery(query).
 		WithVector(vec).
@@ -65,7 +65,7 @@ func (w *wavNative) Search(ctx context.Context, userID, memoryID, query string, 
 		return nil, err
 	}
 	if len(resp.Errors) > 0 {
-		return nil, fmt.Errorf("waviate graphql: %s", formatGraphQLErrors(resp.Errors))
+		return nil, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
 	}
 
 	getData, ok := resp.Data["Get"].(map[string]interface{})
@@ -103,7 +103,7 @@ func (w *wavNative) Search(ctx context.Context, userID, memoryID, query string, 
 	return out, nil
 }
 
-func (w *wavNative) LatestContext(ctx context.Context, userID, memoryID string) (string, time.Time, error) {
+func (w *weavNative) LatestContext(ctx context.Context, userID, memoryID string) (string, time.Time, error) {
 	where := filters.Where().WithPath([]string{"memoryId"}).WithOperator(filters.Equal).WithValueText(memoryID)
 	req := w.client.GraphQL().Get().
 		WithClassName("MemoryContext").
@@ -122,7 +122,7 @@ func (w *wavNative) LatestContext(ctx context.Context, userID, memoryID string) 
 		return "", time.Time{}, err
 	}
 	if len(resp.Errors) > 0 {
-		return "", time.Time{}, fmt.Errorf("waviate graphql: %s", formatGraphQLErrors(resp.Errors))
+		return "", time.Time{}, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
 	}
 	getData, ok := resp.Data["Get"].(map[string]interface{})
 	if !ok {
@@ -151,7 +151,7 @@ func (w *wavNative) LatestContext(ctx context.Context, userID, memoryID string) 
 	return ctxStr, ts, nil
 }
 
-func (w *wavNative) BestContext(ctx context.Context, userID, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
+func (w *weavNative) BestContext(ctx context.Context, userID, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
 	hy := (&gql.HybridArgumentBuilder{}).
 		WithQuery(query).
 		WithVector(vec).
@@ -177,7 +177,7 @@ func (w *wavNative) BestContext(ctx context.Context, userID, memoryID, query str
 		return "", time.Time{}, 0, err
 	}
 	if len(resp.Errors) > 0 {
-		return "", time.Time{}, 0, fmt.Errorf("waviate graphql: %s", formatGraphQLErrors(resp.Errors))
+		return "", time.Time{}, 0, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
 	}
 	getData, ok := resp.Data["Get"].(map[string]interface{})
 	if !ok {
@@ -208,7 +208,7 @@ func (w *wavNative) BestContext(ctx context.Context, userID, memoryID, query str
 	return ctxText, ts, score, nil
 }
 
-func (w *wavNative) DeleteEntry(ctx context.Context, userID, entryID string) error {
+func (w *weavNative) DeleteEntry(ctx context.Context, userID, entryID string) error {
 	if w == nil || w.client == nil || userID == "" || entryID == "" {
 		return nil
 	}
@@ -218,7 +218,7 @@ func (w *wavNative) DeleteEntry(ctx context.Context, userID, entryID string) err
 	return nil
 }
 
-func (w *wavNative) DeleteContext(ctx context.Context, userID, contextID string) error {
+func (w *weavNative) DeleteContext(ctx context.Context, userID, contextID string) error {
 	if w == nil || w.client == nil || userID == "" || contextID == "" {
 		return nil
 	}
@@ -227,7 +227,7 @@ func (w *wavNative) DeleteContext(ctx context.Context, userID, contextID string)
 	return nil
 }
 
-func (w *wavNative) DeleteMemory(ctx context.Context, userID, memoryID string) error {
+func (w *weavNative) DeleteMemory(ctx context.Context, userID, memoryID string) error {
 	if w == nil || w.client == nil || userID == "" || memoryID == "" {
 		return nil
 	}
@@ -275,10 +275,10 @@ func (w *wavNative) DeleteMemory(ctx context.Context, userID, memoryID string) e
 
 // DeleteVault cannot be efficiently implemented without vaultId stored in the index.
 // Rely on service-level enumeration + per-object deletes. No-op here for forward compatibility.
-func (w *wavNative) DeleteVault(ctx context.Context, userID, vaultID string) error { return nil }
+func (w *weavNative) DeleteVault(ctx context.Context, userID, vaultID string) error { return nil }
 
-// UpsertEntry implements a best-effort upsert using Waviate Data Creator.
-func (w *wavNative) UpsertEntry(ctx context.Context, entryID string, vec []float32, payload map[string]interface{}) error {
+// UpsertEntry implements a best-effort upsert using Weaviate Data Creator.
+func (w *weavNative) UpsertEntry(ctx context.Context, entryID string, vec []float32, payload map[string]interface{}) error {
 	if w == nil || w.client == nil {
 		return nil
 	}
@@ -294,7 +294,7 @@ func (w *wavNative) UpsertEntry(ctx context.Context, entryID string, vec []float
 }
 
 // UpsertContext implements a best-effort upsert for MemoryContext class.
-func (w *wavNative) UpsertContext(ctx context.Context, contextID string, vec []float32, payload map[string]interface{}) error {
+func (w *weavNative) UpsertContext(ctx context.Context, contextID string, vec []float32, payload map[string]interface{}) error {
 	if w == nil || w.client == nil {
 		return nil
 	}
@@ -309,9 +309,9 @@ func (w *wavNative) UpsertContext(ctx context.Context, contextID string, vec []f
 	return err
 }
 
-// HealthPing implements health.HealthPinger for waviate-based index.
+// HealthPing implements health.HealthPinger for weaviate-based index.
 // It calls GET http://<baseURL>/v1/meta and expects 200 OK.
-func (w *wavNative) HealthPing(ctx context.Context) error {
+func (w *weavNative) HealthPing(ctx context.Context) error {
 	if w == nil || w.baseURL == "" {
 		return fmt.Errorf("weaviate baseURL missing")
 	}
@@ -361,3 +361,4 @@ func ensureTenant(ctx context.Context, cl *weaviate.Client, className, tenant st
 	ts := []models.Tenant{{Name: tenant}}
 	return cl.Schema().TenantsCreator().WithClassName(className).WithTenants(ts...).Do(ctx)
 }
+

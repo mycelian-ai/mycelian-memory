@@ -20,7 +20,7 @@ Status: alwaysApply
   – Owns prompt-resolution logic (filesystem override → embedded default).  
   – Provides thin helpers used by both MCP server and traditional Go apps.
 
-• Memory Service Backend (HTTP + Spanner)
+• Memory Service Backend (HTTP + Postgres)
   – Stateless CRUD service for users, memories, entries.  
   – No prompt, search, or inference logic.  
   – Future search queries may hit an external Weaviate service.

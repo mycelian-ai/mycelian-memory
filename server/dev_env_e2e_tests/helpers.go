@@ -77,16 +77,16 @@ func waitForHealthy(t *testing.T, baseURL string, timeout time.Duration) {
 	t.Fatalf("memory-service /api/health not responding within %s", timeout)
 }
 
-// ensureWaviateTenants adds the given tenant to both MemoryEntry and MemoryContext classes.
-func ensureWaviateTenants(t *testing.T, waviateURL, tenant string) {
+// ensureWeaviateTenants adds the given tenant to both MemoryEntry and MemoryContext classes.
+func ensureWeaviateTenants(t *testing.T, weaviateURL, tenant string) {
 	// Fallback approach: trigger tenant creation implicitly by creating a dummy object then deleting it
-	// This works in older Waviate without explicit tenant endpoints
+	// This works in older Weaviate without explicit tenant endpoints
 	for _, class := range []string{"MemoryEntry", "MemoryContext"} {
 		// Minimal payload with required fields
 		id := "00000000-0000-0000-0000-000000000000"
 		payload := fmt.Sprintf(`{"userId":%q}`, tenant)
 		// Create
-		url := fmt.Sprintf("%s/v1/objects", waviateURL)
+		url := fmt.Sprintf("%s/v1/objects", weaviateURL)
 		body := fmt.Sprintf(`{"class":"%s","id":%q,"tenant":%q,"properties":%s}`, class, id, tenant, payload)
 		req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBufferString(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -95,7 +95,7 @@ func ensureWaviateTenants(t *testing.T, waviateURL, tenant string) {
 			_ = resp.Body.Close()
 		}
 		// Delete best-effort
-		delURL := fmt.Sprintf("%s/v1/objects/%s/%s?tenant=%s", waviateURL, class, id, tenant)
+		delURL := fmt.Sprintf("%s/v1/objects/%s/%s?tenant=%s", weaviateURL, class, id, tenant)
 		_, _ = http.DefaultClient.Do(mustNewRequest(http.MethodDelete, delURL))
 	}
 }

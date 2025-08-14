@@ -62,7 +62,7 @@ mycelian-memory/
 ### Configuration Management
 - **Environment-based**: No hardcoded values
 - **Service URLs**: Configurable endpoints
-- **Database**: Engine-agnostic (SQLite/Spanner)
+- **Database**: PostgreSQL-focused (local dev and AWS prod)
 - **Debug modes**: `MYCELIAN_DEBUG=true` for verbose logging
 
 ## Dependencies Management
