@@ -58,7 +58,7 @@ func (m *mockSearch) DeleteVault(ctx context.Context, userID, vaultID string) er
 func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}
-	h := &SearchHandler{emb: emb, idx: srch, alpha: 0.6}
+	h, _ := NewSearchHandler(emb, srch, 0.6)
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hello","topK":3}`)
 	req := httptest.NewRequest("POST", "/api/search", body)
@@ -82,7 +82,7 @@ func TestHandleSearch_EmbedsOnce(t *testing.T) {
 func TestHandleSearch_ResponseMapping(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}
-	h := &SearchHandler{emb: emb, idx: srch, alpha: 0.6}
+	h, _ := NewSearchHandler(emb, srch, 0.6)
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
 	req := httptest.NewRequest("POST", "/api/search", body)
@@ -112,7 +112,7 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 func TestHandleSearch_NoResults(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{empty: true}
-	h := &SearchHandler{emb: emb, idx: srch, alpha: 0.6}
+	h, _ := NewSearchHandler(emb, srch, 0.6)
 
 	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
 	req := httptest.NewRequest("POST", "/api/search", body)

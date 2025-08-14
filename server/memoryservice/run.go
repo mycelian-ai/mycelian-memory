@@ -52,7 +52,7 @@ func Run() error {
 	}
 
 	// Build router
-	router := buildRouter(st, idx, embedProvider, cfg)
+	router := buildRouter(st, idx, embedProvider, cfg, log)
 
 	// Start health checkers and bind service health
 	svcHealth := startHealthCheckers(ctx, cfg, log, st, idx, embedProvider)
@@ -107,7 +107,7 @@ func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logge
 }
 
 // buildRouter wires HTTP routes to handlers.
-func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config) *mux.Router {
+func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
 	root := mux.NewRouter()
 	root.Use(api.Recover)
 
@@ -151,8 +151,13 @@ func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.Embeddin
 	root.HandleFunc("/api/health", healthHandler.CheckHealth).Methods("GET")
 
 	// Search
-	search := api.NewSearchHandler(embProvider, idx, cfg.SearchAlpha)
-	root.HandleFunc("/api/search", search.HandleSearch).Methods("POST")
+	search, err := api.NewSearchHandler(embProvider, idx, cfg.SearchAlpha)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("Failed to create search handler")
+		// Handle gracefully - skip search endpoint registration
+	} else {
+		root.HandleFunc("/api/search", search.HandleSearch).Methods("POST")
+	}
 	return root
 }
 
@@ -203,13 +208,6 @@ func serveHTTP(server *http.Server, log zerolog.Logger, cfg *config.Config) <-ch
 	return errCh
 }
 
-// waitUntilHealthy blocks until service health is healthy or the startup window expires.
-func waitUntilHealthy(ctx context.Context, cfg *config.Config, svcHealth *health.ServiceHealthChecker) error {
-	// Allow extra time for health checkers to complete their first probe cycle
-	// Health checkers start as unhealthy and need time to run their first check
-	timeoutSeconds := cfg.HealthIntervalSeconds * 2
-	if timeoutSeconds < 60 {
-		timeoutSeconds = 60 // Minimum 60 seconds for startup
 // calculateStartupHealthTimeout returns the startup health timeout in seconds,
 // calculated as interval*2 with a minimum of 60 seconds.
 func calculateStartupHealthTimeout(healthIntervalSeconds int) int {

@@ -108,9 +108,7 @@ func (p *Provider) HealthPing(ctx context.Context) error {
 	}
 	want := strings.Split(p.model, ":")[0]
 	for _, m := range data.Models {
-	want := baseModelName(p.model)
-	for _, m := range data.Models {
-		if baseModelName(m.Name) == want {
+		if strings.Split(m.Name, ":")[0] == want {
 			return nil
 		}
 	}

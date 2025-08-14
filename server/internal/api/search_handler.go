@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,7 +17,6 @@ type SearchHandler struct {
 	alpha float32
 }
 
-func NewSearchHandler(emb emb.EmbeddingProvider, idx searchindex.Index, alpha float32) *SearchHandler {
 func NewSearchHandler(emb emb.EmbeddingProvider, idx searchindex.Index, alpha float32) (*SearchHandler, error) {
 	if alpha < 0.0 || alpha > 1.0 {
 		return nil, fmt.Errorf("alpha parameter must be in the range [0.0, 1.0], got %f", alpha)
