@@ -76,7 +76,7 @@ type CreateUserRequest struct {
 ### 4. Package Organization
 
 **Non-idiomatic patterns:**
-- Deep nesting of packages (internal/platform/http)
+- Deep nesting of packages (internal/http)
 - Mixing concerns within packages
 - Not following the "internal" package convention properly
 

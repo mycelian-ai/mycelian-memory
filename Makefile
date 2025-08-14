@@ -34,7 +34,7 @@ backend-logs:
 # ------------------------------------------------------------------------------
 # Binary building
 # ------------------------------------------------------------------------------
-.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-memoryctl build-outbox-worker build-waviate-tool
+.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-mycelian-service-tools build-outbox-worker
 
 # Create bin directory
 bin:
@@ -48,20 +48,17 @@ build-mycelian-cli: bin
 build-mcp-server: bin
 	go build -o bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
 
-# Build memoryctl tool
-build-memoryctl: bin
-	cd tools/memoryctl && GOWORK=off go build -o ../../bin/memoryctl .
+# Build Mycelian Service Tools CLI
+build-mycelian-service-tools: bin
+	cd tools/mycelian-service-tools && GOWORK=off go build -o ../../bin/mycelian-service-tools .
 
 # Build outbox-worker app
 build-outbox-worker: bin
 	cd cmd/outbox-worker && GOWORK=off go build -o ../../bin/outbox-worker .
 
-# Build waviate-tool app
-build-waviate-tool: bin
-	cd cmd/waviate-tool && GOWORK=off go build -o ../../bin/waviate-tool .
 
 # Build all binaries
-build-all: build-mycelian-cli build-mcp-server build-memoryctl build-outbox-worker build-waviate-tool
+build-all: build-mycelian-cli build-mcp-server build-mycelian-service-tools build-outbox-worker
 
 # Alias for build-all
 build: build-all
@@ -122,6 +119,7 @@ server-test:
 server-e2e:
 	cd server && go test -v ./dev_env_e2e_tests -tags=e2e
 
+
 client-test:
 	cd client && go test -v ./...
 
@@ -131,11 +129,11 @@ client-test-integration:
 wait-backend-health:
 	@echo "Waiting for memory-service to be healthy at $(API_HEALTH_URL) ..."
 	@i=0; \
-	until curl -sf $(API_HEALTH_URL) | grep -q 'UP'; do \
+	until curl -sf $(API_HEALTH_URL) >/dev/null; do \
 	  if [ $$i -ge 60 ]; then echo "ERROR: backend health timeout"; exit 1; fi; \
 	  i=$$((i+1)); sleep 2; \
 	done; \
-	echo "Backend is healthy."
+	echo "Backend is responding."
 
 test-all-postgres:
 	@set -euo pipefail; \

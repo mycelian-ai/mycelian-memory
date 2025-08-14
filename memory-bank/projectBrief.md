@@ -19,7 +19,7 @@ Build a SaaS multi-agent memory management system that enables AI assistants and
 1. **Memory Service API**: RESTful backend for memory management (port 8080)
 2. **Go Client SDK**: Type-safe client library for memory operations
 3. **MCP Server**: Tool server implementing Model Context Protocol
-4. **CLI Tools**: mycelianCli for management, memoryctl for operations
+4. **CLI Tools**: mycelianCli for management, mycelian-service-tools for operations
 5. **AWS Deployment Package**: Manual deployment code for beta stack
 
 ## Success Criteria

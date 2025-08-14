@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 
+	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 	"github.com/mycelian/mycelian-memory/server/internal/store"
@@ -12,11 +13,11 @@ import (
 type MemoryService struct {
 	store store.Store
 	idx   searchindex.Index
-	emb   searchindex.Embeddings
+	emb   emb.EmbeddingProvider
 }
 
-func NewMemoryService(s store.Store, idx searchindex.Index, emb searchindex.Embeddings) *MemoryService {
-	return &MemoryService{store: s, idx: idx, emb: emb}
+func NewMemoryService(s store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *MemoryService {
+	return &MemoryService{store: s, idx: idx, emb: embProvider}
 }
 
 func (s *MemoryService) DeleteMemory(ctx context.Context, userID, vaultID, memoryID string) error {

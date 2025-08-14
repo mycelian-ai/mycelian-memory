@@ -1,9 +1,6 @@
 package api
 
 import (
-	httpHandlers "github.com/mycelian/mycelian-memory/server/internal/api/http"
-	"github.com/mycelian/mycelian-memory/server/internal/api/recovery"
-
 	"github.com/gorilla/mux"
 )
 
@@ -12,13 +9,13 @@ func NewRouter() *mux.Router {
 	router := mux.NewRouter()
 
 	// Global middlewares
-	router.Use(recovery.Middleware)
+	router.Use(Recover)
 
 	// Create handlers
-	healthHandler := httpHandlers.NewHealthHandler()
+	healthHandler := NewHealthHandler()
 	router.HandleFunc("/api/health", healthHandler.CheckHealth).Methods("GET")
 
-	// Legacy router trimmed to health only; v2 routes wired in composition root.
+	// Legacy router trimmed to health only; routes wired in composition root.
 
 	return router
 }

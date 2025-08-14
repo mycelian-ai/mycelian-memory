@@ -42,6 +42,27 @@ func (s *pgStore) Memories() store.Memories { return &memories{db: s.db} }
 func (s *pgStore) Entries() store.Entries   { return &entries{db: s.db} }
 func (s *pgStore) Contexts() store.Contexts { return &contexts{db: s.db} }
 
+// HealthPing implements health.HealthPinger for Postgres-backed store.
+func (s *pgStore) HealthPing(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
+// Bootstrap performs a connectivity check to ensure Postgres is reachable.
+// This is a fast ping-only check since compose migrations handle schema setup.
+func Bootstrap(ctx context.Context, dsn string) error {
+	if dsn == "" {
+		return nil // No DSN configured, skip bootstrap
+	}
+
+	db, err := Open(dsn)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	return db.PingContext(ctx)
+}
+
 // --- Users ---
 type users struct{ db *sql.DB }
 

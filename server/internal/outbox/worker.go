@@ -13,7 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/mycelian/mycelian-memory/server/internal/embeddings"
+	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 )
 
@@ -56,13 +56,13 @@ type Config struct {
 type Worker struct {
 	db       *sql.DB
 	log      zerolog.Logger
-	embedder embeddings.Provider
+	embedder emb.EmbeddingProvider
 	index    searchindex.Index
 	cfg      Config
 }
 
 // NewWorker constructs a Worker from dependencies.
-func NewWorker(db *sql.DB, emb embeddings.Provider, idx searchindex.Index, cfg Config, log zerolog.Logger) *Worker {
+func NewWorker(db *sql.DB, emb emb.EmbeddingProvider, idx searchindex.Index, cfg Config, log zerolog.Logger) *Worker {
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = 100
 	}

@@ -14,7 +14,6 @@
 #
 # PROJECT STRUCTURE:
 #   cmd/memory-service/           - Main API service binary
-#   tools/schema-manager/         - Database schema management tool
 #   internal/                     - Shared internal packages
 #
 # DEPENDENCIES:
@@ -36,10 +35,9 @@ GO := go
 
 # Directories
 TOOLS_DIR := tools
-SCHEMA_MANAGER_DIR := $(TOOLS_DIR)/schema-manager
 
 # Build targets
-.PHONY: help build-tools build-schema-manager clean-tools
+.PHONY: help
 
 # Default target - show help
 help:
@@ -57,9 +55,7 @@ help:
 	@echo "  make docker-help              - Show detailed Docker commands"
 	@echo ""
 	@echo "🔧 DEVELOPMENT TOOLS:"
-	@echo "  make build-tools              - Build all development tools"
-	@echo "  make build-schema-manager     - Build schema manager tool"
-	@echo "  make clean-tools              - Clean tool binaries"
+	@echo "  (schema-manager removed)"
 	@echo ""
 	@echo "🗄️  DATABASE SCHEMA: (Spanner removed)"
 	@echo ""
@@ -88,60 +84,11 @@ run-local: build-local
 	@echo "🛑 Stopping any existing memory-service ..."
 	- pkill -f "server/bin/memory-service" || true
 	@echo "🚀 Starting memory-service (local build target)"
-	MEMORY_BACKEND_BUILD_TARGET=local ./bin/memory-service
+	MEMORY_SERVER_BUILD_TARGET=local ./bin/memory-service
 
-build-tools: build-schema-manager
+ 
 
-build-schema-manager:
-	@echo "🔨 Building schema manager..."
-	cd $(SCHEMA_MANAGER_DIR) && $(GO) build -o schema-manager .
-	@echo "✅ Schema manager built successfully"
-
-clean-tools:
-	@echo "🧹 Cleaning tools..."
-	rm -f $(SCHEMA_MANAGER_DIR)/schema-manager
-	@echo "✅ Tools cleaned"
-
-# Schema management targets
-.PHONY: schema-help schema-create-emulator schema-validate-emulator schema-drop-emulator
-
-schema-help:
-	@echo "📚 Schema Management Commands:"
-	@echo ""
-	@echo "  make build-schema-manager     - Build the schema manager tool"
-	@echo "  make schema-create-emulator   - Create tables in Spanner emulator"
-	@echo "  make schema-validate-emulator - Validate schema against emulator"
-	@echo "  make schema-drop-emulator     - Drop all tables in emulator (DANGEROUS)"
-	@echo ""
-	@echo "💡 For production use, run the tool manually with appropriate credentials:"
-	@echo "   ./tools/schema-manager/schema-manager -project YOUR_PROJECT -instance YOUR_INSTANCE -database YOUR_DB -credentials PATH_TO_CREDS -operation create-tables"
-
-schema-create-emulator: build-schema-manager
-	@echo "🏗️  Creating tables in Spanner emulator..."
-	./$(SCHEMA_MANAGER_DIR)/schema-manager \
-		-project test-project \
-		-instance test-instance \
-		-database memory-backend \
-		-emulator localhost:9010 \
-		-operation create-tables
-
-schema-validate-emulator: build-schema-manager
-	@echo "🔍 Validating schema in Spanner emulator..."
-	./$(SCHEMA_MANAGER_DIR)/schema-manager \
-		-project test-project \
-		-instance test-instance \
-		-database memory-backend \
-		-emulator localhost:9010 \
-		-operation validate-schema
-
-schema-drop-emulator: build-schema-manager
-	@echo "⚠️  WARNING: This will drop all tables in the emulator!"
-	./$(SCHEMA_MANAGER_DIR)/schema-manager \
-		-project test-project \
-		-instance test-instance \
-		-database memory-backend \
-		-emulator localhost:9010 \
-		-operation drop-tables
+ 
 
 # Development targets
 .PHONY: test build

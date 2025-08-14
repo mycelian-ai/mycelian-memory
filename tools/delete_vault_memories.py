@@ -8,8 +8,8 @@ Usage:
     # Postgres (recommended)
     python delete_vault_memories.py <vault_id> --pg-dsn "postgres://user:pass@host:5432/db?sslmode=disable" [--delete-vault] [--yes]
     
-    # or rely on environment (MEMORY_BACKEND_POSTGRES_DSN)
-    MEMORY_BACKEND_POSTGRES_DSN=postgres://... python delete_vault_memories.py <vault_id> [--delete-vault] [--yes]
+    # or rely on environment (MEMORY_SERVER_POSTGRES_DSN)
+    MEMORY_SERVER_POSTGRES_DSN=postgres://... python delete_vault_memories.py <vault_id> [--delete-vault] [--yes]
 
     # Legacy SQLite (deprecated)
     python delete_vault_memories.py <vault_id> --db-path /path/to/memory.db [--delete-vault] [--yes]
@@ -276,8 +276,8 @@ def main():
 
     parser.add_argument(
         '--pg-dsn',
-        default=os.getenv('MEMORY_BACKEND_POSTGRES_DSN', ''),
-        help='Postgres DSN (e.g., postgres://user:pass@host:5432/db?sslmode=disable). Defaults to MEMORY_BACKEND_POSTGRES_DSN'
+        default=os.getenv('MEMORY_SERVER_POSTGRES_DSN', ''),
+        help='Postgres DSN (e.g., postgres://user:pass@host:5432/db?sslmode=disable). Defaults to MEMORY_SERVER_POSTGRES_DSN'
     )
     
     parser.add_argument(

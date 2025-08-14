@@ -16,7 +16,7 @@
 ### Build System & Tooling
 - **Deterministic Builds**: All binaries output to `bin/` directory
 - **Multi-Module Support**: Go workspace coordination across components
-- **CLI Tools**: mycelianCli for management, memoryctl for operations
+- **CLI Tools**: mycelianCli for management, mycelian-service-tools for operations
 - **Testing Infrastructure**: Unit, integration, and benchmarking systems
 
 ### Development Experience

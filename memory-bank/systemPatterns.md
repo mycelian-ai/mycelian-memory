@@ -10,7 +10,7 @@ mycelian-memory/
 ├── server/                   # Backend service module  
 ├── tools/mycelianCli/        # CLI tool module
 ├── deployments/aws/          # AWS deployment package (new)
-└── tools/schema-manager/     # Schema management module
+└── tools/                    # Helper tools
 ```
 
 **Benefits:**

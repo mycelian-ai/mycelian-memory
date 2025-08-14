@@ -117,9 +117,9 @@ Conventions:
 - Implement all Storage methods with SQL shown above. [Completed]
 - Use `RETURNING` to fetch created rows/creation_time.
 - Add config keys: [Added]
-  - `MEMORY_BACKEND_DB_DRIVER=postgres`
-  - `MEMORY_BACKEND_POSTGRES_DSN` (e.g., `postgres://user:pass@host:5432/db?sslmode=disable`)
-- Update factory (`internal/platform/factory/storage.go`) to construct Postgres adapter. [Added]
+  - `MEMORY_SERVER_DB_DRIVER=postgres`
+  - `MEMORY_SERVER_POSTGRES_DSN` (e.g., `postgres://user:pass@host:5432/db?sslmode=disable`)
+- Update factory (`internal/factory/storage.go`) to construct Postgres adapter. [Added]
 
 ### Vault Isolation & Memory Operations
 - **Strict vault_id scoping**: All memory, entry, and context operations require vault_id in WHERE clauses

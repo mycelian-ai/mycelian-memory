@@ -90,8 +90,8 @@ graph TB
     end
     
     subgraph "CLI Tools"
-        MemCtl[memoryctl]
-        Schema[schema-manager]
+        ServiceTools[mycelian-service-tools]
+        ServiceTools[mycelian-service-tools]
     end
     
     API --> SQLite
@@ -224,7 +224,7 @@ make docker-status
 memory-backend/
 ├── cmd/                    # Application entry points
 │   ├── memory-service/     # Main API server
-│   ├── memoryctl/          # CLI tool
+│   ├── mycelian-service-tools/  # CLI tool (formerly memoryctl)
 │   └── (removed) indexer-prototype/
 ├── internal/               # Private application code
 │   ├── api/                # HTTP handlers and routing
@@ -300,7 +300,8 @@ make build
 
 # Build specific components
 go build -o bin/memory-service ./cmd/memory-service
-go build -o bin/memoryctl ./cmd/memoryctl
+# Build service tools CLI
+make build-mycelian-service-tools   # → bin/mycelian-service-tools
 // indexer-prototype removed
 
 # Build with specific tags
@@ -404,14 +405,14 @@ go test -bench=BenchmarkMemoryCreate ./internal/core/memory/
 
 ### E2E Testing
 
-#### Using memoryctl Scripts
+#### Using Service Tools Cookbooks
 
 ```bash
-# Quick validation test
-./scripts/memoryctl/memoryctl-simple-test.sh
+# Quick validation cookbook
+./tools/mycelian-service-tools/cookbook/memoryctl-simple-scenario.sh
 
-# Comprehensive workflow test
-./scripts/memoryctl/memoryctl-multi-entities.sh
+# Comprehensive workflow cookbook
+./tools/mycelian-service-tools/cookbook/memoryctl-multi-entities-scenario.sh
 ```
 
 #### Using Go E2E Tests
@@ -472,7 +473,7 @@ The system automatically creates a default local user for development:
 
 **Docker Compose**: Uses `user-bootstrap` container
 - Waits for memory-service to be healthy
-- Uses `memoryctl` CLI to create user via API
+- Uses `mycelian-service-tools` CLI to create user via API
 - User ID: `local_user`
 - Email: `dev@localhost`
 - Display Name: `Local User`
@@ -769,7 +770,7 @@ To add a new storage backend:
    }
    ```
 
-3. Update factory in `internal/platform/factory/`:
+3. Update factory in `internal/factory/`:
    ```go
    case "newbackend":
        return newbackend.New(cfg.NewBackend)

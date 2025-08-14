@@ -17,7 +17,7 @@
 
 ### Development Tools
 - **Build System**: Make + Go workspace
-- **CLI Tools**: mycelianCli (management), memoryctl (operations)
+- **CLI Tools**: mycelianCli (management), mycelian-service-tools (operations)
 - **Schema Management**: Live generation from Go structs
 - **Containerization**: Docker + Docker Compose
 
@@ -31,7 +31,7 @@
 ### Local Environment
 ```bash
 # Core requirements
-Go 1.24.5+
+Go 1.24.6+
 Docker Desktop
 Make
 jq (JSON processing)

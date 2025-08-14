@@ -6,29 +6,28 @@ import (
 )
 
 func unsetBuildEnv() {
-	_ = os.Unsetenv("MEMORY_BACKEND_BUILD_TARGET")
-	_ = os.Unsetenv("MEMORY_BACKEND_DB_DRIVER")
-	_ = os.Unsetenv("MEMORY_BACKEND_VECTOR_STORE")
+	_ = os.Unsetenv("MEMORY_SERVER_BUILD_TARGET")
+	_ = os.Unsetenv("MEMORY_SERVER_DB_DRIVER")
 }
 
 func TestResolveDefaultsCloudDev(t *testing.T) {
 	unsetBuildEnv()
-	_ = os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "cloud-dev")
+	_ = os.Setenv("MEMORY_SERVER_BUILD_TARGET", "cloud-dev")
 	defer unsetBuildEnv()
 
 	cfg, err := New()
 	if err != nil {
 		t.Fatalf("config load: %v", err)
 	}
-	if cfg.DBDriver != "postgres" || cfg.VectorStore != "waviate" {
-		t.Fatalf("unexpected mapping: %s %s", cfg.DBDriver, cfg.VectorStore)
+	if cfg.DBDriver != "postgres" {
+		t.Fatalf("unexpected mapping: %s", cfg.DBDriver)
 	}
 }
 
 func TestResolveDefaultsOverride(t *testing.T) {
 	unsetBuildEnv()
-	_ = os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "local")
-	_ = os.Setenv("MEMORY_BACKEND_DB_DRIVER", "postgres")
+	_ = os.Setenv("MEMORY_SERVER_BUILD_TARGET", "local")
+	_ = os.Setenv("MEMORY_SERVER_DB_DRIVER", "postgres")
 	defer unsetBuildEnv()
 
 	cfg, err := New()
@@ -42,16 +41,15 @@ func TestResolveDefaultsOverride(t *testing.T) {
 
 func TestResolveDefaultsLocal(t *testing.T) {
 	unsetBuildEnv()
-	_ = os.Setenv("MEMORY_BACKEND_BUILD_TARGET", "local")
-	_ = os.Unsetenv("MEMORY_BACKEND_DB_DRIVER")
-	_ = os.Unsetenv("MEMORY_BACKEND_VECTOR_STORE")
+	_ = os.Setenv("MEMORY_SERVER_BUILD_TARGET", "local")
+	_ = os.Unsetenv("MEMORY_SERVER_DB_DRIVER")
 	defer unsetBuildEnv()
 
 	cfg, err := New()
 	if err != nil {
 		t.Fatalf("config load: %v", err)
 	}
-	if cfg.DBDriver != "postgres" || cfg.VectorStore != "waviate" {
-		t.Fatalf("unexpected mapping for local: %s %s", cfg.DBDriver, cfg.VectorStore)
+	if cfg.DBDriver != "postgres" {
+		t.Fatalf("unexpected mapping for local: %s", cfg.DBDriver)
 	}
 }

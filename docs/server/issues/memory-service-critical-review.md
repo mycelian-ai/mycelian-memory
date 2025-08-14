@@ -59,7 +59,7 @@ if !titleRx.MatchString(req.Title) {
 
 ```go
 // Problematic pattern:
-dbDriver := os.Getenv("MEMORY_BACKEND_DB_DRIVER")
+dbDriver := os.Getenv("MEMORY_SERVER_DB_DRIVER")
 if dbDriver == "sqlite" {
     log.Warn().Msg("SQLite driver active – ensure indexer handles contexts")
 }
@@ -155,7 +155,7 @@ if req.UserID == "" {
 
 ```go
 // Inefficient pattern:
-dbDriver := os.Getenv("MEMORY_BACKEND_DB_DRIVER")
+dbDriver := os.Getenv("MEMORY_SERVER_DB_DRIVER")
 if dbDriver == "" {
     dbDriver = "unknown"
 }

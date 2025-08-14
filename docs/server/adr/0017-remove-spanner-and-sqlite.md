@@ -34,7 +34,7 @@ ADR 0014 proposed migrating storage from Spanner/SQLite to PostgreSQL locally an
   - Removed `internal/storage/spanner.go`, `spanner_*_test.go`, `internal/storage/schema.sql`.
   - Removed `internal/storage/sqlite/*` and local schema helpers; scrubbed factory case.
   - Updated `internal/config/config.go` to Postgres-only; removed Spanner/SQLite config.
-  - Updated `internal/platform/factory/storage.go` to return an error for `spanner-pg`.
+  - Updated `internal/factory/storage.go` to return an error for `spanner-pg`.
   - Skipped/removed API tests that depended on Spanner emulator harness.
   - Kept search/outbox unchanged (Postgres source of truth; Waviate indexing intact).
 - Tooling & Compose

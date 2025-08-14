@@ -111,9 +111,9 @@ type Config struct {
 **Add .env.example**:
 ```bash
 # .env.example
-MEMORY_BACKEND_GCP_PROJECT_ID=your-project-id
-MEMORY_BACKEND_SPANNER_INSTANCE_ID=your-instance
-MEMORY_BACKEND_HTTP_PORT=8080
+MEMORY_SERVER_GCP_PROJECT_ID=your-project-id
+MEMORY_SERVER_SPANNER_INSTANCE_ID=your-instance
+MEMORY_SERVER_HTTP_PORT=8080
 ```
 
 ### GitHub Ready Checklist

@@ -6,8 +6,17 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 )
 
-// Store exposes persistence operations required by services.
-// Implementations live under internal/store/<driver>/ (e.g., postgres, sqlite).
+// Store defines the persistence surface used by the application services.
+// It provides typed accessors for each resource area (users, vaults, memories,
+// entries, contexts) and hides concrete database details behind simple
+// method contracts. Drivers (e.g., Postgres) live under
+// internal/store/<driver>/ and implement these interfaces.
+//
+// Goals:
+// - Keep business logic free of SQL/driver specifics
+// - Centralize data validation and not-found handling
+// - Provide clear, minimal methods for the operations the app needs
+// - Make it straightforward to test services using mocks
 type Store interface {
 	Users() Users
 	Vaults() Vaults

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	weaviate "github.com/weaviate/weaviate-go-client/v5/weaviate"
@@ -16,7 +18,10 @@ import (
 )
 
 // wavNative is a native implementation of Index using the Weaviate Go client.
-type wavNative struct{ client *weaviate.Client }
+type wavNative struct {
+	client  *weaviate.Client
+	baseURL string // host:port without scheme
+}
 
 // NewWaviateNativeIndex constructs an Index backed by Weaviate at baseURL.
 // baseURL should be host:port (without scheme), e.g., "localhost:8081".
@@ -26,7 +31,7 @@ func NewWaviateNativeIndex(baseURL string) (Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &wavNative{client: cl}, nil
+	return &wavNative{client: cl, baseURL: baseURL}, nil
 }
 
 func (w *wavNative) Search(ctx context.Context, userID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
@@ -302,6 +307,32 @@ func (w *wavNative) UpsertContext(ctx context.Context, contextID string, vec []f
 	}
 	_, err := w.client.Data().Creator().WithClassName("MemoryContext").WithTenant(tenant).WithID(contextID).WithProperties(payload).WithVector(vec).Do(ctx)
 	return err
+}
+
+// HealthPing implements health.HealthPinger for waviate-based index.
+// It calls GET http://<baseURL>/v1/meta and expects 200 OK.
+func (w *wavNative) HealthPing(ctx context.Context) error {
+	if w == nil || w.baseURL == "" {
+		return fmt.Errorf("weaviate baseURL missing")
+	}
+	url := w.baseURL
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		url = "http://" + url
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+"/v1/meta", nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("weaviate status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // formatGraphQLErrors returns compact string with messages extracted for logging.

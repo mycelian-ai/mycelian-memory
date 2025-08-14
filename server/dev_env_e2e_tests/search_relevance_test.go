@@ -48,7 +48,7 @@ func newWeaviateClient(rawURL string) (*wvClient, error) {
 func newTestEmbedder() interface {
 	Embed(context.Context, string) ([]float32, error)
 } {
-	provider := os.Getenv("MEMORY_BACKEND_EMBED_PROVIDER")
+	provider := os.Getenv("MEMORY_SERVER_EMBED_PROVIDER")
 	model := env("EMBED_MODEL", "nomic-embed-text")
 	// We only support the Ollama embedder. Treat any model (including "maxbai")
 	// as an Ollama model name.
@@ -151,7 +151,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	waitForHealthy(t, memSvc, 3*time.Second)
 	// Always require Waviate; only ping Ollama if provider is ollama
 	urls := []string{waviateURL + "/v1/meta"}
-	if strings.EqualFold(os.Getenv("MEMORY_BACKEND_EMBED_PROVIDER"), "ollama") {
+	if strings.EqualFold(os.Getenv("MEMORY_SERVER_EMBED_PROVIDER"), "ollama") {
 		urls = append(urls, ollamaURL+"/api/tags")
 	}
 	for _, url := range urls {
@@ -253,7 +253,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 
 	waitForHealthy(t, memSvc, 3*time.Second)
 	urls := []string{waviateURL + "/v1/meta"}
-	if strings.EqualFold(os.Getenv("MEMORY_BACKEND_EMBED_PROVIDER"), "ollama") {
+	if strings.EqualFold(os.Getenv("MEMORY_SERVER_EMBED_PROVIDER"), "ollama") {
 		urls = append(urls, ollamaURL+"/api/tags")
 	}
 	for _, url := range urls {

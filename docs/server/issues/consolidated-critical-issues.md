@@ -141,7 +141,7 @@ _ = w.client.Schema().TenantsCreator().WithClassName(className).WithTenants(t).D
 **Impact**: Performance degradation  
 **Details**:
 ```go
-dbDriver := os.Getenv("MEMORY_BACKEND_DB_DRIVER")  // Called on every request
+dbDriver := os.Getenv("MEMORY_SERVER_DB_DRIVER")  // Called on every request
 ```
 
 **Fix Required**:

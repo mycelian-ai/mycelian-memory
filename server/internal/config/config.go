@@ -17,17 +17,15 @@ const (
 )
 
 // Config holds the configuration for the memory service
-// Environment variables are automatically parsed from MEMORY_BACKEND_ prefix
+// Environment variables are automatically parsed from MEMORY_SERVER_ prefix
 type Config struct {
 	// Build target selects high-level environment: local, cloud-dev, cloud
 	BuildTarget string `envconfig:"BUILD_TARGET" default:"cloud-dev"`
 
 	// Derived or override drivers
-	DBDriver    string `envconfig:"DB_DRIVER" default:"auto"`
-	VectorStore string `envconfig:"VECTOR_STORE" default:"auto"`
+	DBDriver string `envconfig:"DB_DRIVER" default:"auto"`
 
-	Environment  Environment `envconfig:"ENVIRONMENT" default:"development"`
-	GCPProjectID string      `envconfig:"GCP_PROJECT_ID" default:"artful-guru-459003-k4"`
+	Environment Environment `envconfig:"ENVIRONMENT" default:"development"`
 
 	// HTTP Configuration
 	HTTPPort int `envconfig:"HTTP_PORT" default:"8080"`
@@ -48,8 +46,15 @@ type Config struct {
 	// SQLite support removed
 	// SQLitePath string `envconfig:"SQLITE_PATH" default:""`
 
-	// Waviate (default for all targets)
-	WaviateURL string `envconfig:"WAVIATE_URL" default:"weaviate:8080"`
+	// Vector search index endpoint (provider-agnostic)
+	SearchIndexURL string `envconfig:"SEARCH_INDEX_URL" default:""`
+
+	// Health checker configuration
+	HealthIntervalSeconds     int `envconfig:"HEALTH_INTERVAL_SECONDS" default:"30"`
+	HealthProbeTimeoutSeconds int `envconfig:"HEALTH_PROBE_TIMEOUT_SECONDS" default:"2"`
+
+	// Bootstrap timeout configuration (in seconds)
+	BootstrapTimeoutSeconds int `envconfig:"BOOTSTRAP_TIMEOUT_SECONDS" default:"5"`
 
 	// Testing Configuration
 	TestingUseEmulator  bool `envconfig:"TESTING_USE_EMULATOR" default:"true"`
@@ -57,7 +62,7 @@ type Config struct {
 	TestingParallel     bool `envconfig:"TESTING_PARALLEL" default:"true"`
 }
 
-// ResolveDefaults validates BuildTarget and derives DBDriver and VectorStore when set to "auto" or empty.
+// ResolveDefaults validates BuildTarget and derives DBDriver when set to "auto" or empty.
 func (c *Config) ResolveDefaults() error {
 	var defaultDB string
 
@@ -75,8 +80,6 @@ func (c *Config) ResolveDefaults() error {
 	if c.DBDriver == "" || c.DBDriver == "auto" {
 		c.DBDriver = defaultDB
 	}
-	// Vector store is fixed to Waviate after M3 refactor.
-	c.VectorStore = "waviate"
 
 	// SQLite removed: no local file path derivation
 
@@ -88,12 +91,12 @@ func (c *Config) ResolveDefaults() error {
 }
 
 // New creates a new Config by parsing environment variables
-// Environment variables should be prefixed with MEMORY_BACKEND_
-// Example: MEMORY_BACKEND_GCP_PROJECT_ID, MEMORY_BACKEND_HTTP_PORT
+// Environment variables should be prefixed with MEMORY_SERVER_
+// Example: MEMORY_SERVER_HTTP_PORT, MEMORY_SERVER_POSTGRES_DSN
 func New() (*Config, error) {
 	var cfg Config
 
-	if err := envconfig.Process("MEMORY_BACKEND", &cfg); err != nil {
+	if err := envconfig.Process("MEMORY_SERVER", &cfg); err != nil {
 		return nil, fmt.Errorf("failed to process environment variables: %w", err)
 	}
 
@@ -105,7 +108,6 @@ func New() (*Config, error) {
 		Str("build_target", cfg.BuildTarget).
 		Str("db_driver", cfg.DBDriver).
 		Str("environment", string(cfg.Environment)).
-		Str("project", cfg.GCPProjectID).
 		Int("port", cfg.HTTPPort).
 		// spanner removed
 		Str("embed_provider", cfg.EmbedProvider).
@@ -118,7 +120,12 @@ func New() (*Config, error) {
 			}
 			return "false"
 		}()).
-		Str("waviate_url", cfg.WaviateURL).
+		Str("search_index_url_present", func() string {
+			if cfg.SearchIndexURL != "" {
+				return "true"
+			}
+			return "false"
+		}()).
 		Msg("Configuration loaded")
 
 	return &cfg, nil
@@ -127,8 +134,7 @@ func New() (*Config, error) {
 // NewForTesting creates a config specifically for testing
 func NewForTesting() *Config {
 	cfg := &Config{
-		Environment:  EnvTesting,
-		GCPProjectID: "test-project",
+		Environment: EnvTesting,
 	}
 
 	cfg.HTTPPort = 8080
@@ -138,11 +144,10 @@ func NewForTesting() *Config {
 	cfg.EmbedProvider = "ollama"
 	cfg.EmbedModel = "nomic-embed-text"
 	cfg.SearchAlpha = 0.6
-	cfg.WaviateURL = "localhost:8082"
+	cfg.SearchIndexURL = "localhost:8082"
 
 	cfg.BuildTarget = "cloud-dev"
 	cfg.DBDriver = "auto"
-	cfg.VectorStore = "auto"
 
 	cfg.TestingUseEmulator = true
 	cfg.TestingTempDatabase = true

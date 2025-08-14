@@ -21,8 +21,6 @@ Thumbs.db
 # Build artifacts
 memory-service
 memory-service-*
-memoryctl
-memoryctl-*
 indexer-prototype
 indexer-prototype-*
 *.exe

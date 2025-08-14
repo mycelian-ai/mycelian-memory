@@ -19,7 +19,7 @@ Synapse Memory must run in three distinct environments:
 1. Introduce `BUILD_TARGET` env var (`local`, `cloud-dev`, `cloud`).
 2. Config mapping table derives `DB_DRIVER` and `VECTOR_STORE` automatically; explicit overrides allowed.
 3. CI matrix runs tests on `local` & `cloud-dev` to guarantee parity.
-4. Factories in `internal/platform/factory/` select adapters by target.
+4. Factories in `internal/factory/` select adapters by target.
 5. The schema (`internal/storage/schema.sql`) remains single-source; adapters translate as needed.
 
 # Consequences

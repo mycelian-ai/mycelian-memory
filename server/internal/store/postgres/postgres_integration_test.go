@@ -10,9 +10,9 @@ import (
 
 func makePGStore(t *testing.T) store.Store {
 	t.Helper()
-	dsn := os.Getenv("MEMORY_BACKEND_POSTGRES_DSN")
+	dsn := os.Getenv("MEMORY_SERVER_POSTGRES_DSN")
 	if dsn == "" {
-		t.Skip("MEMORY_BACKEND_POSTGRES_DSN not set; skipping postgres store integration test")
+		t.Skip("MEMORY_SERVER_POSTGRES_DSN not set; skipping postgres store integration test")
 	}
 	db, err := Open(dsn)
 	if err != nil {

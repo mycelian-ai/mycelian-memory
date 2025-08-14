@@ -135,7 +135,7 @@ mycelian-memory/
 ├── tools/
 │   ├── mycelianCli/             # CLI tool for memory operations
 │   ├── benchmarker/             # Performance testing tools
-│   └── schema-manager/          # Database schema management
+│   └── tools/                 # helper tools
 └── docs/                        # Documentation
 ```
 

@@ -57,7 +57,7 @@ mycelian-memory/
 ├── clients/go/               # Client SDK (independent module)
 ├── server/                   # Backend service (independent module)  
 ├── tools/mycelianCli/        # CLI tool (independent module)
-└── tools/schema-manager/     # Schema management (independent module)
+└── tools/                    # Helper tools
 ```
 
 **Benefits:** Independent versioning, clear dependency boundaries, isolated testing.
@@ -79,7 +79,7 @@ Agent (Claude) → MCP Protocol → mycelian-mcp-server → Go Client SDK → Me
 1. **Memory Service API** (server/): RESTful backend on port 8080
 2. **Go Client SDK** (clients/go/): Type-safe client library  
 3. **MCP Server** (clients/go/cmd/mycelian-mcp-server/): Model Context Protocol server
-4. **CLI Tools**: mycelianCli for management, memoryctl for operations
+4. **CLI Tools**: mycelianCli for management, mycelian-service-tools for operations
 5. **Benchmarking** (tools/benchmarker/): Python-based performance testing
 
 ## Development Patterns
@@ -106,7 +106,7 @@ The system auto-creates a default user for development:
 ### Test Types
 - **Unit tests**: `go test ./...` (per module)
 - **Integration tests**: End-to-end with real services
-- **E2E tests**: `./scripts/memoryctl/memoryctl-simple-test.sh`
+- **Cookbook**: `./tools/mycelian-service-tools/cookbook/memoryctl-simple-scenario.sh`
 - **Benchmarking**: Python harness with MSC dataset
 - **Schema validation**: Live MCP tools schema testing
 

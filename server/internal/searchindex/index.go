@@ -28,3 +28,9 @@ type Index interface {
 	DeleteMemory(ctx context.Context, userID, memoryID string) error
 	DeleteVault(ctx context.Context, userID, vaultID string) error
 }
+
+// HealthPinger is optionally implemented by an Index to expose specialized
+// health check logic. Returns nil when healthy.
+type HealthPinger interface {
+	HealthPing(ctx context.Context) error
+}

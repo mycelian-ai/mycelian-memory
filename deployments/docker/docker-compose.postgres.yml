@@ -45,17 +45,23 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - MEMORY_BACKEND_ENVIRONMENT=development
-      - MEMORY_BACKEND_HTTP_PORT=8080
-      - MEMORY_BACKEND_DB_DRIVER=postgres
-      - MEMORY_BACKEND_BUILD_TARGET=cloud-dev
-      - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
-      - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
-      - MEMORY_BACKEND_EMBED_PROVIDER=ollama
-      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
+      - MEMORY_SERVER_ENVIRONMENT=development
+      - MEMORY_SERVER_HTTP_PORT=8080
+      - MEMORY_SERVER_DB_DRIVER=postgres
+      - MEMORY_SERVER_BUILD_TARGET=cloud-dev
+      - MEMORY_SERVER_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
+      - MEMORY_SERVER_SEARCH_INDEX_URL=weaviate:8080
+      - MEMORY_SERVER_EMBED_PROVIDER=ollama
+      - MEMORY_SERVER_EMBED_MODEL=nomic-embed-text
+      - MEMORY_SERVER_HEALTH_INTERVAL_SECONDS=5
+      - MEMORY_SERVER_HEALTH_PROBE_TIMEOUT_SECONDS=2
       - OLLAMA_URL=http://host.docker.internal:11434
     depends_on:
       migrations:
+        condition: service_completed_successfully
+      weaviate:
+        condition: service_healthy
+      ollama-health:
         condition: service_completed_successfully
     networks:
       - memory-network
@@ -83,22 +89,51 @@ services:
       timeout: 3s
       retries: 5
 
+  ollama-health:
+    image: curlimages/curl:latest
+    container_name: ollama-health-check
+    networks:
+      - memory-network
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command: >
+      "
+        echo 'Checking Ollama health at host.docker.internal:11434...';
+        until curl -sf http://host.docker.internal:11434/api/tags; do
+          echo 'Waiting for Ollama to be available...';
+          sleep 2;
+        done;
+        echo 'Ollama is responding. Checking for nomic-embed-text model...';
+        if curl -s http://host.docker.internal:11434/api/tags | grep -q 'nomic-embed-text'; then
+          echo 'Model nomic-embed-text found';
+        else
+          echo 'WARNING: Model nomic-embed-text not found, but Ollama is responding';
+        fi;
+        echo 'OLLAMA HEALTH CHECK COMPLETED'
+      "
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   outbox-worker:
     container_name: outbox-worker
     build:
       context: ../..
       dockerfile: cmd/outbox-worker/Dockerfile
     environment:
-      - MEMORY_BACKEND_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
-      - MEMORY_BACKEND_WAVIATE_URL=weaviate:8080
-      - MEMORY_BACKEND_EMBED_PROVIDER=ollama
-      - MEMORY_BACKEND_EMBED_MODEL=nomic-embed-text
+      - MEMORY_SERVER_POSTGRES_DSN=postgres://memory:memory@postgres:5432/memory?sslmode=disable
+      - MEMORY_SERVER_SEARCH_INDEX_URL=weaviate:8080
+      - MEMORY_SERVER_EMBED_PROVIDER=ollama
+      - MEMORY_SERVER_EMBED_MODEL=nomic-embed-text
+      - MEMORY_SERVER_HEALTH_INTERVAL_SECONDS=5
+      - MEMORY_SERVER_HEALTH_PROBE_TIMEOUT_SECONDS=2
       - OLLAMA_URL=http://host.docker.internal:11434
     depends_on:
       migrations:
         condition: service_completed_successfully
       weaviate:
         condition: service_healthy
+      ollama-health:
+        condition: service_completed_successfully
     networks:
       - memory-network
     restart: unless-stopped
@@ -109,7 +144,7 @@ services:
     container_name: user-bootstrap
     build:
       context: ../..
-      dockerfile: tools/memoryctl/Dockerfile
+      dockerfile: tools/mycelian-service-tools/Dockerfile
     depends_on:
       memory-service:
         condition: service_started
@@ -119,11 +154,11 @@ services:
     entrypoint: ["sh", "-c"]
     command: >
       "
-        until curl -s http://memory-service:8080/api/health | grep 'UP'; do
+        until curl -s http://memory-service:8080/api/health | grep '"status":"healthy"'; do
           echo 'waiting for memory-service...';
           sleep 2;
         done;
-        ./memoryctl users create --userId local_user --email local.user@example.com --name 'Local User' --api http://memory-service:8080 || true
+        ./mycelian-service-tools users create --userId local_user --email local.user@example.com --name 'Local User' --api http://memory-service:8080 || true
       "
 
 networks:

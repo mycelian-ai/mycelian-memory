@@ -180,7 +180,7 @@ func (s *Service) CreateMemoryEntry(ctx context.Context, req CreateMemoryEntryRe
 	}
 
 	// Emit detailed post-persist log including entryID and active storage driver for easier debugging
-	dbDriver := os.Getenv("MEMORY_BACKEND_DB_DRIVER")
+	dbDriver := os.Getenv("MEMORY_SERVER_DB_DRIVER")
 	if dbDriver == "" {
 		dbDriver = "unknown"
 	}
@@ -331,7 +331,7 @@ func (s *Service) CreateMemoryContext(ctx context.Context, req CreateMemoryConte
 	}
 
 	// Debug log for context snapshot creation
-	dbDriver := os.Getenv("MEMORY_BACKEND_DB_DRIVER")
+	dbDriver := os.Getenv("MEMORY_SERVER_DB_DRIVER")
 	if dbDriver == "" {
 		dbDriver = "unknown"
 	}

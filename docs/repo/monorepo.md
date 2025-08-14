@@ -17,7 +17,7 @@ mycelian/
     go.mod
     cmd/
       mycelian-memory-service/   # main.go entry-point
-      memoryctl/                 # CLI tool
+      mycelian-service-tools/    # CLI tool (formerly memoryctl)
     internal/
       core/               # basic types and rules
       api/                # HTTP handlers and routes
@@ -46,7 +46,7 @@ mycelian/
 
   api/                    # protobuf + OpenAPI contracts (single source of truth)
   deployments/            # helm charts, docker-compose, terraform
-  tools/                  # scripts and configs (code-gen, linters, CI helpers)
+  tools/                  # scripts and helper CLIs
   docs/                   # ADRs, onboarding, this file
 ```
 
