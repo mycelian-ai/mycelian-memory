@@ -150,8 +150,8 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 }
 
 // DeleteEntry removes an entry by ID from a memory synchronously.
-// It performs an HTTP DELETE and expects 204 No Content.
-func DeleteEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) error {
+// It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
+func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -165,6 +165,11 @@ func DeleteEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 		return err
 	}
 	if err := types.ValidateIDPresent(entryID, "entryId"); err != nil {
+		return err
+	}
+
+	// Ensure all pending writes for this memory complete before deletion
+	if err := awaitConsistency(ctx, exec, memID); err != nil {
 		return err
 	}
 
@@ -182,4 +187,26 @@ func DeleteEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 		return fmt.Errorf("delete entry: status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// awaitConsistency blocks until all previously submitted jobs for the given memoryID
+// have been executed by the internal executor. This ensures FIFO ordering is preserved.
+func awaitConsistency(ctx context.Context, exec types.Executor, memoryID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	done := make(chan struct{})
+	job := job.New(func(context.Context) error {
+		close(done)
+		return nil
+	})
+	if err := exec.Submit(ctx, memoryID, job); err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
+	}
 }

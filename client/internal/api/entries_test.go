@@ -42,7 +42,8 @@ func TestDeleteEntry_SyncCallsHTTP(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := DeleteEntry(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err != nil {
+	exec := &mockExec{}
+	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err != nil {
 		t.Fatalf("DeleteEntry error: %v", err)
 	}
 }
@@ -58,7 +59,7 @@ func TestEntries_InvalidUserID(t *testing.T) {
 	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1", "m1", nil); err == nil {
 		t.Fatal("expected validation error for ListEntries")
 	}
-	if err := DeleteEntry(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "BAD ID!", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected validation error for DeleteEntry")
 	}
 }
@@ -83,7 +84,7 @@ func TestEntries_NonOKStatuses(t *testing.T) {
 	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", nil); err == nil {
 		t.Fatal("expected error for ListEntries non-200")
 	}
-	if err := DeleteEntry(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected error for DeleteEntry non-204")
 	}
 }
@@ -157,19 +158,21 @@ func TestAddEntry_CtxCanceled(t *testing.T) {
 
 func TestDeleteEntry_HTTPDoError(t *testing.T) {
 	t.Parallel()
+	exec := &mockExec{}
 	hc := &http.Client{Transport: &errRT{}}
-	if err := DeleteEntry(context.Background(), hc, "http://example.com", "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), exec, hc, "http://example.com", "user_1", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected http Do error for DeleteEntry")
 	}
 }
 
 func TestDeleteEntry_CtxCanceled(t *testing.T) {
 	t.Parallel()
+	exec := &mockExec{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	if err := DeleteEntry(ctx, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(ctx, exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected context canceled for DeleteEntry")
 	}
 }

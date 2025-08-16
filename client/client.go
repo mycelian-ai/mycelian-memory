@@ -200,9 +200,9 @@ func (c *Client) GetEntry(ctx context.Context, userID, vaultID, memID, entryID s
 }
 
 // DeleteEntry removes an entry by ID from a memory synchronously via HTTP.
-// This call returns only after the backend confirms deletion (204 No Content).
+// It first awaits consistency to ensure all pending writes complete, then performs the deletion.
 func (c *Client) DeleteEntry(ctx context.Context, userID, vaultID, memID, entryID string) error {
-	return api.DeleteEntry(ctx, c.http, c.baseURL, userID, vaultID, memID, entryID)
+	return api.DeleteEntry(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, entryID)
 }
 
 // --------------------------------------------------------------------
@@ -223,8 +223,9 @@ func (c *Client) GetContext(ctx context.Context, userID, vaultID, memID string) 
 }
 
 // DeleteContext removes a context snapshot by ID synchronously via HTTP.
+// It first awaits consistency to ensure all pending writes complete, then performs the deletion.
 func (c *Client) DeleteContext(ctx context.Context, userID, vaultID, memID, contextID string) error {
-	return api.DeleteContext(ctx, c.http, c.baseURL, userID, vaultID, memID, contextID)
+	return api.DeleteContext(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, contextID)
 }
 
 // --------------------------------------------------------------------

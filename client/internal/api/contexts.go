@@ -105,8 +105,8 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, v
 }
 
 // DeleteContext removes a context snapshot by contextId synchronously.
-// Server treats contexts as append-only snapshots; delete is hard and irreversible.
-func DeleteContext(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, contextID string) error {
+// It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
+func DeleteContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID, contextID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -120,6 +120,11 @@ func DeleteContext(ctx context.Context, httpClient *http.Client, baseURL, userID
 		return err
 	}
 	if err := types.ValidateIDPresent(contextID, "contextId"); err != nil {
+		return err
+	}
+
+	// Ensure all pending writes for this memory complete before deletion
+	if err := awaitConsistency(ctx, exec, memID); err != nil {
 		return err
 	}
 
