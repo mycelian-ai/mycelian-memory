@@ -105,45 +105,11 @@ func mustNewRequest(method, url string) *http.Request {
 	return req
 }
 
-// ensureUser makes sure a specific user exists; creates it if missing.
-// Returns the userId to be used by tests.
+// ensureUser returns the userId to be used by tests.
+// With external user identification, we simply return the provided userID
+// as user management is now handled externally.
 func ensureUser(t *testing.T, memSvc, userID, email string) string {
-	// Fast path: exists
-	r, err := http.Get(fmt.Sprintf("%s/v0/users/%s", memSvc, userID))
-	if err == nil && r.StatusCode == http.StatusOK {
-		_ = r.Body.Close()
-		return userID
-	}
-	if r != nil {
-		_ = r.Body.Close()
-	}
-	// Create user
-	payload := fmt.Sprintf(`{"userId":"%s","email":"%s","timeZone":"UTC","displayName":"Test User"}`, userID, email)
-	resp, err := http.Post(memSvc+"/v0/users", "application/json", bytes.NewBufferString(payload))
-	if err != nil {
-		t.Fatalf("create user %s: %v", userID, err)
-	}
-	// If created, decode; otherwise tolerate duplicate by verifying via GET
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		var out struct {
-			UserID string `json:"userId"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-			t.Fatalf("decode user create: %v", err)
-		}
-		_ = resp.Body.Close()
-		return out.UserID
-	}
-	// Fallback: check again
-	_ = resp.Body.Close()
-	r2, err := http.Get(fmt.Sprintf("%s/v0/users/%s", memSvc, userID))
-	if err == nil && r2.StatusCode == http.StatusOK {
-		_ = r2.Body.Close()
-		return userID
-	}
-	if r2 != nil {
-		_ = r2.Body.Close()
-	}
-	t.Fatalf("failed to ensure user %s: status %d", userID, resp.StatusCode)
-	return ""
+	// User management is now external - simply return the userID for use in tests
+	// In development mode, the server uses the configured DevUserID from environment
+	return userID
 }

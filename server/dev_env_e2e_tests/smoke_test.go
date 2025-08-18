@@ -42,7 +42,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	// 1. Ensure dedicated test user and create weaviate tenant
 	userResp := struct {
 		UserID string `json:"userId"`
-	}{UserID: ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")}
+	}{UserID: "mycelian-dev"} // Use MockAuthorizer's ActorID for Weaviate tenant consistency
 	ensureWeaviateTenants(t, weaviate, userResp.UserID)
 
 	// 2. Create vault then memory (unique per run) and ensure cleanup
@@ -50,25 +50,38 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		VaultID string `json:"vaultId"`
 	}
 	vPayload := fmt.Sprintf(`{"title":"BmVault-%d"}`, time.Now().UnixNano())
-	vResp, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
+	req1, err := http.NewRequest("POST", fmt.Sprintf("%s/v0/vaults", memSvc), bytes.NewBufferString(vPayload))
+	if err != nil {
+		t.Fatalf("create vault request: %v", err)
+	}
+	req1.Header.Set("Content-Type", "application/json")
+	req1.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	vResp, err := http.DefaultClient.Do(req1)
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 	mustJSON(t, vResp, &vaultResp)
 	// Cleanup vault at end
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vaultResp.VaultID), nil)
+		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
-	baseVaultPath := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
+	baseVaultPath := fmt.Sprintf("%s/v0/vaults/%s", memSvc, vaultResp.VaultID)
 
 	// 2. Create memory
 	var memResp struct {
 		MemoryID string `json:"memoryId"`
 	}
 	body := fmt.Sprintf(`{"memoryType":"CONVERSATION","title":"BmSmoke-%d"}`, time.Now().UnixNano())
-	respM, err := http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
+	req2, err := http.NewRequest("POST", baseVaultPath+"/memories", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("create memory request: %v", err)
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	respM, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
@@ -76,7 +89,12 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 
 	// 2b. Verify default context snapshot exists immediately after memory creation
 	ctxURL := fmt.Sprintf("%s/memories/%s/contexts", baseVaultPath, memResp.MemoryID)
-	ctxResp, err := http.Get(ctxURL)
+	ctxReq, err := http.NewRequest("GET", ctxURL, nil)
+	if err != nil {
+		t.Fatalf("get context request: %v", err)
+	}
+	ctxReq.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	ctxResp, err := http.DefaultClient.Do(ctxReq)
 	if err != nil {
 		t.Fatalf("get default context: %v", err)
 	}
@@ -115,7 +133,13 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	// 3. Create entry
 	entryText := fmt.Sprintf("BM25 smoke test %d", time.Now().UnixNano())
 	entryBody := fmt.Sprintf(`{"rawEntry":"%s","summary":"smoke summary"}`, entryText)
-	respE, err := http.Post(fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memResp.MemoryID), "application/json", bytes.NewBufferString(entryBody))
+	entryReq, err := http.NewRequest("POST", fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memResp.MemoryID), bytes.NewBufferString(entryBody))
+	if err != nil {
+		t.Fatalf("create entry request: %v", err)
+	}
+	entryReq.Header.Set("Content-Type", "application/json")
+	entryReq.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	respE, err := http.DefaultClient.Do(entryReq)
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
 	}
@@ -192,7 +216,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
+	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
 	ensureWeaviateTenants(t, weaviate, userResp.UserID)
 
 	// 2. vault then memory
@@ -200,25 +224,38 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		VaultID string `json:"vaultId"`
 	}
 	vPayload := fmt.Sprintf(`{"title":"SearchVault-%d"}`, time.Now().UnixNano())
-	vResp, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(vPayload))
+	req3, err := http.NewRequest("POST", fmt.Sprintf("%s/v0/vaults", memSvc), bytes.NewBufferString(vPayload))
+	if err != nil {
+		t.Fatalf("create vault request: %v", err)
+	}
+	req3.Header.Set("Content-Type", "application/json")
+	req3.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	vResp, err := http.DefaultClient.Do(req3)
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 	mustJSON(t, vResp, &vaultResp)
 	// Cleanup vault at end
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vaultResp.VaultID), nil)
+		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
-	baseVaultPath := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vaultResp.VaultID)
+	baseVaultPath := fmt.Sprintf("%s/v0/vaults/%s", memSvc, vaultResp.VaultID)
 
 	// 2. memory
 	var memResp struct {
 		MemoryID string `json:"memoryId"`
 	}
 	body := fmt.Sprintf(`{"memoryType":"CONVERSATION","title":"SearchSmoke-%d"}`, time.Now().UnixNano())
-	resp, err := http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
+	req4, err := http.NewRequest("POST", baseVaultPath+"/memories", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("create memory request: %v", err)
+	}
+	req4.Header.Set("Content-Type", "application/json")
+	req4.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	resp, err := http.DefaultClient.Do(req4)
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
@@ -227,7 +264,13 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	// 3. entry
 	entryText := fmt.Sprintf("Search API smoke %d", time.Now().UnixNano())
 	entryBody := fmt.Sprintf(`{"rawEntry":"%s","summary":"search summary"}`, entryText)
-	resp, err = http.Post(fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memResp.MemoryID), "application/json", bytes.NewBufferString(entryBody))
+	req5, err := http.NewRequest("POST", fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memResp.MemoryID), bytes.NewBufferString(entryBody))
+	if err != nil {
+		t.Fatalf("create entry request: %v", err)
+	}
+	req5.Header.Set("Content-Type", "application/json")
+	req5.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	resp, err = http.DefaultClient.Do(req5)
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
 	}
@@ -252,13 +295,19 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	}
 
 	// 5. Call search API until it returns the entry
-	searchBody := fmt.Sprintf(`{"userId":"%s","memoryId":"%s","query":"%s"}`, userResp.UserID, memResp.MemoryID, entryText)
+	searchBody := fmt.Sprintf(`{"memoryId":"%s","query":"%s"}`, memResp.MemoryID, entryText)
 	deadline = time.Now().Add(5 * time.Second)
 	for {
 		if time.Now().After(deadline) {
 			t.Fatalf("search API did not return expected entry within timeout")
 		}
-		rs, err := http.Post(memSvc+"/v0/search", "application/json", bytes.NewBufferString(searchBody))
+		searchReq, err := http.NewRequest("POST", memSvc+"/v0/search", bytes.NewBufferString(searchBody))
+		if err != nil {
+			t.Fatalf("search request: %v", err)
+		}
+		searchReq.Header.Set("Content-Type", "application/json")
+		searchReq.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		rs, err := http.DefaultClient.Do(searchReq)
 		if err != nil {
 			t.Fatalf("search request: %v", err)
 		}
@@ -294,10 +343,16 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
+	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
 
 	// 2. vault
-	vResp2, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userResp.UserID), "application/json", bytes.NewBufferString(`{"title":"CtxVault"}`))
+	req6, err := http.NewRequest("POST", fmt.Sprintf("%s/v0/vaults", memSvc), bytes.NewBufferString(`{"title":"CtxVault"}`))
+	if err != nil {
+		t.Fatalf("create vault request: %v", err)
+	}
+	req6.Header.Set("Content-Type", "application/json")
+	req6.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	vResp2, err := http.DefaultClient.Do(req6)
 	if err != nil {
 		t.Fatalf("create vault2: %v", err)
 	}
@@ -305,10 +360,11 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 		VaultID string `json:"vaultId"`
 	}
 	mustJSON(t, vResp2, &v2)
-	baseVaultPath2 := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID)
+	baseVaultPath2 := fmt.Sprintf("%s/v0/vaults/%s", memSvc, v2.VaultID)
 	// Cleanup vault at end
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, v2.VaultID), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, v2.VaultID), nil)
+		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
@@ -317,7 +373,13 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 		MemoryID string `json:"memoryId"`
 	}
 	body := `{"memoryType":"CONVERSATION","title":"ContextSmoke"}`
-	respMem, err := http.Post(baseVaultPath2+"/memories", "application/json", bytes.NewBufferString(body))
+	req7, err := http.NewRequest("POST", baseVaultPath2+"/memories", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("create memory request: %v", err)
+	}
+	req7.Header.Set("Content-Type", "application/json")
+	req7.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	respMem, err := http.DefaultClient.Do(req7)
 	if err != nil {
 		t.Fatalf("create memory2: %v", err)
 	}
@@ -327,9 +389,10 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 
 	// 3. PUT context
 	ctxPayload := `{"context":{"note":"smoke-test"}}`
-	req, _ := http.NewRequest(http.MethodPut, putURL, bytes.NewBufferString(ctxPayload))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	req8, _ := http.NewRequest(http.MethodPut, putURL, bytes.NewBufferString(ctxPayload))
+	req8.Header.Set("Content-Type", "application/json")
+	req8.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	resp, err := http.DefaultClient.Do(req8)
 	if err != nil {
 		t.Fatalf("put context: %v", err)
 	}
@@ -342,7 +405,12 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 
 	// 4. GET latest context and verify
 	getURL := putURL
-	resp, err = http.Get(getURL)
+	req9, err := http.NewRequest("GET", getURL, nil)
+	if err != nil {
+		t.Fatalf("get context request: %v", err)
+	}
+	req9.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	resp, err = http.DefaultClient.Do(req9)
 	if err != nil {
 		t.Fatalf("get context: %v", err)
 	}

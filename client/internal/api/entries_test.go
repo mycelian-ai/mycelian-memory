@@ -20,7 +20,7 @@ func TestAddEntry_EnqueuesAndCallsHTTP(t *testing.T) {
 	defer srv.Close()
 
 	exec := &mockExec{}
-	ack, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", types.AddEntryRequest{RawEntry: "hi"})
+	ack, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.AddEntryRequest{RawEntry: "hi"})
 	if err != nil {
 		t.Fatalf("AddEntry error: %v", err)
 	}
@@ -43,24 +43,8 @@ func TestDeleteEntry_SyncCallsHTTP(t *testing.T) {
 	defer srv.Close()
 
 	exec := &mockExec{}
-	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err != nil {
+	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", "e1"); err != nil {
 		t.Fatalf("DeleteEntry error: %v", err)
-	}
-}
-
-func TestEntries_InvalidUserID(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(http.NotFoundHandler())
-	defer srv.Close()
-	exec := &mockExec{}
-	if _, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "BAD ID!", "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
-		t.Fatal("expected validation error for AddEntry")
-	}
-	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1", "m1", nil); err == nil {
-		t.Fatal("expected validation error for ListEntries")
-	}
-	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "BAD ID!", "v1", "m1", "e1"); err == nil {
-		t.Fatal("expected validation error for DeleteEntry")
 	}
 }
 
@@ -78,13 +62,13 @@ func TestEntries_NonOKStatuses(t *testing.T) {
 	}))
 	defer srv.Close()
 	exec := &mockExec{}
-	if _, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
+	if _, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
 		t.Fatal("expected error for AddEntry non-201")
 	}
-	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", nil); err == nil {
+	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "v1", "m1", nil); err == nil {
 		t.Fatal("expected error for ListEntries non-200")
 	}
-	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected error for DeleteEntry non-204")
 	}
 }
@@ -96,7 +80,7 @@ func TestListEntries_DecodeError(t *testing.T) {
 		_, _ = w.Write([]byte("{bad json"))
 	}))
 	defer srv.Close()
-	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", nil); err == nil {
+	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "v1", "m1", nil); err == nil {
 		t.Fatal("expected decode error for ListEntries")
 	}
 }
@@ -105,7 +89,7 @@ func TestListEntries_DecodeError(t *testing.T) {
 func TestListEntries_HTTPDoError(t *testing.T) {
 	t.Parallel()
 	hc := &http.Client{Transport: &errRT{}}
-	if _, err := ListEntries(context.Background(), hc, "http://example.com", "user_1", "v1", "m1", nil); err == nil {
+	if _, err := ListEntries(context.Background(), hc, "http://example.com", "v1", "m1", nil); err == nil {
 		t.Fatal("expected http Do error for ListEntries")
 	}
 }
@@ -116,7 +100,7 @@ func TestListEntries_CtxCanceled(t *testing.T) {
 	cancel()
 	dummy := httptest.NewServer(http.NotFoundHandler())
 	defer dummy.Close()
-	if _, err := ListEntries(ctx, dummy.Client(), dummy.URL, "user_1", "v1", "m1", nil); err == nil {
+	if _, err := ListEntries(ctx, dummy.Client(), dummy.URL, "v1", "m1", nil); err == nil {
 		t.Fatal("expected context canceled for ListEntries")
 	}
 }
@@ -128,7 +112,7 @@ func TestListEntries_WithParams(t *testing.T) {
 		_, _ = w.Write([]byte(`{"entries":[],"count":0}`))
 	}))
 	defer srv.Close()
-	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "user_1", "v1", "m1", map[string]string{"limit": "2", "offset": "1"}); err != nil {
+	if _, err := ListEntries(context.Background(), srv.Client(), srv.URL, "v1", "m1", map[string]string{"limit": "2", "offset": "1"}); err != nil {
 		t.Fatalf("ListEntries with params: %v", err)
 	}
 }
@@ -139,7 +123,7 @@ func TestAddEntry_SubmitError(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	exec := &failingExec{}
-	if _, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "user_1", "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
+	if _, err := AddEntry(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
 		t.Fatal("expected submit error for AddEntry")
 	}
 }
@@ -151,7 +135,7 @@ func TestAddEntry_CtxCanceled(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	exec := &mockExec{}
-	if _, err := AddEntry(ctx, exec, srv.Client(), srv.URL, "user_1", "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
+	if _, err := AddEntry(ctx, exec, srv.Client(), srv.URL, "v1", "m1", types.AddEntryRequest{RawEntry: "hi"}); err == nil {
 		t.Fatal("expected context canceled for AddEntry")
 	}
 }
@@ -160,7 +144,7 @@ func TestDeleteEntry_HTTPDoError(t *testing.T) {
 	t.Parallel()
 	exec := &mockExec{}
 	hc := &http.Client{Transport: &errRT{}}
-	if err := DeleteEntry(context.Background(), exec, hc, "http://example.com", "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(context.Background(), exec, hc, "http://example.com", "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected http Do error for DeleteEntry")
 	}
 }
@@ -172,7 +156,7 @@ func TestDeleteEntry_CtxCanceled(t *testing.T) {
 	cancel()
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	if err := DeleteEntry(ctx, exec, srv.Client(), srv.URL, "user_1", "v1", "m1", "e1"); err == nil {
+	if err := DeleteEntry(ctx, exec, srv.Client(), srv.URL, "v1", "m1", "e1"); err == nil {
 		t.Fatal("expected context canceled for DeleteEntry")
 	}
 }

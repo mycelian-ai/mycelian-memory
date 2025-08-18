@@ -16,11 +16,8 @@ import (
 // AddEntry submits a new entry to a memory via the sharded executor.
 // This ensures FIFO ordering per memory and provides offline resilience.
 // CRITICAL: This MUST preserve the async executor pattern!
-func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID string, req types.AddEntryRequest) (*types.EnqueueAck, error) {
+func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID string, req types.AddEntryRequest) (*types.EnqueueAck, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -36,7 +33,7 @@ func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client,
 		if err != nil {
 			return err
 		}
-		url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries", baseURL, userID, vaultID, memID)
+		url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/entries", baseURL, vaultID, memID)
 		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodPost, url, bytes.NewBuffer(body))
 		if err != nil {
 			return err
@@ -65,11 +62,8 @@ func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client,
 }
 
 // ListEntries retrieves entries within a memory using the full prefix (synchronous).
-func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID string, params map[string]string) (*types.ListEntriesResponse, error) {
+func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, vaultID, memID string, params map[string]string) (*types.ListEntriesResponse, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -89,7 +83,7 @@ func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 		}
 		query += fmt.Sprintf("%s=%s", k, v)
 	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries%s", baseURL, userID, vaultID, memID, query)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/entries%s", baseURL, vaultID, memID, query)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -111,11 +105,8 @@ func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 }
 
 // GetEntry retrieves a single entry by entryId within a memory (synchronous).
-func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) (*types.Entry, error) {
+func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, vaultID, memID, entryID string) (*types.Entry, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -128,7 +119,7 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/entries/%s", baseURL, vaultID, memID, entryID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -151,11 +142,8 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 
 // DeleteEntry removes an entry by ID from a memory synchronously.
 // It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
-func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID, entryID string) error {
+func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID, entryID string) error {
 	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -173,7 +161,7 @@ func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Clie
 		return err
 	}
 
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries/%s", baseURL, userID, vaultID, memID, entryID)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/entries/%s", baseURL, vaultID, memID, entryID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err

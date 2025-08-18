@@ -18,11 +18,8 @@ import (
 // PutContext stores a snapshot for the memory via the sharded executor.
 // This ensures FIFO ordering per memory and provides offline resilience.
 // CRITICAL: This MUST preserve the async executor pattern!
-func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID string, payload types.PutContextRequest) (*types.EnqueueAck, error) {
+func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID string, payload types.PutContextRequest) (*types.EnqueueAck, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -38,7 +35,7 @@ func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Clien
 		if err != nil {
 			return err
 		}
-		url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/contexts", baseURL, userID, vaultID, memID)
+		url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", baseURL, vaultID, memID)
 		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodPut, url, bytes.NewBuffer(body))
 		if err != nil {
 			return err
@@ -66,11 +63,8 @@ func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Clien
 }
 
 // GetContext retrieves the most recent context snapshot for a memory (synchronous).
-func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID, memID string) (*types.GetContextResponse, error) {
+func GetContext(ctx context.Context, httpClient *http.Client, baseURL, vaultID, memID string) (*types.GetContextResponse, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -79,7 +73,7 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, v
 	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/contexts", baseURL, userID, vaultID, memID)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", baseURL, vaultID, memID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -106,11 +100,8 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, userID, v
 
 // DeleteContext removes a context snapshot by contextId synchronously.
 // It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
-func DeleteContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, userID, vaultID, memID, contextID string) error {
+func DeleteContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID, contextID string) error {
 	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return err
 	}
 	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
@@ -128,7 +119,7 @@ func DeleteContext(ctx context.Context, exec types.Executor, httpClient *http.Cl
 		return err
 	}
 
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/contexts/%s", baseURL, userID, vaultID, memID, contextID)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts/%s", baseURL, vaultID, memID, contextID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err

@@ -55,7 +55,7 @@ func (vh *VaultHandler) handleCreateVault(ctx context.Context, req mcp.CallToolR
 	log.Debug().Str("user_id", userID).Str("title", title).Msg("create_vault invoked")
 
 	start := time.Now()
-	v, err := vh.client.CreateVault(ctx, userID, client.CreateVaultRequest{Title: title, Description: desc})
+	v, err := vh.client.CreateVault(ctx, client.CreateVaultRequest{Title: title, Description: desc})
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Error().Err(err).Dur("elapsed", elapsed).Msg("create_vault failed")
@@ -74,7 +74,7 @@ func (vh *VaultHandler) handleListVaults(ctx context.Context, req mcp.CallToolRe
 	log.Debug().Str("user_id", userID).Msg("list_vaults invoked")
 
 	start := time.Now()
-	vaults, err := vh.client.ListVaults(ctx, userID)
+	vaults, err := vh.client.ListVaults(ctx)
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Error().Err(err).Dur("elapsed", elapsed).Msg("list_vaults failed")
@@ -100,7 +100,7 @@ func (vh *VaultHandler) handleListMemories(ctx context.Context, req mcp.CallTool
 	log.Debug().Str("user_id", userID).Str("vault_id", vaultID).Msg("list_memories invoked")
 
 	start := time.Now()
-	mems, err := vh.client.ListMemories(ctx, userID, vaultID)
+	mems, err := vh.client.ListMemories(ctx, vaultID)
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Error().Err(err).Dur("elapsed", elapsed).Msg("list_memories failed")

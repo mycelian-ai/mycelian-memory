@@ -45,7 +45,7 @@ func TestHandlersEndToEnd(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	sdk := client.New(ts.URL)
+	sdk := client.NewWithDevMode(ts.URL)
 
 	// ----- ContextHandler -----
 	ch := NewContextHandler(sdk)
@@ -113,14 +113,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 		t.Fatalf("get_memory error: %v", err)
 	}
 
-	// ----- UserHandler -----
-	uh := NewUserHandler(sdk)
-	if _, err := uh.handleGetUser(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id": "u1",
-	}}}); err != nil {
-		t.Fatalf("get_user error: %v", err)
-	}
-
 	// ----- SearchHandler -----
 	sh := NewSearchHandler(sdk)
 	if _, err := sh.handleSearch(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
@@ -132,7 +124,7 @@ func TestHandlersEndToEnd(t *testing.T) {
 	}
 
 	// verify backend context reflects the write
-	resCtx, err := sdk.GetContext(context.Background(), "u1", "v1", "m1")
+	resCtx, err := sdk.GetContext(context.Background(), "v1", "m1")
 	if err != nil || resCtx == nil {
 		t.Fatalf("get latest context failed: %v", err)
 	}

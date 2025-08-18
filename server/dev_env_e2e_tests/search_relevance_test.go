@@ -98,7 +98,14 @@ func waitForObjects(t *testing.T, cl *wvClient, tenant string, want int, timeout
 // createVault returns vaultID and base path for further requests
 func createVault(t *testing.T, memSvc, userID, title string) (string, string) {
 	payload := fmt.Sprintf(`{"title":"%s"}`, title)
-	resp, err := http.Post(fmt.Sprintf("%s/v0/users/%s/vaults", memSvc, userID), "application/json", bytes.NewBufferString(payload))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v0/vaults", memSvc), bytes.NewBufferString(payload))
+	if err != nil {
+		t.Fatalf("create vault request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
@@ -109,7 +116,7 @@ func createVault(t *testing.T, memSvc, userID, title string) (string, string) {
 	if _, err := uuid.Parse(v.VaultID); err != nil {
 		t.Fatalf("invalid vaultID")
 	}
-	base := fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userID, v.VaultID)
+	base := fmt.Sprintf("%s/v0/vaults/%s", memSvc, v.VaultID)
 	return v.VaultID, base
 }
 
@@ -124,7 +131,14 @@ func createEntry(t *testing.T, baseVaultPath string, _, memoryID, raw, summary s
 	}
 	data, _ := json.Marshal(payload)
 	url := fmt.Sprintf("%s/memories/%s/entries", baseVaultPath, memoryID)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
+	if err != nil {
+		t.Fatalf("create entry request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
 	}
@@ -173,21 +187,29 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	userResp.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
+	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
 	ensureWeaviateTenants(t, weaviateURL, userResp.UserID)
 
 	// 2. vault and memory (unique per run) with cleanup
 	title := fmt.Sprintf("alphavault-%d", time.Now().UnixNano())
 	vid, baseVaultPath := createVault(t, memSvc, userResp.UserID, title)
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, userResp.UserID, vid), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vid), nil)
+		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 	var memResp struct {
 		MemoryID string `json:"memoryId"`
 	}
 	body := `{"memoryType":"CONVERSATION","title":"alphasweep"}`
-	respM, err := http.Post(baseVaultPath+"/memories", "application/json", bytes.NewBufferString(body))
+	req, err := http.NewRequest("POST", baseVaultPath+"/memories", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("create memory request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+
+	respM, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
@@ -272,7 +294,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	var user struct {
 		UserID string `json:"userId"`
 	}
-	user.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
+	user.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
 	ensureWeaviateTenants(t, weaviateURL, user.UserID)
 	var mem struct {
 		MemoryID string `json:"memoryId"`
@@ -280,11 +302,15 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	// vault then memory
 	vidT, baseVaultPathT := createVault(t, memSvc, user.UserID, "tagvault")
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, user.UserID, vidT), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vidT), nil)
+		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
-	respM, _ := http.Post(baseVaultPathT+"/memories", "application/json", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"Tag"}`))
+	req2, _ := http.NewRequest("POST", baseVaultPathT+"/memories", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"Tag"}`))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	respM, _ := http.DefaultClient.Do(req2)
 	mustJSON(t, respM, &mem)
 
 	// seed entries 5 cats (3 featured) + 5 dogs
@@ -350,17 +376,21 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 	var user struct {
 		UserID string `json:"userId"`
 	}
-	user.UserID = ensureUser(t, memSvc, env("E2E_USER", "test_user"), "test.user@example.com")
+	user.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
 	ensureWeaviateTenants(t, weaviateURL, user.UserID)
 	var mem struct {
 		MemoryID string `json:"memoryId"`
 	}
 	vidM, baseVaultPathM := createVault(t, memSvc, user.UserID, "metavault")
 	defer func() {
-		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/users/%s/vaults/%s", memSvc, user.UserID, vidM), nil)
+		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vidM), nil)
+		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
 		_, _ = http.DefaultClient.Do(req)
 	}()
-	respM2, _ := http.Post(baseVaultPathM+"/memories", "application/json", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"meta"}`))
+	req3, _ := http.NewRequest("POST", baseVaultPathM+"/memories", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"meta"}`))
+	req3.Header.Set("Content-Type", "application/json")
+	req3.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	respM2, _ := http.DefaultClient.Do(req3)
 	mustJSON(t, respM2, &mem)
 
 	t.Skip("metadata filter test disabled under lowercase-title constraint")

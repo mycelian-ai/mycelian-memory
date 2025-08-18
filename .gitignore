@@ -97,7 +97,7 @@ credentials*.json
 # Local database files
 *.db
 memory.db
-.synapse-memory/
+.kiro/
 
 # Secrets directory
 secrets/

@@ -12,16 +12,16 @@ import (
 //
 // Fields:
 //
-//	userId – required, non-empty string
+
 //	memoryId – required, non-empty string
 //	query – required, non-empty string
 //	topK  – optional, 1-100 (defaults to 10)
 //
 // Validation is done via the Validate method.
+// User identification comes from API key authorization.
 //
 // This DTO is intentionally small; future versions may add filters.
 type SearchRequest struct {
-	UserID   string `json:"userId"`
 	MemoryID string `json:"memoryId"`
 	Query    string `json:"query"`
 	TopK     int    `json:"topK,omitempty"`
@@ -30,9 +30,7 @@ type SearchRequest struct {
 // Validate sanitises the struct and applies defaults.
 func (r *SearchRequest) Validate() error {
 	r.Query = strings.TrimSpace(r.Query)
-	if r.UserID == "" {
-		return errors.New("userId is required")
-	}
+
 	if r.MemoryID == "" {
 		return errors.New("memoryId is required")
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 func TestListAndDeleteEntries(t *testing.T) {
-	userID, vaultID, memID, entryID := "user1", "v1", "m1", "e1"
+	vaultID, memID, entryID := "v1", "m1", "e1"
 	var getCalled, deleteCalled bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -28,16 +28,16 @@ func TestListAndDeleteEntries(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New(srv.URL)
+	c := NewWithDevMode(srv.URL)
 	ctx := context.Background()
-	lr, err := c.ListEntries(ctx, userID, vaultID, memID, map[string]string{"limit": "10"})
+	lr, err := c.ListEntries(ctx, vaultID, memID, map[string]string{"limit": "10"})
 	if err != nil || lr.Count != 1 {
 		t.Fatalf("ListEntries error: %v", err)
 	}
 	if !getCalled {
 		t.Fatalf("GET not called")
 	}
-	if err := c.DeleteEntry(ctx, userID, vaultID, memID, entryID); err != nil {
+	if err := c.DeleteEntry(ctx, vaultID, memID, entryID); err != nil {
 		t.Fatalf("DeleteEntry error: %v", err)
 	}
 	if !deleteCalled {

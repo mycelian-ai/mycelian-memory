@@ -12,12 +12,9 @@ import (
 
 // Use shared validation and types from types package
 
-// CreateVault creates a new vault for the specified user.
-func CreateVault(ctx context.Context, httpClient *http.Client, baseURL, userID string, req types.CreateVaultRequest) (*types.Vault, error) {
+// CreateVault creates a new vault using API key authentication.
+func CreateVault(ctx context.Context, httpClient *http.Client, baseURL string, req types.CreateVaultRequest) (*types.Vault, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateUserID(userID); err != nil {
 		return nil, err
 	}
 	if err := types.ValidateTitle(req.Title, "title"); err != nil {
@@ -27,12 +24,13 @@ func CreateVault(ctx context.Context, httpClient *http.Client, baseURL, userID s
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults", baseURL, userID)
+	url := fmt.Sprintf("%s/v0/vaults", baseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	// Note: Authorization header will be added by transport layer
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
@@ -51,19 +49,17 @@ func CreateVault(ctx context.Context, httpClient *http.Client, baseURL, userID s
 	return &vault, nil
 }
 
-// ListVaults returns all vaults for a user.
-func ListVaults(ctx context.Context, httpClient *http.Client, baseURL, userID string) ([]types.Vault, error) {
+// ListVaults returns all vaults using API key authentication.
+func ListVaults(ctx context.Context, httpClient *http.Client, baseURL string) ([]types.Vault, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateUserID(userID); err != nil {
-		return nil, err
-	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults", baseURL, userID)
+	url := fmt.Sprintf("%s/v0/vaults", baseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	// Note: Authorization header will be added by transport layer
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return nil, err
@@ -81,15 +77,12 @@ func ListVaults(ctx context.Context, httpClient *http.Client, baseURL, userID st
 	return lr.Vaults, nil
 }
 
-// GetVault retrieves a vault by ID.
-func GetVault(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID string) (*types.Vault, error) {
+// GetVault retrieves a vault by ID using API key authentication.
+func GetVault(ctx context.Context, httpClient *http.Client, baseURL, vaultID string) (*types.Vault, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateUserID(userID); err != nil {
-		return nil, err
-	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s", baseURL, userID, vaultID)
+	url := fmt.Sprintf("%s/v0/vaults/%s", baseURL, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -111,15 +104,12 @@ func GetVault(ctx context.Context, httpClient *http.Client, baseURL, userID, vau
 	return &vault, nil
 }
 
-// DeleteVault deletes the vault. Backend returns 204 No Content on success.
-func DeleteVault(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultID string) error {
+// DeleteVault deletes the vault using API key authentication. Backend returns 204 No Content on success.
+func DeleteVault(ctx context.Context, httpClient *http.Client, baseURL, vaultID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := types.ValidateUserID(userID); err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s", baseURL, userID, vaultID)
+	url := fmt.Sprintf("%s/v0/vaults/%s", baseURL, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -136,15 +126,12 @@ func DeleteVault(ctx context.Context, httpClient *http.Client, baseURL, userID, 
 	return nil
 }
 
-// GetVaultByTitle fetches a vault by its title.
-func GetVaultByTitle(ctx context.Context, httpClient *http.Client, baseURL, userID, vaultTitle string) (*types.Vault, error) {
+// GetVaultByTitle fetches a vault by its title using API key authentication.
+func GetVaultByTitle(ctx context.Context, httpClient *http.Client, baseURL, vaultTitle string) (*types.Vault, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateUserID(userID); err != nil {
-		return nil, err
-	}
-	url := fmt.Sprintf("%s/v0/users/%s/vaults/%s", baseURL, userID, vaultTitle)
+	url := fmt.Sprintf("%s/v0/vaults/%s", baseURL, vaultTitle)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

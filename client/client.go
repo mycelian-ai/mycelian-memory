@@ -28,14 +28,24 @@ type Client struct {
 	baseURL string
 	http    *http.Client
 	exec    executor
+	apiKey  string // API key for actor authentication (must be explicitly configured)
 
 	closedOnce uint32 // ensures Close is idempotent
 }
 
-// New constructs a Client with optional functional arguments.
-func New(base string, opts ...Option) *Client {
+// New constructs a Client with the specified baseURL and apiKey.
+// Additional options can be provided via functional arguments.
+func New(baseURL, apiKey string, opts ...Option) *Client {
+	if baseURL == "" {
+		panic("baseURL cannot be empty")
+	}
+	if apiKey == "" {
+		panic("apiKey cannot be empty")
+	}
+
 	c := &Client{
-		baseURL: base,
+		baseURL: baseURL,
+		apiKey:  apiKey,
 		http:    &http.Client{Timeout: 30 * time.Second},
 	}
 
@@ -53,7 +63,64 @@ func New(base string, opts ...Option) *Client {
 		c.exec = newDefaultExecutor()
 	}
 
+	// Wrap HTTP transport to automatically add Authorization header
+	c.wrapTransportWithAPIKey()
+
 	return c
+}
+
+// NewWithDevMode constructs a Client for development mode using the hardcoded local dev API key.
+// This only works when the server is running in development mode with MockAuthorizer.
+// Convenience constructor for local development.
+func NewWithDevMode(baseURL string, opts ...Option) *Client {
+	// Use the hardcoded API key that MockAuthorizer recognizes
+	const localDevAPIKey = "sk_local_mycelian_dev_key"
+	return New(baseURL, localDevAPIKey, opts...)
+}
+
+// wrapTransportWithAPIKey wraps the HTTP client's transport to automatically
+// add the Authorization header to all requests using the configured API key.
+func (c *Client) wrapTransportWithAPIKey() {
+	baseTransport := c.http.Transport
+	if baseTransport == nil {
+		baseTransport = http.DefaultTransport
+	}
+	c.http.Transport = &apiKeyTransport{
+		base:   baseTransport,
+		apiKey: c.apiKey,
+	}
+}
+
+// apiKeyTransport wraps an http.RoundTripper to automatically add Authorization header
+type apiKeyTransport struct {
+	base   http.RoundTripper
+	apiKey string
+}
+
+func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original
+	cloned := req.Clone(req.Context())
+	// Add the Authorization header with Bearer token
+	cloned.Header.Set("Authorization", "Bearer "+t.apiKey)
+	return t.base.RoundTrip(cloned)
+}
+
+// getUserID returns a userID for backward compatibility with existing API endpoints.
+// In the actor-based model, this maps to the actorID. In local development, this will be "mycelian-dev".
+// TODO: This is a transitional method - eventually API endpoints should be actor-based.
+func (c *Client) getUserID() string {
+	// For now, extract actor ID from the API key
+	// In local development with "sk_local_mycelian_dev_key", this should resolve to "mycelian-dev"
+	// In production, this would be the actual actor ID resolved from the API key
+
+	// For the hardcoded local dev case:
+	if c.apiKey == "sk_local_mycelian_dev_key" {
+		return "mycelian-dev"
+	}
+
+	// For production, we'd need to resolve this through the server, but for now use a fallback
+	// TODO: Implement proper actor ID resolution for production keys
+	return "default-actor" // This is a temporary fallback
 }
 
 // Close stops the background executor (if any). Safe to call multiple times.
@@ -101,72 +168,57 @@ func newDefaultExecutor() *shardqueue.ShardExecutor {
 // --------------------------------------------------------------------
 
 // CreateMemory creates a new memory in the given vault.
-func (c *Client) CreateMemory(ctx context.Context, userID, vaultID string, req CreateMemoryRequest) (*Memory, error) {
-	return api.CreateMemory(ctx, c.http, c.baseURL, userID, vaultID, req)
+func (c *Client) CreateMemory(ctx context.Context, vaultID string, req CreateMemoryRequest) (*Memory, error) {
+	return api.CreateMemory(ctx, c.http, c.baseURL, vaultID, req)
 }
 
 // ListMemories retrieves memories within a vault.
-func (c *Client) ListMemories(ctx context.Context, userID, vaultID string) ([]Memory, error) {
-	return api.ListMemories(ctx, c.http, c.baseURL, userID, vaultID)
+func (c *Client) ListMemories(ctx context.Context, vaultID string) ([]Memory, error) {
+	return api.ListMemories(ctx, c.http, c.baseURL, vaultID)
 }
 
 // GetMemory retrieves a specific memory.
-func (c *Client) GetMemory(ctx context.Context, userID, vaultID, memoryID string) (*Memory, error) {
-	return api.GetMemory(ctx, c.http, c.baseURL, userID, vaultID, memoryID)
+func (c *Client) GetMemory(ctx context.Context, vaultID, memoryID string) (*Memory, error) {
+	return api.GetMemory(ctx, c.http, c.baseURL, vaultID, memoryID)
 }
 
 // DeleteMemory deletes a specific memory.
-func (c *Client) DeleteMemory(ctx context.Context, userID, vaultID, memoryID string) error {
-	return api.DeleteMemory(ctx, c.http, c.baseURL, userID, vaultID, memoryID)
+func (c *Client) DeleteMemory(ctx context.Context, vaultID, memoryID string) error {
+	return api.DeleteMemory(ctx, c.http, c.baseURL, vaultID, memoryID)
 }
 
 // --------------------------------------------------------------------
 // Vault operations - delegated to internal/api
 // --------------------------------------------------------------------
 
-// CreateVault creates a new vault for the specified user.
-func (c *Client) CreateVault(ctx context.Context, userID string, req CreateVaultRequest) (*Vault, error) {
-	return api.CreateVault(ctx, c.http, c.baseURL, userID, req)
+// CreateVault creates a new vault.
+func (c *Client) CreateVault(ctx context.Context, req CreateVaultRequest) (*Vault, error) {
+	return api.CreateVault(ctx, c.http, c.baseURL, req)
 }
 
-// ListVaults returns all vaults for a user.
-func (c *Client) ListVaults(ctx context.Context, userID string) ([]Vault, error) {
-	return api.ListVaults(ctx, c.http, c.baseURL, userID)
+// ListVaults returns all vaults.
+func (c *Client) ListVaults(ctx context.Context) ([]Vault, error) {
+	return api.ListVaults(ctx, c.http, c.baseURL)
 }
 
 // GetVault retrieves a vault by ID.
-func (c *Client) GetVault(ctx context.Context, userID, vaultID string) (*Vault, error) {
-	return api.GetVault(ctx, c.http, c.baseURL, userID, vaultID)
+func (c *Client) GetVault(ctx context.Context, vaultID string) (*Vault, error) {
+	return api.GetVault(ctx, c.http, c.baseURL, vaultID)
 }
 
 // DeleteVault deletes the vault. Backend returns 204 No Content on success.
-func (c *Client) DeleteVault(ctx context.Context, userID, vaultID string) error {
-	return api.DeleteVault(ctx, c.http, c.baseURL, userID, vaultID)
+func (c *Client) DeleteVault(ctx context.Context, vaultID string) error {
+	return api.DeleteVault(ctx, c.http, c.baseURL, vaultID)
 }
 
 // GetVaultByTitle fetches a vault by its title.
-func (c *Client) GetVaultByTitle(ctx context.Context, userID, vaultTitle string) (*Vault, error) {
-	return api.GetVaultByTitle(ctx, c.http, c.baseURL, userID, vaultTitle)
+func (c *Client) GetVaultByTitle(ctx context.Context, vaultTitle string) (*Vault, error) {
+	return api.GetVaultByTitle(ctx, c.http, c.baseURL, vaultTitle)
 }
 
 // --------------------------------------------------------------------
-// User operations - delegated to internal/api
+// User operations - REMOVED: user management is now external
 // --------------------------------------------------------------------
-
-// CreateUser registers a new user.
-func (c *Client) CreateUser(ctx context.Context, req CreateUserRequest) (*User, error) {
-	return api.CreateUser(ctx, c.http, c.baseURL, req)
-}
-
-// GetUser retrieves a user by ID.
-func (c *Client) GetUser(ctx context.Context, userID string) (*User, error) {
-	return api.GetUser(ctx, c.http, c.baseURL, userID)
-}
-
-// DeleteUser removes a user by ID.
-func (c *Client) DeleteUser(ctx context.Context, userID string) error {
-	return api.DeleteUser(ctx, c.http, c.baseURL, userID)
-}
 
 // --------------------------------------------------------------------
 // Search operations - delegated to internal/api
@@ -184,25 +236,25 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) (*SearchResponse
 // AddEntry submits a new entry to a memory via the sharded executor.
 // This ensures FIFO ordering per memory and provides offline resilience.
 // CRITICAL: This MUST preserve the async executor pattern!
-func (c *Client) AddEntry(ctx context.Context, userID, vaultID, memID string, req AddEntryRequest) (*EnqueueAck, error) {
+func (c *Client) AddEntry(ctx context.Context, vaultID, memID string, req AddEntryRequest) (*EnqueueAck, error) {
 	// CRITICAL: Pass the executor for async operation
-	return api.AddEntry(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, req)
+	return api.AddEntry(ctx, c.exec, c.http, c.baseURL, vaultID, memID, req)
 }
 
 // ListEntries retrieves entries within a memory using the full prefix (synchronous).
-func (c *Client) ListEntries(ctx context.Context, userID, vaultID, memID string, params map[string]string) (*ListEntriesResponse, error) {
-	return api.ListEntries(ctx, c.http, c.baseURL, userID, vaultID, memID, params)
+func (c *Client) ListEntries(ctx context.Context, vaultID, memID string, params map[string]string) (*ListEntriesResponse, error) {
+	return api.ListEntries(ctx, c.http, c.baseURL, vaultID, memID, params)
 }
 
 // GetEntry retrieves a single entry by entryId within a memory (synchronous).
-func (c *Client) GetEntry(ctx context.Context, userID, vaultID, memID, entryID string) (*Entry, error) {
-	return api.GetEntry(ctx, c.http, c.baseURL, userID, vaultID, memID, entryID)
+func (c *Client) GetEntry(ctx context.Context, vaultID, memID, entryID string) (*Entry, error) {
+	return api.GetEntry(ctx, c.http, c.baseURL, vaultID, memID, entryID)
 }
 
 // DeleteEntry removes an entry by ID from a memory synchronously via HTTP.
 // It first awaits consistency to ensure all pending writes complete, then performs the deletion.
-func (c *Client) DeleteEntry(ctx context.Context, userID, vaultID, memID, entryID string) error {
-	return api.DeleteEntry(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, entryID)
+func (c *Client) DeleteEntry(ctx context.Context, vaultID, memID, entryID string) error {
+	return api.DeleteEntry(ctx, c.exec, c.http, c.baseURL, vaultID, memID, entryID)
 }
 
 // --------------------------------------------------------------------
@@ -212,20 +264,20 @@ func (c *Client) DeleteEntry(ctx context.Context, userID, vaultID, memID, entryI
 // PutContext stores a snapshot for the memory via the sharded executor.
 // This ensures FIFO ordering per memory and provides offline resilience.
 // CRITICAL: This MUST preserve the async executor pattern!
-func (c *Client) PutContext(ctx context.Context, userID, vaultID, memID string, payload PutContextRequest) (*EnqueueAck, error) {
+func (c *Client) PutContext(ctx context.Context, vaultID, memID string, payload PutContextRequest) (*EnqueueAck, error) {
 	// CRITICAL: Pass the executor for async operation
-	return api.PutContext(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, payload)
+	return api.PutContext(ctx, c.exec, c.http, c.baseURL, vaultID, memID, payload)
 }
 
 // GetContext retrieves the most recent context snapshot for a memory (synchronous).
-func (c *Client) GetContext(ctx context.Context, userID, vaultID, memID string) (*GetContextResponse, error) {
-	return api.GetContext(ctx, c.http, c.baseURL, userID, vaultID, memID)
+func (c *Client) GetContext(ctx context.Context, vaultID, memID string) (*GetContextResponse, error) {
+	return api.GetContext(ctx, c.http, c.baseURL, vaultID, memID)
 }
 
 // DeleteContext removes a context snapshot by ID synchronously via HTTP.
 // It first awaits consistency to ensure all pending writes complete, then performs the deletion.
-func (c *Client) DeleteContext(ctx context.Context, userID, vaultID, memID, contextID string) error {
-	return api.DeleteContext(ctx, c.exec, c.http, c.baseURL, userID, vaultID, memID, contextID)
+func (c *Client) DeleteContext(ctx context.Context, vaultID, memID, contextID string) error {
+	return api.DeleteContext(ctx, c.exec, c.http, c.baseURL, vaultID, memID, contextID)
 }
 
 // --------------------------------------------------------------------

@@ -55,7 +55,7 @@ func (p *Provider) Embed(ctx context.Context, text string) ([]float32, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("ollama embeddings status %d", resp.StatusCode)
 	}
@@ -94,7 +94,7 @@ func (p *Provider) HealthPing(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("ollama status %d", resp.StatusCode)
 	}

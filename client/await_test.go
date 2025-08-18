@@ -10,7 +10,7 @@ import (
 )
 
 func TestAwaitConsistency(t *testing.T) {
-	c := New("http://example.com")
+	c := New("http://example.com", "test-api-key")
 
 	memID := "mem-123"
 	var ranFirst int32

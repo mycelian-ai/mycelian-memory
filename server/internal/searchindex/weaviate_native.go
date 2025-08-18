@@ -328,7 +328,7 @@ func (w *weavNative) HealthPing(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("weaviate status %d", resp.StatusCode)
 	}
@@ -361,4 +361,3 @@ func ensureTenant(ctx context.Context, cl *weaviate.Client, className, tenant st
 	ts := []models.Tenant{{Name: tenant}}
 	return cl.Schema().TenantsCreator().WithClassName(className).WithTenants(ts...).Do(ctx)
 }
-

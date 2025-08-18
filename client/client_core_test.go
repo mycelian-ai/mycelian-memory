@@ -37,7 +37,7 @@ func TestCloseIdempotent(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	if New("http://example.com") == nil {
+	if New("http://example.com", "test-api-key") == nil {
 		t.Fatalf("expected client")
 	}
 }

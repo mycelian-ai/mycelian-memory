@@ -79,9 +79,9 @@ func TestClient_AddEntry(t *testing.T) {
 			serverDelay: 100 * time.Millisecond,
 		},
 		{
-			name:      "invalid user id validation error (pre-enqueue)",
+			name:      "no client-side user id validation (enqueued successfully)",
 			serverRes: resp{status: http.StatusCreated, body: map[string]string{"message": "ok"}},
-			wantErr:   true,
+			wantErr:   false, // Client-side userID validation removed - now handled server-side
 		},
 	}
 
@@ -99,7 +99,7 @@ func TestClient_AddEntry(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			c := client.New(srv.URL)
+			c := client.NewWithDevMode(srv.URL)
 			ctx := context.Background()
 			if tt.cancelCtx {
 				var cancel context.CancelFunc
@@ -112,11 +112,8 @@ func TestClient_AddEntry(t *testing.T) {
 				defer cancel()
 			}
 
-			userID := "user1"
-			if tt.name == "invalid user id validation error (pre-enqueue)" {
-				userID = "BAD ID!"
-			}
-			_, err := c.AddEntry(ctx, userID, "vlt-1", "mem-1", client.AddEntryRequest{RawEntry: "hello"})
+			// Note: userID validation is now handled by server-side authentication
+			_, err := c.AddEntry(ctx, "vlt-1", "mem-1", client.AddEntryRequest{RawEntry: "hello"})
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}
@@ -134,9 +131,9 @@ func TestClient_AddEntry(t *testing.T) {
 
 func TestClient_DeleteEntry_Success(t *testing.T) {
 	t.Parallel()
-	userID, vaultID, memID, entryID := "u1", "v1", "m1", "e1"
+	vaultID, memID, entryID := "v1", "m1", "e1"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v0/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v0/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("expected DELETE, got %s", r.Method)
 		}
@@ -145,25 +142,25 @@ func TestClient_DeleteEntry_Success(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	c := client.New(srv.URL)
+	c := client.NewWithDevMode(srv.URL)
 	t.Cleanup(func() { _ = c.Close() })
-	if err := c.DeleteEntry(context.Background(), userID, vaultID, memID, entryID); err != nil {
+	if err := c.DeleteEntry(context.Background(), vaultID, memID, entryID); err != nil {
 		t.Fatalf("delete entry: %v", err)
 	}
 }
 
 func TestClient_GetEntry_Success(t *testing.T) {
 	t.Parallel()
-	userID, vaultID, memID, entryID := "u1", "v1", "m1", "e1"
+	vaultID, memID, entryID := "v1", "m1", "e1"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v0/users/"+userID+"/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v0/vaults/"+vaultID+"/memories/"+memID+"/entries/"+entryID, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"entryId":      entryID,
-			"userId":       userID,
+			"userId":       "test-user", // Placeholder for mock response
 			"vaultId":      vaultID,
 			"memoryId":     memID,
 			"creationTime": time.Now().UTC().Format(time.RFC3339),
@@ -173,9 +170,9 @@ func TestClient_GetEntry_Success(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	c := client.New(srv.URL)
+	c := client.NewWithDevMode(srv.URL)
 	t.Cleanup(func() { _ = c.Close() })
-	got, err := c.GetEntry(context.Background(), userID, vaultID, memID, entryID)
+	got, err := c.GetEntry(context.Background(), vaultID, memID, entryID)
 	if err != nil {
 		t.Fatalf("get entry: %v", err)
 	}

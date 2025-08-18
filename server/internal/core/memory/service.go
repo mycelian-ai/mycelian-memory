@@ -26,54 +26,7 @@ func NewService(storage storage.Storage) *Service {
 	}
 }
 
-// CreateUser creates a new user with business validation
-func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*storage.User, error) {
-	// Validate payload
-	if err := s.validateCreateUserRequest(req); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	// Default timezone
-	if req.TimeZone == "" {
-		req.TimeZone = "UTC"
-	}
-
-	// Pass through to storage with caller-supplied userId as primary key
-	createReq := storage.CreateUserRequest{
-		UserID:      req.UserID,
-		Email:       req.Email,
-		DisplayName: req.DisplayName,
-		TimeZone:    req.TimeZone,
-	}
-
-	log.Info().Str("userId", req.UserID).Msg("Creating user")
-
-	user, err := s.storage.CreateUser(ctx, createReq)
-	if err != nil {
-		// Detect duplicate user (unique/primary key violation) by inspecting error string.
-		// Storage drivers should bubble up a recognizable message.
-		if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(err.Error(), "ALREADY_EXISTS") {
-			return nil, NewConflictError("userId", "already exists")
-		}
-		return nil, fmt.Errorf("failed to create user: %w", err)
-	}
-
-	return user, nil
-}
-
-// GetUser retrieves a user by ID
-func (s *Service) GetUser(ctx context.Context, userID string) (*storage.User, error) {
-	if userID == "" {
-		return nil, fmt.Errorf("user ID is required")
-	}
-
-	user, err := s.storage.GetUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	return user, nil
-}
+// CreateUser and GetUser methods removed - user management is now external
 
 // CreateMemory creates a new memory with business validation
 func (s *Service) CreateMemory(ctx context.Context, req CreateMemoryRequest) (*storage.Memory, error) {
@@ -359,18 +312,7 @@ func (s *Service) GetLatestMemoryContext(ctx context.Context, userID string, vau
 }
 
 // Validation methods
-func (s *Service) validateCreateUserRequest(req CreateUserRequest) error {
-	if req.UserID == "" {
-		return NewValidationError("userId", "userId is required")
-	}
-	if !validateUserID(req.UserID) {
-		return NewValidationError("userId", "must be lowercase letters, numbers or underscore (1-20 chars)")
-	}
-	if req.Email == "" {
-		return NewValidationError("email", "email is required")
-	}
-	return nil
-}
+// validateCreateUserRequest removed - user management is now external
 
 func (s *Service) validateCreateMemoryRequest(req CreateMemoryRequest) error {
 	if req.VaultID == uuid.Nil {
@@ -417,15 +359,4 @@ func (s *Service) validateCreateMemoryEntryRequest(req CreateMemoryEntryRequest)
 // title validation regex shared by memory & vault services
 var titleRx = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 
-// validateUserID uses same pattern as api/validate but avoids import cycle
-func validateUserID(u string) bool {
-	if len(u) == 0 || len(u) > 20 {
-		return false
-	}
-	for _, r := range u {
-		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
-			return false
-		}
-	}
-	return true
-}
+// validateUserID removed - user management is now external

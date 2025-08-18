@@ -65,7 +65,7 @@ func (mh *MemoryHandler) handleGetMemory(ctx context.Context, req mcp.CallToolRe
 		Msg("handling get_memory request")
 
 	start := time.Now()
-	mem, err := mh.client.GetMemory(ctx, userID, vaultID, memoryID)
+	mem, err := mh.client.GetMemory(ctx, vaultID, memoryID)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -111,7 +111,7 @@ func (mh *MemoryHandler) handleCreateMemoryInVault(ctx context.Context, req mcp.
 		Msg("handling create_memory_in_vault request")
 
 	start := time.Now()
-	mem, err := mh.client.CreateMemory(ctx, userID, vaultID, client.CreateMemoryRequest{
+	mem, err := mh.client.CreateMemory(ctx, vaultID, client.CreateMemoryRequest{
 		Title:       title,
 		MemoryType:  memoryType,
 		Description: description,

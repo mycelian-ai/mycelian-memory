@@ -5,7 +5,7 @@ import "github.com/mycelian/mycelian-memory/client/internal/types"
 // Public type aliases so SDK consumers can import only the client package.
 // Requests
 type (
-	CreateUserRequest   = types.CreateUserRequest
+	// CreateUserRequest removed - user management is now external
 	CreateVaultRequest  = types.CreateVaultRequest
 	CreateMemoryRequest = types.CreateMemoryRequest
 	AddEntryRequest     = types.AddEntryRequest
@@ -13,7 +13,7 @@ type (
 	SearchRequest       = types.SearchRequest
 
 	// Domain entities
-	User   = types.User
+	// User removed - user management is now external
 	Vault  = types.Vault
 	Memory = types.Memory
 	Entry  = types.Entry

@@ -12,7 +12,7 @@ import (
 
 func TestClient_PutAndGetContext(t *testing.T) {
 	t.Parallel()
-	userID, vaultID, memID := "user1", "v1", "m1"
+	vaultID, memID := "v1", "m1"
 	var putCalled bool
 	ctxResp := client.GetContextResponse{Context: map[string]interface{}{"activeContext": "foo"}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -29,10 +29,10 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.New(srv.URL)
+	c := client.NewWithDevMode(srv.URL)
 	t.Cleanup(func() { _ = c.Close() })
 	ctx := context.Background()
-	if _, err := c.PutContext(ctx, userID, vaultID, memID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "foo"}}); err != nil {
+	if _, err := c.PutContext(ctx, vaultID, memID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "foo"}}); err != nil {
 		t.Fatalf("PutContext: %v", err)
 	}
 	if err := c.AwaitConsistency(ctx, memID); err != nil {
@@ -41,7 +41,7 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	if !putCalled {
 		t.Fatalf("PUT not called")
 	}
-	got, err := c.GetContext(ctx, userID, vaultID, memID)
+	got, err := c.GetContext(ctx, vaultID, memID)
 	if err != nil {
 		t.Fatalf("GetContext: %v", err)
 	}

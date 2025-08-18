@@ -1,15 +1,5 @@
 -- PostgreSQL schema for Synapse Memory (parity with ADR 0014)
-
--- Users
-CREATE TABLE IF NOT EXISTS users (
-  user_id        TEXT PRIMARY KEY,
-  email          TEXT NOT NULL UNIQUE,
-  display_name   TEXT,
-  time_zone      TEXT NOT NULL DEFAULT 'UTC',
-  status         TEXT NOT NULL DEFAULT 'ACTIVE',
-  creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_active_time TIMESTAMPTZ
-);
+-- Users table eliminated - user_id is now treated as opaque string identifier
 
 -- Vaults
 CREATE TABLE IF NOT EXISTS vaults (

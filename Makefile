@@ -34,7 +34,7 @@ backend-logs:
 # ------------------------------------------------------------------------------
 # Binary building
 # ------------------------------------------------------------------------------
-.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-mycelian-service-tools build-outbox-worker
+.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-mycelian-service-tools build-outbox-worker build-check
 
 # Create bin directory
 bin:
@@ -63,6 +63,29 @@ build-all: build-mycelian-cli build-mcp-server build-mycelian-service-tools buil
 # Alias for build-all
 build: build-all
 
+# Build check - compile all modules to catch compilation errors
+build-check:
+	@echo "Building all workspace modules to check for compilation errors..."
+	@echo "Building client module..."
+	@cd client && go build ./... && go test -c ./... -o /dev/null
+	@echo "Building server module..."
+	@cd server && go build ./... && go test -c ./... -o /dev/null
+	@echo "Building tools/mycelianCli module..."
+	@cd tools/mycelianCli && go build .
+	@echo "Building mcp module..."
+	@cd mcp && go build ./... && go test -c ./... -o /dev/null
+	@echo "Building cmd/mycelian-mcp-server module..."
+	@cd cmd/mycelian-mcp-server && go build .
+	@echo "Building cmd/memory-service module..."
+	@cd cmd/memory-service && go build .
+	@echo "Building cmd/outbox-worker module..."
+	@cd cmd/outbox-worker && go build .
+	@echo "Building tools/mycelian-service-tools module..."
+	@cd tools/mycelian-service-tools && go build .
+	@echo "Building tools/invariants-checker module..."
+	@cd tools/invariants-checker && go build .
+	@echo "✅ All modules compiled successfully!"
+
 # Clean built binaries
 clean-bin:
 	rm -rf bin/
@@ -73,6 +96,7 @@ help:
 	@echo ""
 	@echo "Build Commands:"
 	@echo "  build                  Build all binaries to bin/ directory"
+	@echo "  build-check            Compile all workspace modules (catches compilation errors)"
 	@echo "  build-mycelian-cli     Build mycelianCli to bin/mycelianCli"
 	@echo "  build-mcp-server       Build MCP server to bin/mycelian-mcp-server"
 	@echo "  clean-bin              Remove all built binaries"
@@ -129,7 +153,7 @@ client-test-integration:
 wait-backend-health:
 	@echo "Waiting for memory-service to be healthy at $(API_HEALTH_URL) ..."
 	@i=0; \
-	until curl -sf $(API_HEALTH_URL) >/dev/null; do \
+	until curl -sf $(API_HEALTH_URL) | grep -q '"status":"healthy"'; do \
 	  if [ $$i -ge 60 ]; then echo "ERROR: backend health timeout"; exit 1; fi; \
 	  i=$$((i+1)); sleep 2; \
 	done; \

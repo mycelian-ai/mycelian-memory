@@ -26,7 +26,7 @@ func TestSearchMemoriesTool(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	sdk := client.New(ts.URL)
+	sdk := client.NewWithDevMode(ts.URL)
 	sh := NewSearchHandler(sdk)
 	// Build request
 	req := mcp.CallToolRequest{

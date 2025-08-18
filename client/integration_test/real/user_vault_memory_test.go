@@ -5,12 +5,10 @@ package client_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mycelian/mycelian-memory/client"
 )
 
@@ -24,31 +22,13 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	c := client.New(baseURL)
+	c := client.NewWithDevMode(baseURL)
 	defer c.Close()
 
-	// create user
-	uid := fmt.Sprintf("u%s", uuid.NewString()[:8])
-	email := fmt.Sprintf("crud-%s@example.com", uuid.NewString())
-	user, err := c.CreateUser(ctx, client.CreateUserRequest{UserID: uid, Email: email})
-	if err != nil {
-		t.Fatalf("CreateUser: %v", err)
-	}
-	if user.ID == "" {
-		t.Fatal("CreateUser: empty user ID")
-	}
-
-	// get user
-	fetched, err := c.GetUser(ctx, user.ID)
-	if err != nil {
-		t.Fatalf("GetUser: %v", err)
-	}
-	if fetched.ID != user.ID {
-		t.Fatalf("GetUser: id mismatch: %s != %s", fetched.ID, user.ID)
-	}
+	// User management is now external - use MockAuthorizer's actor ID
 
 	// create vault
-	vault, err := c.CreateVault(ctx, user.ID, client.CreateVaultRequest{Title: "crud-vault"})
+	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: "crud-vault"})
 	if err != nil {
 		t.Fatalf("CreateVault: %v", err)
 	}
@@ -57,7 +37,7 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	}
 
 	// list vaults
-	vaults, err := c.ListVaults(ctx, user.ID)
+	vaults, err := c.ListVaults(ctx)
 	if err != nil {
 		t.Fatalf("ListVaults: %v", err)
 	}
@@ -66,7 +46,7 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	}
 
 	// get vault
-	gotVault, err := c.GetVault(ctx, user.ID, vault.VaultID)
+	gotVault, err := c.GetVault(ctx, vault.VaultID)
 	if err != nil {
 		t.Fatalf("GetVault: %v", err)
 	}
@@ -75,7 +55,7 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	}
 
 	// create memory
-	mem, err := c.CreateMemory(ctx, user.ID, vault.VaultID, client.CreateMemoryRequest{Title: "crud-mem", MemoryType: "NOTES"})
+	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "crud-mem", MemoryType: "NOTES"})
 	if err != nil {
 		t.Fatalf("CreateMemory: %v", err)
 	}
@@ -84,7 +64,7 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	}
 
 	// list memories
-	mems, err := c.ListMemories(ctx, user.ID, vault.VaultID)
+	mems, err := c.ListMemories(ctx, vault.VaultID)
 	if err != nil {
 		t.Fatalf("ListMemories: %v", err)
 	}
@@ -93,7 +73,7 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	}
 
 	// get memory
-	gotMem, err := c.GetMemory(ctx, user.ID, vault.VaultID, mem.ID)
+	gotMem, err := c.GetMemory(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("GetMemory: %v", err)
 	}
@@ -102,12 +82,11 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	}
 
 	// cleanup
-	if err := c.DeleteMemory(ctx, user.ID, vault.VaultID, mem.ID); err != nil {
+	if err := c.DeleteMemory(ctx, vault.VaultID, mem.ID); err != nil {
 		t.Fatalf("DeleteMemory: %v", err)
 	}
-	if err := c.DeleteVault(ctx, user.ID, vault.VaultID); err != nil {
+	if err := c.DeleteVault(ctx, vault.VaultID); err != nil {
 		t.Fatalf("DeleteVault: %v", err)
 	}
-	// Note: DELETE /api/users/{userId} is not currently supported by the backend.
-	// Leave user as-is; cleanup focuses on memory and vault.
+	// User deletion is now external - no user cleanup needed
 }

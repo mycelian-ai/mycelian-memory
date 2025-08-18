@@ -7,7 +7,7 @@ import (
 )
 
 func TestSearchRequestValidateDefaults(t *testing.T) {
-	req := SearchRequest{UserID: "u1", MemoryID: "m1", Query: " test "}
+	req := SearchRequest{MemoryID: "m1", Query: " test "}
 	if err := req.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -17,14 +17,14 @@ func TestSearchRequestValidateDefaults(t *testing.T) {
 }
 
 func TestSearchRequestValidateError(t *testing.T) {
-	req := SearchRequest{UserID: "u1", MemoryID: "m1", Query: "   "}
+	req := SearchRequest{MemoryID: "m1", Query: "   "}
 	if err := req.Validate(); err == nil {
 		t.Fatalf("expected validation error for empty query")
 	}
 }
 
 func TestDecodeSearchRequest(t *testing.T) {
-	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"foo","topK":5}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"foo","topK":5}`)
 	r := httptest.NewRequest("POST", "/v0/search", body)
 	sr, err := decodeSearchRequest(nil, r)
 	if err != nil {

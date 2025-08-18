@@ -7,13 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// CreateUserRequest represents a request to create a user
-type CreateUserRequest struct {
-	UserID      string
-	Email       string
-	DisplayName *string
-	TimeZone    string
-}
+// CreateUserRequest removed - user management is now external
 
 // CreateMemoryRequest represents a request to create a memory
 type CreateMemoryRequest struct {

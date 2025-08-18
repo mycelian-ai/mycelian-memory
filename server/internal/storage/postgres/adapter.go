@@ -56,56 +56,7 @@ func (s *PostgresStorage) HealthCheck(ctx context.Context) error {
 	return row.Scan(&one)
 }
 
-// --- User operations ---
-
-func (s *PostgresStorage) CreateUser(ctx context.Context, req storage.CreateUserRequest) (*storage.User, error) {
-	var u storage.User
-	u.UserID = req.UserID
-	u.Email = req.Email
-	u.DisplayName = req.DisplayName
-	u.TimeZone = req.TimeZone
-	u.Status = "ACTIVE"
-
-	// Use DEFAULT now() for creation_time; RETURNING to fetch
-	row := s.db.QueryRowContext(ctx, `
-        INSERT INTO users (user_id, email, display_name, time_zone, status)
-        VALUES ($1,$2,$3,$4,$5)
-        RETURNING creation_time
-    `, u.UserID, u.Email, u.DisplayName, u.TimeZone, u.Status)
-	if err := row.Scan(&u.CreationTime); err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func (s *PostgresStorage) GetUser(ctx context.Context, userID string) (*storage.User, error) {
-	var u storage.User
-	row := s.db.QueryRowContext(ctx, `
-        SELECT user_id, email, display_name, time_zone, status, creation_time, last_active_time
-        FROM users WHERE user_id=$1
-    `, userID)
-	if err := row.Scan(&u.UserID, &u.Email, &u.DisplayName, &u.TimeZone, &u.Status, &u.CreationTime, &u.LastActiveTime); err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func (s *PostgresStorage) GetUserByEmail(ctx context.Context, email string) (*storage.User, error) {
-	var u storage.User
-	row := s.db.QueryRowContext(ctx, `
-        SELECT user_id, email, display_name, time_zone, status, creation_time, last_active_time
-        FROM users WHERE email=$1 AND status='ACTIVE'
-    `, email)
-	if err := row.Scan(&u.UserID, &u.Email, &u.DisplayName, &u.TimeZone, &u.Status, &u.CreationTime, &u.LastActiveTime); err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func (s *PostgresStorage) UpdateUserLastActive(ctx context.Context, userID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET last_active_time = now() WHERE user_id=$1`, userID)
-	return err
-}
+// --- User operations removed - user management is now external ---
 
 // --- Vault operations ---
 

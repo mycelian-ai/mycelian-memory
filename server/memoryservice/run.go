@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mycelian/mycelian-memory/server/internal/api"
+	"github.com/mycelian/mycelian-memory/server/internal/auth"
 	"github.com/mycelian/mycelian-memory/server/internal/config"
 	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
 	"github.com/mycelian/mycelian-memory/server/internal/factory"
@@ -111,47 +112,45 @@ func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.Embeddin
 	root := mux.NewRouter()
 	root.Use(api.Recover)
 
-	// Users
-	userSvc := services.NewUserService(st)
-	userHandler := api.NewUserHandler(userSvc)
-	root.HandleFunc("/v0/users", userHandler.CreateUser).Methods("POST")
-	root.HandleFunc("/v0/users/{userId}", userHandler.GetUser).Methods("GET")
+	// Create Authorizer
+	authorizerFactory := auth.NewAuthorizerFactory(cfg)
+	authorizer := authorizerFactory.CreateAuthorizer()
 
 	// Vaults
 	vaultSvc := services.NewVaultService(st, idx)
-	vault := api.NewVaultHandler(vaultSvc)
-	root.HandleFunc("/v0/users/{userId}/vaults", vault.CreateVault).Methods("POST")
-	root.HandleFunc("/v0/users/{userId}/vaults", vault.ListVaults).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}", vault.GetVault).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}", vault.DeleteVault).Methods("DELETE")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/attach", vault.AttachMemoryToVault).Methods("POST")
+	vault := api.NewVaultHandler(vaultSvc, authorizer)
+	root.HandleFunc("/v0/vaults", vault.CreateVault).Methods("POST")
+	root.HandleFunc("/v0/vaults", vault.ListVaults).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}", vault.GetVault).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}", vault.DeleteVault).Methods("DELETE")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/attach", vault.AttachMemoryToVault).Methods("POST")
 
 	// Memories
 	memorySvc := services.NewMemoryService(st, idx, embProvider)
-	memory := api.NewMemoryHandler(memorySvc, vaultSvc)
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories", memory.CreateMemory).Methods("POST")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories", memory.ListMemories).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}", memory.GetMemory).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}", memory.DeleteMemory).Methods("DELETE")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries", memory.ListMemoryEntries).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries", memory.CreateMemoryEntry).Methods("POST")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}", memory.GetMemoryEntryByID).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}", memory.DeleteMemoryEntryByID).Methods("DELETE")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}/tags", memory.UpdateMemoryEntryTags).Methods("PATCH")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts", memory.PutMemoryContext).Methods("PUT")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts", memory.GetLatestMemoryContext).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts/{contextId}", memory.DeleteMemoryContextByID).Methods("DELETE")
+	memory := api.NewMemoryHandler(memorySvc, vaultSvc, authorizer)
+	root.HandleFunc("/v0/vaults/{vaultId}/memories", memory.CreateMemory).Methods("POST")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories", memory.ListMemories).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}", memory.GetMemory).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}", memory.DeleteMemory).Methods("DELETE")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/entries", memory.ListMemoryEntries).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/entries", memory.CreateMemoryEntry).Methods("POST")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}", memory.GetMemoryEntryByID).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}", memory.DeleteMemoryEntryByID).Methods("DELETE")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}/tags", memory.UpdateMemoryEntryTags).Methods("PATCH")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/contexts", memory.PutMemoryContext).Methods("PUT")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/contexts", memory.GetLatestMemoryContext).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}/contexts/{contextId}", memory.DeleteMemoryContextByID).Methods("DELETE")
 
 	// Title-based
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultTitle}/memories", memory.ListMemoriesByVaultTitle).Methods("GET")
-	root.HandleFunc("/v0/users/{userId}/vaults/{vaultTitle}/memories/{memoryTitle}", memory.GetMemoryByTitle).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultTitle}/memories", memory.ListMemoriesByVaultTitle).Methods("GET")
+	root.HandleFunc("/v0/vaults/{vaultTitle}/memories/{memoryTitle}", memory.GetMemoryByTitle).Methods("GET")
 
 	// Health
 	healthHandler := api.NewHealthHandler()
 	root.HandleFunc("/v0/health", healthHandler.CheckHealth).Methods("GET")
 
 	// Search
-	search, err := api.NewSearchHandler(embProvider, idx, cfg.SearchAlpha)
+	search, err := api.NewSearchHandler(embProvider, idx, cfg.SearchAlpha, authorizer)
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("Failed to create search handler")
 		// Handle gracefully - skip search endpoint registration

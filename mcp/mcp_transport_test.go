@@ -50,7 +50,6 @@ func TestMCPServerTransports(t *testing.T) {
 		{"vault", handlers.NewVaultHandler(sdk)},
 		{"context", handlers.NewContextHandler(sdk)},
 		{"consistency", handlers.NewConsistencyHandler(sdk)},
-		{"user", handlers.NewUserHandler(sdk)},
 	}
 
 	for _, h := range handlers {

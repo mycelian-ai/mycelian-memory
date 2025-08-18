@@ -20,7 +20,7 @@ func TestGetDefaultPromptsTool_MatchesEmbedded(t *testing.T) {
 		t.Fatalf("no memory types found in embedded prompts")
 	}
 
-	sdk := client.New("http://example.com")
+	sdk := client.NewWithDevMode("http://example.com")
 	ph := NewPromptsHandler(sdk)
 
 	for _, mt := range memTypes {

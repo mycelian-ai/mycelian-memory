@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mycelian/mycelian-memory/client"
 )
 
@@ -23,42 +22,38 @@ func TestContextEvolutionE2E(t *testing.T) {
 		baseURL = "http://localhost:11545"
 	}
 
-	c := client.New(baseURL)
+	c := client.NewWithDevMode(baseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	defer c.Close()
 
-	email := fmt.Sprintf("evo-%s@example.com", uuid.NewString())
-	uid := fmt.Sprintf("u%s", uuid.NewString()[:8])
-	user, err := c.CreateUser(ctx, client.CreateUserRequest{UserID: uid, Email: email})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
+	// User management is now external - use MockAuthorizer's actor ID
+	// No user creation needed
 
-	vault, err := c.CreateVault(ctx, user.ID, client.CreateVaultRequest{Title: "evo-vault"})
+	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: "evo-vault"})
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 
-	mem, err := c.CreateMemory(ctx, user.ID, vault.VaultID, client.CreateMemoryRequest{Title: "EvoTest", MemoryType: "NOTES"})
+	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "EvoTest", MemoryType: "NOTES"})
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
 
 	snapshots := []string{"ctx-1", "ctx-2", "ctx-3"}
 	for i, snap := range snapshots {
-		if _, err := c.PutContext(ctx, user.ID, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": snap}}); err != nil {
+		if _, err := c.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": snap}}); err != nil {
 			t.Fatalf("put context %d: %v", i, err)
 		}
 		raw := fmt.Sprintf("entry-%d", i+1)
-		if _, err := c.AddEntry(ctx, user.ID, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: raw, Summary: "evo"}); err != nil {
+		if _, err := c.AddEntry(ctx, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: raw, Summary: "evo"}); err != nil {
 			t.Fatalf("add entry %d: %v", i, err)
 		}
 	}
 
 	_ = c.AwaitConsistency(ctx, mem.ID)
 
-	latestCtx, err := c.GetContext(ctx, user.ID, vault.VaultID, mem.ID)
+	latestCtx, err := c.GetContext(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("get latest context: %v", err)
 	}
@@ -68,9 +63,9 @@ func TestContextEvolutionE2E(t *testing.T) {
 	}
 
 	// cleanup
-	_ = c.DeleteMemory(ctx, user.ID, vault.VaultID, mem.ID)
-	_ = c.DeleteVault(ctx, user.ID, vault.VaultID)
-	_ = c.DeleteUser(ctx, user.ID)
+	_ = c.DeleteMemory(ctx, vault.VaultID, mem.ID)
+	_ = c.DeleteVault(ctx, vault.VaultID)
+	// User deletion is now external - no user cleanup needed
 }
 
 // TestMultiAgentContextAccessE2E verifies that context written by one agent is
@@ -85,42 +80,38 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 	defer cancel()
 
 	// Agent A
-	agentA := client.New(baseURL)
+	agentA := client.NewWithDevMode(baseURL)
 	defer agentA.Close()
 
-	email := fmt.Sprintf("ma-%s@example.com", uuid.NewString())
-	uid2 := fmt.Sprintf("u%s", uuid.NewString()[:8])
-	user, err := agentA.CreateUser(ctx, client.CreateUserRequest{UserID: uid2, Email: email})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
+	// User management is now external - both agents use same MockAuthorizer actor ID
+	// No user creation needed
 
-	vault, err := agentA.CreateVault(ctx, user.ID, client.CreateVaultRequest{Title: "ma-vault"})
+	vault, err := agentA.CreateVault(ctx, client.CreateVaultRequest{Title: "ma-vault"})
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
 
-	mem, err := agentA.CreateMemory(ctx, user.ID, vault.VaultID, client.CreateMemoryRequest{Title: "MATest", MemoryType: "NOTES"})
+	mem, err := agentA.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "MATest", MemoryType: "NOTES"})
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
 
 	originalCtx := "Agent A context"
-	if _, err := agentA.PutContext(ctx, user.ID, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": originalCtx}}); err != nil {
+	if _, err := agentA.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": originalCtx}}); err != nil {
 		t.Fatalf("agentA put context: %v", err)
 	}
 	_ = agentA.AwaitConsistency(ctx, mem.ID)
 
-	if _, err := agentA.AddEntry(ctx, user.ID, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "A entry", Summary: "sum"}); err != nil {
+	if _, err := agentA.AddEntry(ctx, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "A entry", Summary: "sum"}); err != nil {
 		t.Fatalf("agentA add entry: %v", err)
 	}
 	_ = agentA.AwaitConsistency(ctx, mem.ID)
 
 	// Agent B
-	agentB := client.New(baseURL)
+	agentB := client.NewWithDevMode(baseURL)
 	defer agentB.Close()
 
-	resCtx, err := agentB.GetContext(ctx, user.ID, vault.VaultID, mem.ID)
+	resCtx, err := agentB.GetContext(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("agentB get context: %v", err)
 	}
@@ -129,18 +120,18 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 		t.Fatalf("context mismatch: %#v", resCtx.Context)
 	}
 
-	if _, err := agentB.AddEntry(ctx, user.ID, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "B entry", Summary: "sum"}); err != nil {
+	if _, err := agentB.AddEntry(ctx, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "B entry", Summary: "sum"}); err != nil {
 		t.Fatalf("agentB add entry: %v", err)
 	}
 	_ = agentB.AwaitConsistency(ctx, mem.ID)
 
-	entries, err := agentB.ListEntries(ctx, user.ID, vault.VaultID, mem.ID, map[string]string{"limit": "10"})
+	entries, err := agentB.ListEntries(ctx, vault.VaultID, mem.ID, map[string]string{"limit": "10"})
 	if err != nil || len(entries.Entries) != 2 {
 		t.Fatalf("expected 2 entries, got %d (%v)", len(entries.Entries), err)
 	}
 
 	// cleanup
-	_ = agentB.DeleteMemory(ctx, user.ID, vault.VaultID, mem.ID)
-	_ = agentB.DeleteVault(ctx, user.ID, vault.VaultID)
-	_ = agentB.DeleteUser(ctx, user.ID)
+	_ = agentB.DeleteMemory(ctx, vault.VaultID, mem.ID)
+	_ = agentB.DeleteVault(ctx, vault.VaultID)
+	// User deletion is now external - no user cleanup needed
 }

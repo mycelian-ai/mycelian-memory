@@ -84,7 +84,7 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 		Msg("handling add_entry request")
 
 	start := time.Now()
-	ack, err := eh.client.AddEntry(ctx, userID, vaultID, memoryID, clientpkg.AddEntryRequest{
+	ack, err := eh.client.AddEntry(ctx, vaultID, memoryID, clientpkg.AddEntryRequest{
 		RawEntry: rawEntry,
 		Summary:  summary,
 		Tags:     tags,
@@ -158,7 +158,7 @@ func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolR
 		Msg("handling list_entries request")
 
 	start := time.Now()
-	resp, err := eh.client.ListEntries(ctx, userID, vaultID, memoryID, params)
+	resp, err := eh.client.ListEntries(ctx, vaultID, memoryID, params)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -217,7 +217,7 @@ func (eh *EntryHandler) handleGetEntry(ctx context.Context, req mcp.CallToolRequ
 		Msg("handling get_entry request")
 
 	start := time.Now()
-	e, err := eh.client.GetEntry(ctx, userID, vaultID, memoryID, entryID)
+	e, err := eh.client.GetEntry(ctx, vaultID, memoryID, entryID)
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Error().Err(err).

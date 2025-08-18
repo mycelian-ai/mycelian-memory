@@ -9,23 +9,38 @@ import (
 	"github.com/gorilla/mux"
 
 	respond "github.com/mycelian/mycelian-memory/server/internal/api/respond"
+	"github.com/mycelian/mycelian-memory/server/internal/auth"
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/services"
 )
 
 type MemoryHandler struct {
-	svc     *services.MemoryService
-	vaultSv *services.VaultService
+	svc        *services.MemoryService
+	vaultSv    *services.VaultService
+	authorizer auth.Authorizer
 }
 
-func NewMemoryHandler(svc *services.MemoryService, vaultSvc *services.VaultService) *MemoryHandler {
-	return &MemoryHandler{svc: svc, vaultSv: vaultSvc}
+func NewMemoryHandler(svc *services.MemoryService, vaultSvc *services.VaultService, authorizer auth.Authorizer) *MemoryHandler {
+	return &MemoryHandler{svc: svc, vaultSv: vaultSvc, authorizer: authorizer}
 }
 
-// CreateMemory POST /api/users/{userId}/vaults/{vaultId}/memories
+// CreateMemory POST /api/vaults/{vaultId}/memories
 func (h *MemoryHandler) CreateMemory(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.create", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	vars := mux.Vars(r)
-	userID := vars["userId"]
 	vaultID := vars["vaultId"]
 	var req struct {
 		MemoryType  string  `json:"memoryType"`
@@ -36,7 +51,7 @@ func (h *MemoryHandler) CreateMemory(w http.ResponseWriter, r *http.Request) {
 		respond.WriteBadRequest(w, "Invalid JSON")
 		return
 	}
-	m := &model.Memory{UserID: userID, VaultID: vaultID, MemoryType: req.MemoryType, Title: req.Title, Description: req.Description}
+	m := &model.Memory{UserID: actorInfo.ActorID, VaultID: vaultID, MemoryType: req.MemoryType, Title: req.Title, Description: req.Description}
 	out, err := h.svc.CreateMemory(r.Context(), m)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
@@ -45,10 +60,24 @@ func (h *MemoryHandler) CreateMemory(w http.ResponseWriter, r *http.Request) {
 	respond.WriteJSON(w, http.StatusCreated, out)
 }
 
-// ListMemories GET /api/users/{userId}/vaults/{vaultId}/memories
+// ListMemories GET /api/vaults/{vaultId}/memories
 func (h *MemoryHandler) ListMemories(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	out, err := h.svc.ListMemories(r.Context(), v["userId"], v["vaultId"])
+	out, err := h.svc.ListMemories(r.Context(), actorInfo.ActorID, v["vaultId"])
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
@@ -59,10 +88,24 @@ func (h *MemoryHandler) ListMemories(w http.ResponseWriter, r *http.Request) {
 	respond.WriteJSON(w, http.StatusOK, map[string]interface{}{"memories": out, "count": len(out)})
 }
 
-// GetMemory GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}
+// GetMemory GET /api/vaults/{vaultId}/memories/{memoryId}
 func (h *MemoryHandler) GetMemory(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	out, err := h.svc.GetMemory(r.Context(), v["userId"], v["vaultId"], v["memoryId"])
+	out, err := h.svc.GetMemory(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"])
 	if err != nil {
 		respond.WriteNotFound(w, err.Error())
 		return
@@ -70,11 +113,25 @@ func (h *MemoryHandler) GetMemory(w http.ResponseWriter, r *http.Request) {
 	respond.WriteJSON(w, http.StatusOK, out)
 }
 
-// ListMemoryEntries GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries
+// ListMemoryEntries GET /api/vaults/{vaultId}/memories/{memoryId}/entries
 func (h *MemoryHandler) ListMemoryEntries(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
 	q := r.URL.Query()
-	req := model.ListEntriesRequest{UserID: v["userId"], VaultID: v["vaultId"], MemoryID: v["memoryId"]}
+	req := model.ListEntriesRequest{UserID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"]}
 	if s := q.Get("limit"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
 			req.Limit = n
@@ -101,8 +158,22 @@ func (h *MemoryHandler) ListMemoryEntries(w http.ResponseWriter, r *http.Request
 	respond.WriteJSON(w, http.StatusOK, map[string]interface{}{"entries": outs, "count": len(outs)})
 }
 
-// CreateMemoryEntry POST /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries
+// CreateMemoryEntry POST /api/vaults/{vaultId}/memories/{memoryId}/entries
 func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.create", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
 	var in struct {
 		RawEntry       string                 `json:"rawEntry"`
@@ -116,7 +187,7 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	e := &model.MemoryEntry{
-		UserID: v["userId"], VaultID: v["vaultId"], MemoryID: v["memoryId"],
+		UserID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"],
 		RawEntry: in.RawEntry, Summary: in.Summary, Metadata: in.Metadata, Tags: in.Tags, ExpirationTime: in.ExpirationTime,
 	}
 	out, err := h.svc.CreateEntry(r.Context(), e)
@@ -127,10 +198,24 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 	respond.WriteJSON(w, http.StatusCreated, out)
 }
 
-// GetMemoryEntryByID GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
+// GetMemoryEntryByID GET /api/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
 func (h *MemoryHandler) GetMemoryEntryByID(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	out, err := h.svc.GetEntryByID(r.Context(), v["userId"], v["vaultId"], v["memoryId"], v["entryId"])
+	out, err := h.svc.GetEntryByID(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"], v["entryId"])
 	if err != nil {
 		respond.WriteNotFound(w, err.Error())
 		return
@@ -138,8 +223,22 @@ func (h *MemoryHandler) GetMemoryEntryByID(w http.ResponseWriter, r *http.Reques
 	respond.WriteJSON(w, http.StatusOK, out)
 }
 
-// UpdateMemoryEntryTags PATCH /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}/tags
+// UpdateMemoryEntryTags PATCH /api/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}/tags
 func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.write", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
 	var in struct {
 		Tags map[string]interface{} `json:"tags"`
@@ -148,7 +247,7 @@ func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Req
 		respond.WriteBadRequest(w, "Invalid JSON")
 		return
 	}
-	out, err := h.svc.UpdateEntryTags(r.Context(), v["userId"], v["vaultId"], v["memoryId"], v["entryId"], in.Tags)
+	out, err := h.svc.UpdateEntryTags(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"], v["entryId"], in.Tags)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
@@ -156,8 +255,22 @@ func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Req
 	respond.WriteJSON(w, http.StatusOK, out)
 }
 
-// PutMemoryContext PUT /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts
+// PutMemoryContext PUT /api/vaults/{vaultId}/memories/{memoryId}/contexts
 func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.write", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
 	var body struct {
 		Context map[string]interface{} `json:"context"`
@@ -171,7 +284,7 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 		respond.WriteBadRequest(w, "context must be a valid JSON object")
 		return
 	}
-	mc := &model.MemoryContext{UserID: v["userId"], VaultID: v["vaultId"], MemoryID: v["memoryId"], ContextJSON: raw}
+	mc := &model.MemoryContext{UserID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"], ContextJSON: raw}
 	out, err := h.svc.PutContext(r.Context(), mc)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
@@ -180,10 +293,24 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 	respond.WriteJSON(w, http.StatusCreated, out)
 }
 
-// GetLatestMemoryContext GET /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts
+// GetLatestMemoryContext GET /api/vaults/{vaultId}/memories/{memoryId}/contexts
 func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	out, err := h.svc.GetLatestContext(r.Context(), v["userId"], v["vaultId"], v["memoryId"])
+	out, err := h.svc.GetLatestContext(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"])
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
@@ -205,19 +332,33 @@ func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Re
 	respond.WriteJSON(w, http.StatusOK, resp)
 }
 
-// GetMemoryByTitle GET /api/users/{userId}/vaults/{vaultTitle}/memories/{memoryTitle}
+// GetMemoryByTitle GET /api/vaults/{vaultTitle}/memories/{memoryTitle}
 func (h *MemoryHandler) GetMemoryByTitle(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
 	if h.vaultSv == nil {
 		respond.WriteInternalError(w, "vault service unavailable")
 		return
 	}
-	vaultObj, err := h.vaultSv.GetVaultByTitle(r.Context(), v["userId"], v["vaultTitle"])
+	vaultObj, err := h.vaultSv.GetVaultByTitle(r.Context(), actorInfo.ActorID, v["vaultTitle"])
 	if err != nil {
 		respond.WriteNotFound(w, err.Error())
 		return
 	}
-	mem, err := h.svc.GetMemoryByTitle(r.Context(), v["userId"], vaultObj.VaultID, v["memoryTitle"])
+	mem, err := h.svc.GetMemoryByTitle(r.Context(), actorInfo.ActorID, vaultObj.VaultID, v["memoryTitle"])
 	if err != nil {
 		respond.WriteNotFound(w, err.Error())
 		return
@@ -225,19 +366,33 @@ func (h *MemoryHandler) GetMemoryByTitle(w http.ResponseWriter, r *http.Request)
 	respond.WriteJSON(w, http.StatusOK, mem)
 }
 
-// ListMemoriesByVaultTitle GET /api/users/{userId}/vaults/{vaultTitle}/memories
+// ListMemoriesByVaultTitle GET /api/vaults/{vaultTitle}/memories
 func (h *MemoryHandler) ListMemoriesByVaultTitle(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.read", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
 	if h.vaultSv == nil {
 		respond.WriteInternalError(w, "vault service unavailable")
 		return
 	}
-	vaultObj, err := h.vaultSv.GetVaultByTitle(r.Context(), v["userId"], v["vaultTitle"])
+	vaultObj, err := h.vaultSv.GetVaultByTitle(r.Context(), actorInfo.ActorID, v["vaultTitle"])
 	if err != nil {
 		respond.WriteNotFound(w, err.Error())
 		return
 	}
-	mems, err := h.svc.ListMemories(r.Context(), v["userId"], vaultObj.VaultID)
+	mems, err := h.svc.ListMemories(r.Context(), actorInfo.ActorID, vaultObj.VaultID)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
@@ -248,30 +403,72 @@ func (h *MemoryHandler) ListMemoriesByVaultTitle(w http.ResponseWriter, r *http.
 	respond.WriteJSON(w, http.StatusOK, map[string]interface{}{"memories": mems, "count": len(mems)})
 }
 
-// DeleteMemory DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}
+// DeleteMemory DELETE /api/vaults/{vaultId}/memories/{memoryId}
 func (h *MemoryHandler) DeleteMemory(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.delete", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	if err := h.svc.DeleteMemory(r.Context(), v["userId"], v["vaultId"], v["memoryId"]); err != nil {
+	if err := h.svc.DeleteMemory(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"]); err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DeleteMemoryEntryByID DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
+// DeleteMemoryEntryByID DELETE /api/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}
 func (h *MemoryHandler) DeleteMemoryEntryByID(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.delete", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	if err := h.svc.DeleteEntry(r.Context(), v["userId"], v["vaultId"], v["memoryId"], v["entryId"]); err != nil {
+	if err := h.svc.DeleteEntry(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"], v["entryId"]); err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DeleteMemoryContextByID DELETE /api/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts/{contextId}
+// DeleteMemoryContextByID DELETE /api/vaults/{vaultId}/memories/{memoryId}/contexts/{contextId}
 func (h *MemoryHandler) DeleteMemoryContextByID(w http.ResponseWriter, r *http.Request) {
+	// Extract API key from Authorization header
+	apiKey, err := auth.ExtractAPIKey(r)
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
+	// Authorize the request
+	actorInfo, err := h.authorizer.Authorize(r.Context(), apiKey, "memory.delete", "default")
+	if err != nil {
+		respond.WriteError(w, http.StatusUnauthorized, "Unauthorized: "+err.Error())
+		return
+	}
+
 	v := mux.Vars(r)
-	if err := h.svc.DeleteContext(r.Context(), v["userId"], v["vaultId"], v["memoryId"], v["contextId"]); err != nil {
+	if err := h.svc.DeleteContext(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"], v["contextId"]); err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
 	}

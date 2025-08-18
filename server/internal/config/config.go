@@ -27,6 +27,10 @@ type Config struct {
 
 	Environment Environment `envconfig:"ENVIRONMENT" default:"development"`
 
+	// Development Mode Configuration
+	DevMode   bool   `envconfig:"DEV_MODE" default:"false"`
+	DevUserID string `envconfig:"DEV_USER_ID" default:"mycelian-dev"`
+
 	// HTTP Configuration
 	HTTPPort int `envconfig:"HTTP_PORT" default:"11545"`
 
@@ -163,4 +167,9 @@ func (c *Config) GetHTTPAddr() string {
 // GetGRPCAddr returns the gRPC server address
 func (c *Config) GetGRPCAddr() string {
 	return fmt.Sprintf(":%d", c.GRPCPort)
+}
+
+// IsDevMode returns true if development mode is enabled
+func (c *Config) IsDevMode() bool {
+	return c.DevMode
 }

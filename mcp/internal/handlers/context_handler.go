@@ -62,7 +62,7 @@ func (ch *ContextHandler) handlePutContext(ctx context.Context, req mcp.CallTool
 		Msg("handling put_context request")
 
 	start := time.Now()
-	ack, err := ch.client.PutContext(ctx, userID, vaultID, memID, client.PutContextRequest{Context: content})
+	ack, err := ch.client.PutContext(ctx, vaultID, memID, client.PutContextRequest{Context: content})
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -110,7 +110,7 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 		Msg("handling get_context request")
 
 	start := time.Now()
-	res, err := ch.client.GetContext(ctx, userID, vaultID, memID)
+	res, err := ch.client.GetContext(ctx, vaultID, memID)
 	elapsed := time.Since(start)
 
 	if err != nil {

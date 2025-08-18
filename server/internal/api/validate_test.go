@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-func TestCreateUser_InvalidEmail(t *testing.T) {
-	if err := CreateUser("alice", "bad email", nil); err == nil {
-		t.Fatalf("expected error for invalid email")
-	}
-}
-
 // No deep type check for tag values yet – only object type enforced.
 
 func TestIsJSONObject(t *testing.T) {

@@ -21,30 +21,24 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 		baseURL = "http://localhost:11545"
 	}
 
-	c := client.New(baseURL)
+	c := client.NewWithDevMode(baseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	defer c.Close()
 
-	// 1) Create user, vault, memory
-	email := fmt.Sprintf("del-%s@example.com", uuid.NewString())
-	uid := fmt.Sprintf("u%s", uuid.NewString()[:8])
-	user, err := c.CreateUser(ctx, client.CreateUserRequest{UserID: uid, Email: email})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	vault, err := c.CreateVault(ctx, user.ID, client.CreateVaultRequest{Title: "del-vault"})
+	// 1) Create vault, memory (user management is now external)
+	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: "del-vault"})
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
-	mem, err := c.CreateMemory(ctx, user.ID, vault.VaultID, client.CreateMemoryRequest{Title: "del-mem", MemoryType: "NOTES"})
+	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "del-mem", MemoryType: "NOTES"})
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
 
 	// 2) Add entry with unique content, wait for indexer to upsert
 	uniqueText := fmt.Sprintf("unique-delete-token-%s", uuid.NewString())
-	if _, err := c.AddEntry(ctx, user.ID, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: uniqueText, Summary: "to be deleted"}); err != nil {
+	if _, err := c.AddEntry(ctx, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: uniqueText, Summary: "to be deleted"}); err != nil {
 		t.Fatalf("add entry: %v", err)
 	}
 	if err := c.AwaitConsistency(ctx, mem.ID); err != nil {
@@ -55,7 +49,7 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 	var appeared bool
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		sr, _ := c.Search(ctx, client.SearchRequest{UserID: user.ID, MemoryID: mem.ID, Query: uniqueText, TopK: 3})
+		sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopK: 3})
 		if sr != nil && sr.Count > 0 {
 			appeared = true
 			break
@@ -67,7 +61,7 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 	}
 
 	// 4) Find entryId via ListEntries, then delete it
-	lr, err := c.ListEntries(ctx, user.ID, vault.VaultID, mem.ID, nil)
+	lr, err := c.ListEntries(ctx, vault.VaultID, mem.ID, nil)
 	if err != nil || lr.Count == 0 {
 		t.Fatalf("list entries: err=%v count=%d", err, lr.Count)
 	}
@@ -75,27 +69,27 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 	if entryID == "" {
 		t.Fatalf("empty entryID")
 	}
-	if err := c.DeleteEntry(ctx, user.ID, vault.VaultID, mem.ID, entryID); err != nil {
+	if err := c.DeleteEntry(ctx, vault.VaultID, mem.ID, entryID); err != nil {
 		t.Fatalf("delete entry: %v", err)
 	}
 
 	// 5) Poll search until the entry disappears
 	deadline = time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		sr, _ := c.Search(ctx, client.SearchRequest{UserID: user.ID, MemoryID: mem.ID, Query: uniqueText, TopK: 3})
+		sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopK: 3})
 		if sr != nil && sr.Count == 0 {
 			break // success
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	sr, _ := c.Search(ctx, client.SearchRequest{UserID: user.ID, MemoryID: mem.ID, Query: uniqueText, TopK: 3})
+	sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopK: 3})
 	if sr != nil && sr.Count > 0 {
 		t.Fatalf("entry still present in search after delete: %+v", sr)
 	}
 
 	// Cleanup resources
-	_ = c.DeleteMemory(ctx, user.ID, vault.VaultID, mem.ID)
-	_ = c.DeleteVault(ctx, user.ID, vault.VaultID)
-	_ = c.DeleteUser(ctx, user.ID)
+	_ = c.DeleteMemory(ctx, vault.VaultID, mem.ID)
+	_ = c.DeleteVault(ctx, vault.VaultID)
+	// User deletion is now external - no user cleanup needed
 }

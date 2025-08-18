@@ -13,7 +13,7 @@ import (
 func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	t.Parallel()
 
-	userID := "user123"
+	userID := "mycelian-dev" // This matches what getUserID() returns for the local dev API key
 	vaultID := "vault-456"
 	vaultTitle := "work-projects"
 
@@ -25,17 +25,22 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		// Check Authorization header
+		if r.Header.Get("Authorization") != "Bearer sk_local_mycelian_dev_key" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v0/users/"+userID+"/vaults":
+		case r.Method == http.MethodPost && r.URL.Path == "/v0/vaults":
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults":
 			_ = json.NewEncoder(w).Encode(&vaultListRes)
-		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultTitle:
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/"+vaultTitle:
 			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID:
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/"+vaultID:
 			_ = json.NewEncoder(w).Encode(&v)
-		case r.Method == http.MethodDelete && r.URL.Path == "/v0/users/"+userID+"/vaults/"+vaultID:
+		case r.Method == http.MethodDelete && r.URL.Path == "/v0/vaults/"+vaultID:
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -44,12 +49,12 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.New(srv.URL)
+	c := client.NewWithDevMode(srv.URL)
 	t.Cleanup(func() { _ = c.Close() })
 	ctx := context.Background()
 
 	// CreateVault
-	created, err := c.CreateVault(ctx, userID, client.CreateVaultRequest{Title: vaultTitle})
+	created, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: vaultTitle})
 	if err != nil {
 		t.Fatalf("CreateVault error: %v", err)
 	}
@@ -58,7 +63,7 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	}
 
 	// ListVaults
-	vl, err := c.ListVaults(ctx, userID)
+	vl, err := c.ListVaults(ctx)
 	if err != nil {
 		t.Fatalf("ListVaults error: %v", err)
 	}
@@ -67,7 +72,7 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	}
 
 	// GetVaultByTitle
-	byTitle, err := c.GetVaultByTitle(ctx, userID, vaultTitle)
+	byTitle, err := c.GetVaultByTitle(ctx, vaultTitle)
 	if err != nil {
 		t.Fatalf("GetVaultByTitle error: %v", err)
 	}
@@ -76,7 +81,7 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	}
 
 	// GetVault
-	gv, err := c.GetVault(ctx, userID, vaultID)
+	gv, err := c.GetVault(ctx, vaultID)
 	if err != nil {
 		t.Fatalf("GetVault error: %v", err)
 	}
@@ -85,7 +90,7 @@ func TestClient_VaultCRUD_AndGetByTitle(t *testing.T) {
 	}
 
 	// DeleteVault
-	if err := c.DeleteVault(ctx, userID, vaultID); err != nil {
+	if err := c.DeleteVault(ctx, vaultID); err != nil {
 		t.Fatalf("DeleteVault error: %v", err)
 	}
 }

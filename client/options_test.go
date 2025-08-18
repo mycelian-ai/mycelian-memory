@@ -34,7 +34,7 @@ func TestWithHTTPClientAndDebugLogging(t *testing.T) {
 		return &http.Response{StatusCode: 200, Body: http.NoBody, Header: make(http.Header)}, nil
 	})
 	base := &http.Client{Transport: rt}
-	c2 := New("http://example.com", WithHTTPClient(base), WithDebugLogging(true))
+	c2 := New("http://example.com", "test-api-key", WithHTTPClient(base), WithDebugLogging(true))
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", strings.NewReader(""))
 	if _, err := c2.http.Do(req); err != nil {
 		t.Fatalf("request failed: %v", err)

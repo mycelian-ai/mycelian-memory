@@ -70,14 +70,12 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable verbose debug output")
 
 	// Sub-commands
-	rootCmd.AddCommand(newCreateUserCmd())
 	rootCmd.AddCommand(newCreateMemoryCmd())
 	rootCmd.AddCommand(newCreateVaultCmd())
 	rootCmd.AddCommand(newListVaultsCmd())
 	rootCmd.AddCommand(newGetVaultCmd())
 	rootCmd.AddCommand(newListMemoriesCmd())
 	rootCmd.AddCommand(newDeleteVaultCmd())
-	rootCmd.AddCommand(newGetUserCmd())
 	rootCmd.AddCommand(newCreateEntryCmd())
 	rootCmd.AddCommand(newListEntriesCmd())
 	rootCmd.AddCommand(newGetPromptsCmd())
@@ -90,75 +88,6 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newGetAssetCmd())
 
 	return rootCmd
-}
-
-func newCreateUserCmd() *cobra.Command {
-	var userID, email, displayName, timeZone string
-
-	cmd := &cobra.Command{
-		Use:   "create-user",
-		Short: "Create a new user",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			if email == "" {
-				return fmt.Errorf("--email is required")
-			}
-
-			log.Debug().
-				Str("email", email).
-				Str("display_name", displayName).
-				Str("time_zone", timeZone).
-				Str("service_url", serviceURL).
-				Msg("creating user")
-
-			c := client.New(serviceURL)
-			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
-			defer cancel()
-
-			start := time.Now()
-			user, err := c.CreateUser(ctx, client.CreateUserRequest{
-				UserID:      userID,
-				Email:       email,
-				DisplayName: displayName,
-				TimeZone:    timeZone,
-			})
-			elapsed := time.Since(start)
-
-			if err != nil {
-				log.Error().
-					Err(err).
-					Str("email", email).
-					Dur("elapsed", elapsed).
-					Msg("create user failed")
-				return err
-			}
-
-			log.Debug().
-				Str("user_id", user.ID).
-				Str("email", user.Email).
-				Str("display_name", user.DisplayName).
-				Str("time_zone", user.TimeZone).
-				Dur("elapsed", elapsed).
-				Msg("create user completed")
-
-			dbg(user)
-			fmt.Printf("User created: %s (%s)\n", user.ID, user.Email)
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
-	cmd.Flags().StringVar(&email, "email", "", "User email (required)")
-	cmd.Flags().StringVar(&displayName, "display-name", "", "Display name (optional)")
-	cmd.Flags().StringVar(&timeZone, "time-zone", "", "Time zone (optional)")
-	_ = cmd.MarkFlagRequired("email")
-	_ = cmd.MarkFlagRequired("user-id")
-
-	return cmd
 }
 
 func newCreateMemoryCmd() *cobra.Command {
@@ -204,12 +133,12 @@ func newCreateMemoryCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("creating memory")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
 			start := time.Now()
-			mem, err := c.CreateMemory(ctx, userID, vaultID, client.CreateMemoryRequest{
+			mem, err := c.CreateMemory(ctx, vaultID, client.CreateMemoryRequest{
 				Title:       title,
 				MemoryType:  memoryType,
 				Description: description,
@@ -296,13 +225,13 @@ func newCreateEntryCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("creating entry")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 			defer c.Close() // Ensure queues are drained before context is cancelled
 
 			start := time.Now()
-			ack, err := c.AddEntry(ctx, userID, vaultID, memoryID, client.AddEntryRequest{
+			ack, err := c.AddEntry(ctx, vaultID, memoryID, client.AddEntryRequest{
 				RawEntry: rawEntry,
 				Summary:  summary,
 			})
@@ -380,14 +309,14 @@ func newListEntriesCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("listing entries")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
 			limit = applyUpperBoundToLimit(limit)
 
 			start := time.Now()
-			resp, err := c.ListEntries(ctx, userID, vaultID, memoryID, map[string]string{"limit": strconv.Itoa(limit)})
+			resp, err := c.ListEntries(ctx, vaultID, memoryID, map[string]string{"limit": strconv.Itoa(limit)})
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -443,7 +372,7 @@ func newGetPromptsCmd() *cobra.Command {
 				return fmt.Errorf("--memory-type is required")
 			}
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
 			defer cancel()
 
@@ -499,13 +428,13 @@ func newPutContextCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("putting context")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 			defer c.Close() // Ensure queues are drained before process exits
 
 			start := time.Now()
-			ack, err := c.PutContext(ctx, userID, vaultID, memoryID, client.PutContextRequest{Context: content})
+			ack, err := c.PutContext(ctx, vaultID, memoryID, client.PutContextRequest{Context: content})
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -575,12 +504,12 @@ func newGetContextCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("getting context")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
 			start := time.Now()
-			resp, err := c.GetContext(ctx, userID, vaultID, memoryID)
+			resp, err := c.GetContext(ctx, vaultID, memoryID)
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -715,13 +644,12 @@ func newSearchCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("searching memories")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 			defer cancel()
 
 			start := time.Now()
 			resp, err := c.Search(ctx, client.SearchRequest{
-				UserID:   userID,
 				MemoryID: memoryID,
 				Query:    query,
 				TopK:     topK,
@@ -758,57 +686,6 @@ func newSearchCmd() *cobra.Command {
 	_ = cmd.MarkFlagRequired("user-id")
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("query")
-
-	return cmd
-}
-
-func newGetUserCmd() *cobra.Command {
-	var userID string
-
-	cmd := &cobra.Command{
-		Use:   "get-user",
-		Short: "Get detailed information about a user",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			log.Debug().
-				Str("user_id", userID).
-				Str("service_url", serviceURL).
-				Msg("getting user")
-
-			c := client.New(serviceURL)
-			ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
-			defer cancel()
-
-			start := time.Now()
-			user, err := c.GetUser(ctx, userID)
-			elapsed := time.Since(start)
-			if err != nil {
-				log.Error().
-					Err(err).
-					Str("user_id", userID).
-					Dur("elapsed", elapsed).
-					Msg("get user failed")
-				return err
-			}
-
-			log.Debug().
-				Str("user_id", userID).
-				Dur("elapsed", elapsed).
-				Msg("get user completed")
-
-			dbg(user)
-			b, _ := json.MarshalIndent(user, "", "  ")
-			fmt.Println(string(b))
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
-	_ = cmd.MarkFlagRequired("user-id")
 
 	return cmd
 }
@@ -928,7 +805,7 @@ func newAwaitConsistencyCmd() *cobra.Command {
 				Str("service_url", serviceURL).
 				Msg("awaiting consistency")
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 			defer cancel()
 
@@ -1038,11 +915,11 @@ func newCreateVaultCmd() *cobra.Command {
 				}
 			}
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
-			v, err := c.CreateVault(ctx, userID, client.CreateVaultRequest{Title: title, Description: description})
+			v, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: title, Description: description})
 			if err != nil {
 				return err
 			}
@@ -1071,11 +948,11 @@ func newListVaultsCmd() *cobra.Command {
 				return fmt.Errorf("invalid --user-id: %w", err)
 			}
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
-			vaults, err := c.ListVaults(ctx, userID)
+			vaults, err := c.ListVaults(ctx)
 			if err != nil {
 				return err
 			}
@@ -1107,11 +984,11 @@ func newGetVaultCmd() *cobra.Command {
 				return fmt.Errorf("invalid --title: %w", err)
 			}
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
-			v, err := c.GetVaultByTitle(ctx, userID, title)
+			v, err := c.GetVaultByTitle(ctx, title)
 			if err != nil {
 				return err
 			}
@@ -1144,11 +1021,11 @@ func newDeleteVaultCmd() *cobra.Command {
 				return fmt.Errorf("invalid --vault-id: %w", err)
 			}
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
-			if err := c.DeleteVault(ctx, userID, vaultID); err != nil {
+			if err := c.DeleteVault(ctx, vaultID); err != nil {
 				return err
 			}
 			fmt.Println("Vault deleted")
@@ -1198,21 +1075,21 @@ func newListMemoriesCmd() *cobra.Command {
 				}
 			}
 
-			c := client.New(serviceURL)
+			c := client.NewWithDevMode(serviceURL)
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
 
 			var mems []client.Memory
 			var err error
 			if vaultID != "" {
-				mems, err = c.ListMemories(ctx, userID, vaultID)
+				mems, err = c.ListMemories(ctx, vaultID)
 			} else {
 				// Get vault by title to obtain vault ID
-				vault, err := c.GetVaultByTitle(ctx, userID, vaultTitle)
+				vault, err := c.GetVaultByTitle(ctx, vaultTitle)
 				if err != nil {
 					return fmt.Errorf("failed to get vault by title '%s': %w", vaultTitle, err)
 				}
-				mems, err = c.ListMemories(ctx, userID, vault.VaultID)
+				mems, err = c.ListMemories(ctx, vault.VaultID)
 			}
 			if err != nil {
 				return err

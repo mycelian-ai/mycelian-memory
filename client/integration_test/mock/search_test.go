@@ -22,7 +22,7 @@ func TestClient_Search_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.New(srv.URL)
+	c := client.New(srv.URL, "test-api-key")
 	t.Cleanup(func() { _ = c.Close() })
 	res, err := c.Search(context.Background(), client.SearchRequest{UserID: "user1", MemoryID: "m1", Query: "x"})
 	if err != nil || len(res.Entries) != 1 {

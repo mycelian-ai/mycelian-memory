@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mycelian/mycelian-memory/server/internal/auth"
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 )
 
@@ -55,13 +56,28 @@ func (m *mockSearch) DeleteContext(ctx context.Context, userID, contextID string
 func (m *mockSearch) DeleteMemory(ctx context.Context, userID, memoryID string) error   { return nil }
 func (m *mockSearch) DeleteVault(ctx context.Context, userID, vaultID string) error     { return nil }
 
+type mockAuthorizer struct{}
+
+func (m *mockAuthorizer) Authorize(ctx context.Context, apiKey, operation, resource string) (*auth.ActorInfo, error) {
+	return &auth.ActorInfo{
+		ActorID:     "test-user",
+		ProjectID:   "test-project",
+		OrgID:       "test-org",
+		KeyType:     "admin",
+		KeyName:     "Test Key",
+		Permissions: []string{"*"},
+	}, nil
+}
+
 func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}
-	h, _ := NewSearchHandler(emb, srch, 0.6)
+	auth := &mockAuthorizer{}
+	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hello","topK":3}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hello","topK":3}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
+	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
 
 	h.HandleSearch(w, req)
@@ -82,10 +98,12 @@ func TestHandleSearch_EmbedsOnce(t *testing.T) {
 func TestHandleSearch_ResponseMapping(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{}
-	h, _ := NewSearchHandler(emb, srch, 0.6)
+	auth := &mockAuthorizer{}
+	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi"}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
+	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
 	h.HandleSearch(w, req)
 
@@ -112,10 +130,12 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 func TestHandleSearch_NoResults(t *testing.T) {
 	emb := &mockEmbedder{}
 	srch := &mockSearch{empty: true}
-	h, _ := NewSearchHandler(emb, srch, 0.6)
+	auth := &mockAuthorizer{}
+	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"userId":"u1","memoryId":"m1","query":"hi"}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi"}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
+	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
 	h.HandleSearch(w, req)
 

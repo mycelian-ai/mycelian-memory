@@ -12,13 +12,13 @@ import (
 
 func TestCreateVault_Success(t *testing.T) {
 	t.Parallel()
-	want := types.Vault{UserID: "user_1", VaultID: "v1", Title: "t"}
+	want := types.Vault{UserID: "test-user", VaultID: "v1", Title: "t"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(want)
 	}))
 	defer srv.Close()
-	got, err := CreateVault(context.Background(), srv.Client(), srv.URL, "user_1", types.CreateVaultRequest{Title: "t"})
+	got, err := CreateVault(context.Background(), srv.Client(), srv.URL, types.CreateVaultRequest{Title: "t"})
 	if err != nil || got == nil || got.VaultID != want.VaultID {
 		t.Fatalf("CreateVault unexpected: got=%+v err=%v", got, err)
 	}
@@ -32,7 +32,7 @@ func TestListVaults_Success(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
-	got, err := ListVaults(context.Background(), srv.Client(), srv.URL, "user_1")
+	got, err := ListVaults(context.Background(), srv.Client(), srv.URL)
 	if err != nil || len(got) != 1 || got[0].VaultID != "v1" {
 		t.Fatalf("ListVaults unexpected: got=%+v err=%v", got, err)
 	}
@@ -46,7 +46,7 @@ func TestGetVault_Success(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(want)
 	}))
 	defer srv.Close()
-	got, err := GetVault(context.Background(), srv.Client(), srv.URL, "user_1", "v1")
+	got, err := GetVault(context.Background(), srv.Client(), srv.URL, "v1")
 	if err != nil || got == nil || got.VaultID != "v1" {
 		t.Fatalf("GetVault unexpected: got=%+v err=%v", got, err)
 	}
@@ -58,7 +58,7 @@ func TestDeleteVault_Success(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	if err := DeleteVault(context.Background(), srv.Client(), srv.URL, "user_1", "v1"); err != nil {
+	if err := DeleteVault(context.Background(), srv.Client(), srv.URL, "v1"); err != nil {
 		t.Fatalf("DeleteVault error: %v", err)
 	}
 }
@@ -67,17 +67,17 @@ func TestVaults_InvalidUserID(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	if _, err := CreateVault(context.Background(), srv.Client(), srv.URL, "BAD ID!", types.CreateVaultRequest{Title: "t"}); err == nil {
-		t.Fatal("expected validation error for CreateVault")
+	if _, err := CreateVault(context.Background(), srv.Client(), srv.URL, types.CreateVaultRequest{Title: "t"}); err == nil {
+		t.Fatal("expected HTTP error for CreateVault")
 	}
-	if _, err := ListVaults(context.Background(), srv.Client(), srv.URL, "BAD ID!"); err == nil {
-		t.Fatal("expected validation error for ListVaults")
+	if _, err := ListVaults(context.Background(), srv.Client(), srv.URL); err == nil {
+		t.Fatal("expected HTTP error for ListVaults")
 	}
-	if _, err := GetVault(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1"); err == nil {
-		t.Fatal("expected validation error for GetVault")
+	if _, err := GetVault(context.Background(), srv.Client(), srv.URL, "v1"); err == nil {
+		t.Fatal("expected HTTP error for GetVault")
 	}
-	if err := DeleteVault(context.Background(), srv.Client(), srv.URL, "BAD ID!", "v1"); err == nil {
-		t.Fatal("expected validation error for DeleteVault")
+	if err := DeleteVault(context.Background(), srv.Client(), srv.URL, "v1"); err == nil {
+		t.Fatal("expected HTTP error for DeleteVault")
 	}
 }
 
@@ -94,16 +94,16 @@ func TestVaults_NonOKStatuses(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	if _, err := CreateVault(context.Background(), srv.Client(), srv.URL, "user_1", types.CreateVaultRequest{Title: "t"}); err == nil {
+	if _, err := CreateVault(context.Background(), srv.Client(), srv.URL, types.CreateVaultRequest{Title: "t"}); err == nil {
 		t.Fatal("expected error for CreateVault non-201")
 	}
-	if _, err := ListVaults(context.Background(), srv.Client(), srv.URL, "user_1"); err == nil {
+	if _, err := ListVaults(context.Background(), srv.Client(), srv.URL); err == nil {
 		t.Fatal("expected error for ListVaults non-200")
 	}
-	if _, err := GetVault(context.Background(), srv.Client(), srv.URL, "user_1", "v1"); err == nil {
+	if _, err := GetVault(context.Background(), srv.Client(), srv.URL, "v1"); err == nil {
 		t.Fatal("expected error for GetVault non-200")
 	}
-	if err := DeleteVault(context.Background(), srv.Client(), srv.URL, "user_1", "v1"); err == nil {
+	if err := DeleteVault(context.Background(), srv.Client(), srv.URL, "v1"); err == nil {
 		t.Fatal("expected error for DeleteVault non-204")
 	}
 }
@@ -114,7 +114,7 @@ func TestGetVaultByTitle_NonOK(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
-	if _, err := GetVaultByTitle(context.Background(), srv.Client(), srv.URL, "user_1", "title"); err == nil {
+	if _, err := GetVaultByTitle(context.Background(), srv.Client(), srv.URL, "title"); err == nil {
 		t.Fatal("expected error for GetVaultByTitle non-200")
 	}
 }
@@ -127,7 +127,7 @@ func TestVaults_DecodeErrors(t *testing.T) {
 		_, _ = w.Write([]byte("{bad json"))
 	}))
 	defer srv1.Close()
-	if _, err := CreateVault(context.Background(), srv1.Client(), srv1.URL, "user_1", types.CreateVaultRequest{Title: "t"}); err == nil {
+	if _, err := CreateVault(context.Background(), srv1.Client(), srv1.URL, types.CreateVaultRequest{Title: "t"}); err == nil {
 		t.Fatal("expected decode error for CreateVault")
 	}
 
@@ -137,7 +137,7 @@ func TestVaults_DecodeErrors(t *testing.T) {
 		_, _ = w.Write([]byte("{bad json"))
 	}))
 	defer srv2.Close()
-	if _, err := ListVaults(context.Background(), srv2.Client(), srv2.URL, "user_1"); err == nil {
+	if _, err := ListVaults(context.Background(), srv2.Client(), srv2.URL); err == nil {
 		t.Fatal("expected decode error for ListVaults")
 	}
 
@@ -147,7 +147,7 @@ func TestVaults_DecodeErrors(t *testing.T) {
 		_, _ = w.Write([]byte("{bad json"))
 	}))
 	defer srv3.Close()
-	if _, err := GetVault(context.Background(), srv3.Client(), srv3.URL, "user_1", "v1"); err == nil {
+	if _, err := GetVault(context.Background(), srv3.Client(), srv3.URL, "v1"); err == nil {
 		t.Fatal("expected decode error for GetVault")
 	}
 }
@@ -155,16 +155,16 @@ func TestVaults_DecodeErrors(t *testing.T) {
 func TestVaults_HTTPDoError(t *testing.T) {
 	t.Parallel()
 	hc := &http.Client{Transport: &errRT{}}
-	if _, err := CreateVault(context.Background(), hc, "http://example.com", "user_1", types.CreateVaultRequest{Title: "t"}); err == nil {
+	if _, err := CreateVault(context.Background(), hc, "http://example.com", types.CreateVaultRequest{Title: "t"}); err == nil {
 		t.Fatal("expected Do error for CreateVault")
 	}
-	if _, err := ListVaults(context.Background(), hc, "http://example.com", "user_1"); err == nil {
+	if _, err := ListVaults(context.Background(), hc, "http://example.com"); err == nil {
 		t.Fatal("expected Do error for ListVaults")
 	}
-	if _, err := GetVault(context.Background(), hc, "http://example.com", "user_1", "v1"); err == nil {
+	if _, err := GetVault(context.Background(), hc, "http://example.com", "v1"); err == nil {
 		t.Fatal("expected Do error for GetVault")
 	}
-	if err := DeleteVault(context.Background(), hc, "http://example.com", "user_1", "v1"); err == nil {
+	if err := DeleteVault(context.Background(), hc, "http://example.com", "v1"); err == nil {
 		t.Fatal("expected Do error for DeleteVault")
 	}
 }
@@ -175,7 +175,7 @@ func TestCreateVault_CtxCanceled(t *testing.T) {
 	cancel()
 	dummy := httptest.NewServer(http.NotFoundHandler())
 	defer dummy.Close()
-	if _, err := CreateVault(ctx, dummy.Client(), dummy.URL, "user_1", types.CreateVaultRequest{Title: "t"}); err == nil {
+	if _, err := CreateVault(ctx, dummy.Client(), dummy.URL, types.CreateVaultRequest{Title: "t"}); err == nil {
 		t.Fatal("expected context canceled for CreateVault")
 	}
 }
@@ -186,7 +186,7 @@ func TestCreateVault_InvalidTitle(t *testing.T) {
 	defer srv.Close()
 	// too long title (over 50 chars)
 	long := "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz" // 52
-	if _, err := CreateVault(context.Background(), srv.Client(), srv.URL, "user_1", types.CreateVaultRequest{Title: long}); err == nil {
+	if _, err := CreateVault(context.Background(), srv.Client(), srv.URL, types.CreateVaultRequest{Title: long}); err == nil {
 		t.Fatal("expected validation error for long title")
 	}
 }

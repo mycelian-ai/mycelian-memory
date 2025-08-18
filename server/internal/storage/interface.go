@@ -8,16 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// User represents a user in the system
-type User struct {
-	UserID         string     `json:"userId"`
-	Email          string     `json:"email"`
-	DisplayName    *string    `json:"displayName,omitempty"`
-	TimeZone       string     `json:"timeZone"`
-	Status         string     `json:"status"`
-	CreationTime   time.Time  `json:"creationTime"`
-	LastActiveTime *time.Time `json:"lastActiveTime,omitempty"`
-}
+// User struct and related types removed - user management is now external
 
 // Memory represents a memory instance
 type Memory struct {
@@ -63,13 +54,7 @@ type MemoryContext struct {
 	CreationTime time.Time       `json:"creationTime"`
 }
 
-// CreateUserRequest represents the request to create a new user
-type CreateUserRequest struct {
-	UserID      string  `json:"userId"`
-	Email       string  `json:"email"`
-	DisplayName *string `json:"displayName,omitempty"`
-	TimeZone    string  `json:"timeZone"`
-}
+// CreateUserRequest removed - user management is now external
 
 // CreateMemoryRequest represents the request to create a new memory
 type CreateMemoryRequest struct {
@@ -180,13 +165,8 @@ type DeleteMemoryFromVaultRequest struct {
 }
 
 // Storage interface defines the contract for memory storage operations
+// User management methods removed - user_id is now treated as opaque string identifier
 type Storage interface {
-	// User operations
-	CreateUser(ctx context.Context, req CreateUserRequest) (*User, error)
-	GetUser(ctx context.Context, userID string) (*User, error)
-	GetUserByEmail(ctx context.Context, email string) (*User, error)
-	UpdateUserLastActive(ctx context.Context, userID string) error
-
 	// Memory operations
 	CreateMemory(ctx context.Context, req CreateMemoryRequest) (*Memory, error)
 	GetMemory(ctx context.Context, userID string, vaultID uuid.UUID, memoryID string) (*Memory, error)

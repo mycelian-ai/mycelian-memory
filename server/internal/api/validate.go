@@ -12,9 +12,6 @@ var emailRx = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 // We deliberately keep it simple to meet the "English + space" requirement.
 var titleRx = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 
-// UserID must be lowercase letters, digits, underscore, 1-20 chars
-var userIdRx = regexp.MustCompile(`^[a-z0-9_]{1,20}$`)
-
 // Title validates that a title string conforms to our rules:
 // - 1–50 bytes
 // - ASCII letters/digits/space/hyphen/underscore/apostrophe only
@@ -78,23 +75,6 @@ func IsJSONObject(val interface{}) error {
 }
 
 // -------- Request specific helpers ----------
-
-// CreateUser validates input for creating a new user. UserID is mandatory.
-func CreateUser(userId, email string, displayName *string) error {
-	if userId == "" {
-		return fmt.Errorf("userId is required")
-	}
-	if !userIdRx.MatchString(userId) {
-		return fmt.Errorf("userId must match %s", userIdRx.String())
-	}
-	if err := Email(email); err != nil {
-		return err
-	}
-	if err := MaxLen("displayName", displayName, 100); err != nil {
-		return err
-	}
-	return nil
-}
 
 func CreateMemory(memoryType, title string, description *string) error {
 	if err := NonEmpty("memoryType", memoryType); err != nil {

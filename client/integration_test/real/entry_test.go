@@ -5,12 +5,10 @@ package client_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mycelian/mycelian-memory/client"
 )
 
@@ -28,45 +26,39 @@ func TestAddEntryE2E(t *testing.T) {
 		baseURL = "http://localhost:11545"
 	}
 
-	c := client.New(baseURL)
+	c := client.NewWithDevMode(baseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	defer c.Close()
 
-	// create user
-	email := fmt.Sprintf("it-%s@example.com", uuid.NewString())
-	uid := fmt.Sprintf("u%s", uuid.NewString()[:8])
-	user, err := c.CreateUser(ctx, client.CreateUserRequest{UserID: uid, Email: email})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
+	// User management is now external - use MockAuthorizer's actor ID
 
 	// create vault & memory
-	vault, err := c.CreateVault(ctx, user.ID, client.CreateVaultRequest{Title: "it-vault"})
+	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: "it-vault"})
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
-	mem, err := c.CreateMemory(ctx, user.ID, vault.VaultID, client.CreateMemoryRequest{Title: "Demo", MemoryType: "NOTES"})
+	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "Demo", MemoryType: "NOTES"})
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}
 
 	// set context
-	_, err = c.PutContext(ctx, user.ID, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "ctx"}})
+	_, err = c.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "ctx"}})
 	if err != nil {
 		t.Fatalf("put context: %v", err)
 	}
 	_ = c.AwaitConsistency(ctx, mem.ID)
 
 	// add entry
-	_, err = c.AddEntry(ctx, user.ID, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "hello", Summary: "sum"})
+	_, err = c.AddEntry(ctx, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "hello", Summary: "sum"})
 	if err != nil {
 		t.Fatalf("add entry: %v", err)
 	}
 	_ = c.AwaitConsistency(ctx, mem.ID)
 
 	// list entries
-	lr, err := c.ListEntries(ctx, user.ID, vault.VaultID, mem.ID, nil)
+	lr, err := c.ListEntries(ctx, vault.VaultID, mem.ID, nil)
 	if err != nil {
 		t.Fatalf("list entries failed: %v", err)
 	}
@@ -75,7 +67,7 @@ func TestAddEntryE2E(t *testing.T) {
 	}
 
 	// cleanup
-	_ = c.DeleteMemory(ctx, user.ID, vault.VaultID, mem.ID)
-	_ = c.DeleteVault(ctx, user.ID, vault.VaultID)
-	_ = c.DeleteUser(ctx, user.ID)
+	_ = c.DeleteMemory(ctx, vault.VaultID, mem.ID)
+	_ = c.DeleteVault(ctx, vault.VaultID)
+	// User deletion is now external - no user cleanup needed
 }
