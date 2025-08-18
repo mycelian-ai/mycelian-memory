@@ -13,7 +13,7 @@ func TestValidateCreateMemoryRequest_LengthLimits(t *testing.T) {
 	// Helper to create a valid base request
 	validReq := func() CreateMemoryRequest {
 		return CreateMemoryRequest{
-			UserID:     "u",
+			ActorID:    "u",
 			VaultID:    mustParseUUID("123e4567-e89b-12d3-a456-426614174000"),
 			MemoryType: "PROJECT",
 			Title:      "valid-title",

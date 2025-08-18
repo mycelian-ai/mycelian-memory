@@ -1,33 +1,33 @@
 -- PostgreSQL schema for Synapse Memory (parity with ADR 0014)
--- Users table eliminated - user_id is now treated as opaque string identifier
+-- Users table eliminated - actor_id is now treated as opaque string identifier
 
 -- Vaults
 CREATE TABLE IF NOT EXISTS vaults (
-  user_id        TEXT NOT NULL,
+  actor_id       TEXT NOT NULL,
   vault_id       TEXT NOT NULL,
   title          TEXT NOT NULL,
   description    TEXT,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, vault_id),
-  UNIQUE (user_id, title)
+  PRIMARY KEY (actor_id, vault_id),
+  UNIQUE (actor_id, title)
 );
 
 -- Memories
 CREATE TABLE IF NOT EXISTS memories (
-  user_id        TEXT NOT NULL,
+  actor_id       TEXT NOT NULL,
   vault_id       TEXT NOT NULL,
   memory_id      TEXT NOT NULL,
   memory_type    TEXT NOT NULL,
   title          TEXT NOT NULL,
   description    TEXT,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, vault_id, memory_id),
+  PRIMARY KEY (actor_id, vault_id, memory_id),
   UNIQUE (vault_id, title)
 );
 
 -- MemoryEntries
 CREATE TABLE IF NOT EXISTS memory_entries (
-  user_id        TEXT NOT NULL,
+  actor_id       TEXT NOT NULL,
   vault_id       TEXT NOT NULL,
   memory_id      TEXT NOT NULL,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -41,20 +41,20 @@ CREATE TABLE IF NOT EXISTS memory_entries (
   corrected_entry_creation_time TIMESTAMPTZ,
   correction_reason TEXT,
   last_update_time TIMESTAMPTZ,
-  PRIMARY KEY (user_id, vault_id, memory_id, creation_time, entry_id)
+  PRIMARY KEY (actor_id, vault_id, memory_id, creation_time, entry_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS memory_entries_entry_id_uq ON memory_entries(entry_id);
-CREATE INDEX IF NOT EXISTS memory_entries_recent_idx ON memory_entries(user_id, vault_id, memory_id, creation_time DESC);
+CREATE INDEX IF NOT EXISTS memory_entries_recent_idx ON memory_entries(actor_id, vault_id, memory_id, creation_time DESC);
 
 -- MemoryContexts
 CREATE TABLE IF NOT EXISTS memory_contexts (
-  user_id        TEXT NOT NULL,
+  actor_id       TEXT NOT NULL,
   vault_id       TEXT NOT NULL,
   memory_id      TEXT NOT NULL,
   context_id     TEXT NOT NULL,
   context        JSONB NOT NULL,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, vault_id, memory_id, context_id)
+  PRIMARY KEY (actor_id, vault_id, memory_id, context_id)
 );
 
 -- Outbox for Weaviate sync

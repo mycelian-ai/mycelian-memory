@@ -139,15 +139,15 @@ func TestVaultDeletePropagatesToIndex(t *testing.T) {
 	idx := &fakeIndex{}
 	fs := &fakeStore{
 		mems: []*model.Memory{
-			{UserID: "u1", VaultID: "v1", MemoryID: "m1"},
-			{UserID: "u1", VaultID: "v1", MemoryID: "m2"},
+			{ActorID: "u1", VaultID: "v1", MemoryID: "m1"},
+			{ActorID: "u1", VaultID: "v1", MemoryID: "m2"},
 		},
 		entriesByMem: map[string][]*model.MemoryEntry{
-			"m1": {&model.MemoryEntry{UserID: "u1", VaultID: "v1", MemoryID: "m1", EntryID: "e1"}, &model.MemoryEntry{UserID: "u1", VaultID: "v1", MemoryID: "m1", EntryID: "e2"}},
-			"m2": {&model.MemoryEntry{UserID: "u1", VaultID: "v1", MemoryID: "m2", EntryID: "e3"}},
+			"m1": {&model.MemoryEntry{ActorID: "u1", VaultID: "v1", MemoryID: "m1", EntryID: "e1"}, &model.MemoryEntry{ActorID: "u1", VaultID: "v1", MemoryID: "m1", EntryID: "e2"}},
+			"m2": {&model.MemoryEntry{ActorID: "u1", VaultID: "v1", MemoryID: "m2", EntryID: "e3"}},
 		},
 		ctxByMem: map[string]*model.MemoryContext{
-			"m1": {UserID: "u1", VaultID: "v1", MemoryID: "m1", ContextID: "c1"},
+			"m1": {ActorID: "u1", VaultID: "v1", MemoryID: "m1", ContextID: "c1"},
 			// m2 has no context
 		},
 	}

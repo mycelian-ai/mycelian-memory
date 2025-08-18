@@ -51,7 +51,7 @@ func (h *MemoryHandler) CreateMemory(w http.ResponseWriter, r *http.Request) {
 		respond.WriteBadRequest(w, "Invalid JSON")
 		return
 	}
-	m := &model.Memory{UserID: actorInfo.ActorID, VaultID: vaultID, MemoryType: req.MemoryType, Title: req.Title, Description: req.Description}
+	m := &model.Memory{ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryType: req.MemoryType, Title: req.Title, Description: req.Description}
 	out, err := h.svc.CreateMemory(r.Context(), m)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
@@ -131,7 +131,7 @@ func (h *MemoryHandler) ListMemoryEntries(w http.ResponseWriter, r *http.Request
 
 	v := mux.Vars(r)
 	q := r.URL.Query()
-	req := model.ListEntriesRequest{UserID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"]}
+	req := model.ListEntriesRequest{ActorID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"]}
 	if s := q.Get("limit"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
 			req.Limit = n
@@ -187,7 +187,7 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	e := &model.MemoryEntry{
-		UserID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"],
+		ActorID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"],
 		RawEntry: in.RawEntry, Summary: in.Summary, Metadata: in.Metadata, Tags: in.Tags, ExpirationTime: in.ExpirationTime,
 	}
 	out, err := h.svc.CreateEntry(r.Context(), e)
@@ -284,7 +284,7 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 		respond.WriteBadRequest(w, "context must be a valid JSON object")
 		return
 	}
-	mc := &model.MemoryContext{UserID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"], ContextJSON: raw}
+	mc := &model.MemoryContext{ActorID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"], ContextJSON: raw}
 	out, err := h.svc.PutContext(r.Context(), mc)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
@@ -323,7 +323,7 @@ func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Re
 	}
 	resp := map[string]interface{}{
 		"contextId":    out.ContextID,
-		"userId":       out.UserID,
+		"actorId":      out.ActorID,
 		"vaultId":      out.VaultID,
 		"memoryId":     out.MemoryID,
 		"creationTime": out.CreationTime,

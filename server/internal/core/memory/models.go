@@ -12,7 +12,7 @@ import (
 // CreateMemoryRequest represents a request to create a memory
 type CreateMemoryRequest struct {
 	VaultID     uuid.UUID
-	UserID      string
+	ActorID     string
 	MemoryType  string
 	Title       string
 	Description *string
@@ -21,7 +21,7 @@ type CreateMemoryRequest struct {
 // CreateMemoryEntryRequest represents a request to create a memory entry
 type CreateMemoryEntryRequest struct {
 	VaultID        uuid.UUID
-	UserID         string
+	ActorID        string
 	MemoryID       string
 	RawEntry       string
 	Summary        *string
@@ -33,7 +33,7 @@ type CreateMemoryEntryRequest struct {
 // ListMemoryEntriesRequest represents a request to list memory entries
 type ListMemoryEntriesRequest struct {
 	VaultID  uuid.UUID
-	UserID   string
+	ActorID  string
 	MemoryID string
 	Limit    int
 	Before   *time.Time
@@ -43,7 +43,7 @@ type ListMemoryEntriesRequest struct {
 // UpdateMemoryEntryTagsRequest represents a request to update memory entry tags
 type UpdateMemoryEntryTagsRequest struct {
 	VaultID  uuid.UUID
-	UserID   string
+	ActorID  string
 	MemoryID string
 	EntryID  string
 	Tags     map[string]interface{}
@@ -54,7 +54,7 @@ type UpdateMemoryEntryTagsRequest struct {
 // ContextID optional; generated if absent.
 type CreateMemoryContextRequest struct {
 	VaultID   uuid.UUID
-	UserID    string
+	ActorID   string
 	MemoryID  string
 	ContextID *string
 	Context   json.RawMessage

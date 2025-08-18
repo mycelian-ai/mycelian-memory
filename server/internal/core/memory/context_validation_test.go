@@ -11,7 +11,7 @@ func TestCreateMemoryContext_Validation(t *testing.T) {
 	// helper
 	mkReq := func(payload string) CreateMemoryContextRequest {
 		return CreateMemoryContextRequest{
-			UserID:   "u",
+			ActorID:  "u",
 			MemoryID: "m",
 			Context:  json.RawMessage(payload),
 		}

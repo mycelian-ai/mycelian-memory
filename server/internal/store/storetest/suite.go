@@ -34,7 +34,7 @@ func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
 	}
 
 	// Vaults
-	v, err := s.Vaults().Create(ctx, &model.Vault{UserID: userID, Title: "test-vault"})
+	v, err := s.Vaults().Create(ctx, &model.Vault{ActorID: userID, Title: "test-vault"})
 	if err != nil {
 		t.Fatalf("CreateVault: %v", err)
 	}
@@ -49,7 +49,7 @@ func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
 	}
 
 	// Memories
-	m, err := s.Memories().Create(ctx, &model.Memory{UserID: userID, VaultID: v.VaultID, MemoryType: "text", Title: "m1"})
+	m, err := s.Memories().Create(ctx, &model.Memory{ActorID: userID, VaultID: v.VaultID, MemoryType: "text", Title: "m1"})
 	if err != nil {
 		t.Fatalf("CreateMemory: %v", err)
 	}
@@ -61,17 +61,17 @@ func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
 	}
 
 	// Entries
-	e1, err := s.Entries().Create(ctx, &model.MemoryEntry{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "hello"})
+	e1, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "hello"})
 	if err != nil {
 		t.Fatalf("CreateEntry e1: %v", err)
 	}
-	e2, err := s.Entries().Create(ctx, &model.MemoryEntry{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "world"})
+	e2, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "world"})
 	if err != nil {
 		t.Fatalf("CreateEntry e2: %v", err)
 	}
 
 	// ListEntries
-	lst, err := s.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID})
+	lst, err := s.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID})
 	if err != nil || len(lst) < 2 {
 		t.Fatalf("ListEntries: n=%d err=%v", len(lst), err)
 	}
@@ -88,7 +88,7 @@ func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
 
 	// Contexts
 	ctxBody := json.RawMessage(`{"foo":"bar"}`)
-	c, err := s.Contexts().Put(ctx, &model.MemoryContext{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, ContextJSON: ctxBody})
+	c, err := s.Contexts().Put(ctx, &model.MemoryContext{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, ContextJSON: ctxBody})
 	if err != nil {
 		t.Fatalf("PutContext: %v", err)
 	}
@@ -107,31 +107,31 @@ func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
 
 	// Paging and time filters
 	// Create additional entries with spacing
-	if _, err := s.Entries().Create(ctx, &model.MemoryEntry{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "three"}); err != nil {
+	if _, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "three"}); err != nil {
 		t.Fatalf("CreateEntry e3: %v", err)
 	}
 	time.Sleep(5 * time.Millisecond)
-	if _, err := s.Entries().Create(ctx, &model.MemoryEntry{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "four"}); err != nil {
+	if _, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "four"}); err != nil {
 		t.Fatalf("CreateEntry e4: %v", err)
 	}
 
 	// Limit should cap results
-	if lst2, err := s.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, Limit: 2}); err != nil || len(lst2) != 2 {
+	if lst2, err := s.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, Limit: 2}); err != nil || len(lst2) != 2 {
 		t.Fatalf("ListEntries limit: n=%d err=%v", len(lst2), err)
 	}
 
 	// Before filter should exclude the newest item
-	if all, err := s.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID}); err == nil && len(all) >= 2 {
+	if all, err := s.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID}); err == nil && len(all) >= 2 {
 		bf := all[0].CreationTime
-		if bef, err := s.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, Before: &bf}); err != nil || len(bef) >= len(all) {
+		if bef, err := s.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, Before: &bf}); err != nil || len(bef) >= len(all) {
 			t.Fatalf("before should reduce results: before=%d all=%d err=%v", len(bef), len(all), err)
 		}
 	}
 
 	// After filter should include at least one when using older timestamp
-	if all, err := s.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID}); err == nil && len(all) >= 2 {
+	if all, err := s.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID}); err == nil && len(all) >= 2 {
 		oldest := all[len(all)-1].CreationTime
-		if aft, err := s.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, After: &oldest}); err != nil || len(aft) == 0 {
+		if aft, err := s.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, After: &oldest}); err != nil || len(aft) == 0 {
 			t.Fatalf("after should return at least one entry: n=%d err=%v", len(aft), err)
 		}
 	}

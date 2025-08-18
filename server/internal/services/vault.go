@@ -45,7 +45,7 @@ func (s *VaultService) DeleteVault(ctx context.Context, userID, vaultID string) 
 
 	for _, m := range memories {
 		// List all entries under this memory
-		entries, err := s.store.Entries().List(ctx, model.ListEntriesRequest{UserID: userID, VaultID: vaultID, MemoryID: m.MemoryID, Limit: 0})
+		entries, err := s.store.Entries().List(ctx, model.ListEntriesRequest{ActorID: userID, VaultID: vaultID, MemoryID: m.MemoryID, Limit: 0})
 		if err != nil {
 			return err
 		}

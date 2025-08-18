@@ -13,10 +13,10 @@ type User struct {
 	LastActiveTime *time.Time `json:"lastActiveTime,omitempty"`
 }
 
-// Vault groups memories under a user.
+// Vault groups memories under an actor.
 type Vault struct {
 	VaultID      string    `json:"vaultId"`
-	UserID       string    `json:"userId"`
+	ActorID      string    `json:"actorId"`
 	Title        string    `json:"title"`
 	CreationTime time.Time `json:"creationTime"`
 }
@@ -24,7 +24,7 @@ type Vault struct {
 // Memory is a container for entries and contexts.
 type Memory struct {
 	MemoryID     string    `json:"memoryId"`
-	UserID       string    `json:"userId"`
+	ActorID      string    `json:"actorId"`
 	VaultID      string    `json:"vaultId"`
 	MemoryType   string    `json:"memoryType"`
 	Title        string    `json:"title"`
@@ -35,7 +35,7 @@ type Memory struct {
 // MemoryEntry is an immutable record of content with optional summary and metadata.
 type MemoryEntry struct {
 	EntryID        string                 `json:"entryId"`
-	UserID         string                 `json:"userId"`
+	ActorID        string                 `json:"actorId"`
 	VaultID        string                 `json:"vaultId"`
 	MemoryID       string                 `json:"memoryId"`
 	RawEntry       string                 `json:"rawEntry"`
@@ -49,7 +49,7 @@ type MemoryEntry struct {
 // MemoryContext stores the latest context snapshot for a memory.
 type MemoryContext struct {
 	ContextID    string    `json:"contextId"`
-	UserID       string    `json:"userId"`
+	ActorID      string    `json:"actorId"`
 	VaultID      string    `json:"vaultId"`
 	MemoryID     string    `json:"memoryId"`
 	ContextJSON  []byte    `json:"context"`
@@ -65,7 +65,7 @@ type SearchHit struct {
 
 // ListEntriesRequest captures filters used when listing entries.
 type ListEntriesRequest struct {
-	UserID   string
+	ActorID  string
 	VaultID  string
 	MemoryID string
 	Limit    int

@@ -45,7 +45,7 @@ func (h *VaultHandler) CreateVault(w http.ResponseWriter, r *http.Request) {
 		respond.WriteBadRequest(w, "Invalid JSON")
 		return
 	}
-	v := &model.Vault{UserID: actorInfo.ActorID, Title: req.Title}
+	v := &model.Vault{ActorID: actorInfo.ActorID, Title: req.Title}
 	out, err := h.svc.CreateVault(r.Context(), v)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())

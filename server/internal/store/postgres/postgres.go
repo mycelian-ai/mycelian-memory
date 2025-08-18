@@ -111,19 +111,19 @@ func (v *vaults) Create(ctx context.Context, mv *model.Vault) (*model.Vault, err
 	}
 	var created time.Time
 	row := v.db.QueryRowContext(ctx, `
-        INSERT INTO vaults (user_id, vault_id, title, description)
+        INSERT INTO vaults (actor_id, vault_id, title, description)
         VALUES ($1,$2,$3,$4)
         RETURNING creation_time
-    `, mv.UserID, id, mv.Title, nil)
+    `, mv.ActorID, id, mv.Title, nil)
 	if err := row.Scan(&created); err != nil {
 		return nil, err
 	}
-	return &model.Vault{VaultID: id, UserID: mv.UserID, Title: mv.Title, CreationTime: created}, nil
+	return &model.Vault{VaultID: id, ActorID: mv.ActorID, Title: mv.Title, CreationTime: created}, nil
 }
 
 func (v *vaults) GetByID(ctx context.Context, userID, vaultID string) (*model.Vault, error) {
 	var out model.Vault
-	out.UserID = userID
+	out.ActorID = userID
 	out.VaultID = vaultID
 	row := v.db.QueryRowContext(ctx, `
         SELECT title, description, creation_time FROM vaults WHERE user_id=$1 AND vault_id=$2
@@ -139,10 +139,10 @@ func (v *vaults) GetByID(ctx context.Context, userID, vaultID string) (*model.Va
 
 func (v *vaults) GetByTitle(ctx context.Context, userID, title string) (*model.Vault, error) {
 	var out model.Vault
-	out.UserID = userID
+	out.ActorID = userID
 	out.Title = title
 	row := v.db.QueryRowContext(ctx, `
-        SELECT vault_id, description, creation_time FROM vaults WHERE user_id=$1 AND title=$2
+        SELECT vault_id, description, creation_time FROM vaults WHERE actor_id=$1 AND title=$2
     `, userID, title)
 	var created time.Time
 	var desc *string
@@ -156,7 +156,7 @@ func (v *vaults) GetByTitle(ctx context.Context, userID, title string) (*model.V
 func (v *vaults) List(ctx context.Context, userID string) ([]*model.Vault, error) {
 	rows, err := v.db.QueryContext(ctx, `
         SELECT vault_id, title, description, creation_time
-        FROM vaults WHERE user_id=$1 ORDER BY creation_time DESC
+        FROM vaults WHERE actor_id=$1 ORDER BY creation_time DESC
     `, userID)
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (v *vaults) List(ctx context.Context, userID string) ([]*model.Vault, error
 		if err := rows.Scan(&id, &title, &desc, &created); err != nil {
 			return nil, err
 		}
-		res = append(res, &model.Vault{VaultID: id, UserID: userID, Title: title, CreationTime: created})
+		res = append(res, &model.Vault{VaultID: id, ActorID: userID, Title: title, CreationTime: created})
 	}
 	return res, rows.Err()
 }
@@ -183,7 +183,7 @@ func (v *vaults) Delete(ctx context.Context, userID, vaultID string) error {
 	defer func() { _ = tx.Rollback() }()
 
 	// Collect child IDs
-	entryRows, err := tx.QueryContext(ctx, `SELECT entry_id FROM memory_entries WHERE user_id=$1 AND vault_id=$2`, userID, vaultID)
+	entryRows, err := tx.QueryContext(ctx, `SELECT entry_id FROM memory_entries WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID)
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (v *vaults) Delete(ctx context.Context, userID, vaultID string) error {
 	}
 	_ = entryRows.Close()
 
-	ctxRows, err := tx.QueryContext(ctx, `SELECT context_id FROM memory_contexts WHERE user_id=$1 AND vault_id=$2`, userID, vaultID)
+	ctxRows, err := tx.QueryContext(ctx, `SELECT context_id FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID)
 	if err != nil {
 		return err
 	}
@@ -213,26 +213,26 @@ func (v *vaults) Delete(ctx context.Context, userID, vaultID string) error {
 	}
 	_ = ctxRows.Close()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE user_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_contexts WHERE user_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM memories WHERE user_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memories WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM vaults WHERE user_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM vaults WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID); err != nil {
 		return err
 	}
 
 	for _, id := range entryIDs {
-		if err := writeOutbox(ctx, tx, "delete_entry", id, map[string]interface{}{"userId": userID}); err != nil {
+		if err := writeOutbox(ctx, tx, "delete_entry", id, map[string]interface{}{"actorId": userID}); err != nil {
 			return err
 		}
 	}
 	for _, id := range ctxIDs {
-		if err := writeOutbox(ctx, tx, "delete_context", id, map[string]interface{}{"userId": userID}); err != nil {
+		if err := writeOutbox(ctx, tx, "delete_context", id, map[string]interface{}{"actorId": userID}); err != nil {
 			return err
 		}
 	}
@@ -248,13 +248,13 @@ func (v *vaults) AddMemory(ctx context.Context, userID, vaultID, memoryID string
 
 	// Validate target vault exists
 	var exists int
-	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM vaults WHERE user_id=$1 AND vault_id=$2`, userID, vaultID).Scan(&exists); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM vaults WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID).Scan(&exists); err != nil {
 		return fmt.Errorf("VAULT_NOT_FOUND: %w", err)
 	}
 
 	// Locate current vault and title for the memory
 	var currentVaultID, title string
-	if err := tx.QueryRowContext(ctx, `SELECT vault_id, title FROM memories WHERE user_id=$1 AND memory_id=$2`, userID, memoryID).Scan(&currentVaultID, &title); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT vault_id, title FROM memories WHERE actor_id=$1 AND memory_id=$2`, userID, memoryID).Scan(&currentVaultID, &title); err != nil {
 		return fmt.Errorf("MEMORY_NOT_FOUND: %w", err)
 	}
 	if currentVaultID == vaultID {
@@ -263,7 +263,7 @@ func (v *vaults) AddMemory(ctx context.Context, userID, vaultID, memoryID string
 
 	// Enforce unique (vault_id, title) in target
 	var conflict int
-	err = tx.QueryRowContext(ctx, `SELECT 1 FROM memories WHERE user_id=$1 AND vault_id=$2 AND title=$3`, userID, vaultID, title).Scan(&conflict)
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM memories WHERE actor_id=$1 AND vault_id=$2 AND title=$3`, userID, vaultID, title).Scan(&conflict)
 	if err == nil {
 		return fmt.Errorf("MEMORY_TITLE_CONFLICT: title already exists in target vault")
 	}
@@ -271,13 +271,13 @@ func (v *vaults) AddMemory(ctx context.Context, userID, vaultID, memoryID string
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, `UPDATE memories SET vault_id=$1 WHERE user_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE memories SET vault_id=$1 WHERE actor_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE memory_entries SET vault_id=$1 WHERE user_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE memory_entries SET vault_id=$1 WHERE actor_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE memory_contexts SET vault_id=$1 WHERE user_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE memory_contexts SET vault_id=$1 WHERE actor_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -296,10 +296,10 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 	memID := uuid.New().String()
 	var created time.Time
 	if err := tx.QueryRowContext(ctx, `
-        INSERT INTO memories (user_id, vault_id, memory_id, memory_type, title, description)
+        INSERT INTO memories (actor_id, vault_id, memory_id, memory_type, title, description)
         VALUES ($1,$2,$3,$4,$5,$6)
         RETURNING creation_time
-    `, mm.UserID, mm.VaultID, memID, mm.MemoryType, mm.Title, mm.Description).Scan(&created); err != nil {
+    `, mm.ActorID, mm.VaultID, memID, mm.MemoryType, mm.Title, mm.Description).Scan(&created); err != nil {
 		return nil, err
 	}
 
@@ -308,15 +308,15 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 	defaultCtx := json.RawMessage(`{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`)
 	var ctxCreated time.Time
 	if err := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_contexts (user_id, vault_id, memory_id, context_id, context)
+        INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mm.UserID, mm.VaultID, memID, ctxID, []byte(defaultCtx)).Scan(&ctxCreated); err != nil {
+    `, mm.ActorID, mm.VaultID, memID, ctxID, []byte(defaultCtx)).Scan(&ctxCreated); err != nil {
 		return nil, err
 	}
 
 	payload := map[string]interface{}{
-		"userId":       mm.UserID,
+		"actorId":      mm.ActorID,
 		"memoryId":     memID,
 		"contextId":    ctxID,
 		"context":      string(defaultCtx),
@@ -329,17 +329,17 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &model.Memory{MemoryID: memID, UserID: mm.UserID, VaultID: mm.VaultID, MemoryType: mm.MemoryType, Title: mm.Title, Description: mm.Description, CreationTime: created}, nil
+	return &model.Memory{MemoryID: memID, ActorID: mm.ActorID, VaultID: mm.VaultID, MemoryType: mm.MemoryType, Title: mm.Title, Description: mm.Description, CreationTime: created}, nil
 }
 
 func (m *memories) GetByID(ctx context.Context, userID, vaultID, memoryID string) (*model.Memory, error) {
 	var out model.Memory
-	out.UserID = userID
+	out.ActorID = userID
 	out.VaultID = vaultID
 	out.MemoryID = memoryID
 	row := m.db.QueryRowContext(ctx, `
         SELECT memory_type, title, description, creation_time
-        FROM memories WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3
+        FROM memories WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3
     `, userID, vaultID, memoryID)
 	if err := row.Scan(&out.MemoryType, &out.Title, &out.Description, &out.CreationTime); err != nil {
 		return nil, err
@@ -349,12 +349,12 @@ func (m *memories) GetByID(ctx context.Context, userID, vaultID, memoryID string
 
 func (m *memories) GetByTitle(ctx context.Context, userID, vaultID, title string) (*model.Memory, error) {
 	var out model.Memory
-	out.UserID = userID
+	out.ActorID = userID
 	out.VaultID = vaultID
 	out.Title = title
 	row := m.db.QueryRowContext(ctx, `
         SELECT memory_id, memory_type, description, creation_time
-        FROM memories WHERE user_id=$1 AND vault_id=$2 AND title=$3
+        FROM memories WHERE actor_id=$1 AND vault_id=$2 AND title=$3
     `, userID, vaultID, title)
 	if err := row.Scan(&out.MemoryID, &out.MemoryType, &out.Description, &out.CreationTime); err != nil {
 		return nil, err
@@ -365,7 +365,7 @@ func (m *memories) GetByTitle(ctx context.Context, userID, vaultID, title string
 func (m *memories) List(ctx context.Context, userID, vaultID string) ([]*model.Memory, error) {
 	rows, err := m.db.QueryContext(ctx, `
         SELECT memory_id, memory_type, title, description, creation_time
-        FROM memories WHERE user_id=$1 AND vault_id=$2 ORDER BY creation_time DESC
+        FROM memories WHERE actor_id=$1 AND vault_id=$2 ORDER BY creation_time DESC
     `, userID, vaultID)
 	if err != nil {
 		return nil, err
@@ -374,7 +374,7 @@ func (m *memories) List(ctx context.Context, userID, vaultID string) ([]*model.M
 	var out []*model.Memory
 	for rows.Next() {
 		var mm model.Memory
-		mm.UserID = userID
+		mm.ActorID = userID
 		mm.VaultID = vaultID
 		if err := rows.Scan(&mm.MemoryID, &mm.MemoryType, &mm.Title, &mm.Description, &mm.CreationTime); err != nil {
 			return nil, err
@@ -391,7 +391,7 @@ func (m *memories) Delete(ctx context.Context, userID, vaultID, memoryID string)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	entryRows, err := tx.QueryContext(ctx, `SELECT entry_id FROM memory_entries WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID)
+	entryRows, err := tx.QueryContext(ctx, `SELECT entry_id FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID)
 	if err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func (m *memories) Delete(ctx context.Context, userID, vaultID, memoryID string)
 	}
 	_ = entryRows.Close()
 
-	ctxRows, err := tx.QueryContext(ctx, `SELECT context_id FROM memory_contexts WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID)
+	ctxRows, err := tx.QueryContext(ctx, `SELECT context_id FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID)
 	if err != nil {
 		return err
 	}
@@ -421,23 +421,23 @@ func (m *memories) Delete(ctx context.Context, userID, vaultID, memoryID string)
 	}
 	_ = ctxRows.Close()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_contexts WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM memories WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memories WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`, userID, vaultID, memoryID); err != nil {
 		return err
 	}
 
 	for _, id := range entryIDs {
-		if err := writeOutbox(ctx, tx, "delete_entry", id, map[string]interface{}{"userId": userID}); err != nil {
+		if err := writeOutbox(ctx, tx, "delete_entry", id, map[string]interface{}{"actorId": userID}); err != nil {
 			return err
 		}
 	}
 	for _, id := range ctxIDs {
-		if err := writeOutbox(ctx, tx, "delete_context", id, map[string]interface{}{"userId": userID}); err != nil {
+		if err := writeOutbox(ctx, tx, "delete_context", id, map[string]interface{}{"actorId": userID}); err != nil {
 			return err
 		}
 	}
@@ -459,16 +459,16 @@ func (e *entries) Create(ctx context.Context, me *model.MemoryEntry) (*model.Mem
 	metaJSON, _ := json.Marshal(me.Metadata)
 	tagsJSON, _ := json.Marshal(me.Tags)
 	row := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_entries (user_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
+        INSERT INTO memory_entries (actor_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         RETURNING creation_time
-    `, me.UserID, me.VaultID, me.MemoryID, me.RawEntry, me.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
+    `, me.ActorID, me.VaultID, me.MemoryID, me.RawEntry, me.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
 	if err := row.Scan(&created); err != nil {
 		return nil, err
 	}
 
 	payload := map[string]interface{}{
-		"userId":       me.UserID,
+		"actorId":      me.ActorID,
 		"memoryId":     me.MemoryID,
 		"entryId":      entryID,
 		"rawEntry":     me.RawEntry,
@@ -489,11 +489,11 @@ func (e *entries) Create(ctx context.Context, me *model.MemoryEntry) (*model.Mem
 }
 
 func (e *entries) List(ctx context.Context, req model.ListEntriesRequest) ([]*model.MemoryEntry, error) {
-	query := `SELECT user_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
+	query := `SELECT actor_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
                       correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                       correction_reason, last_update_time
-               FROM memory_entries WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3`
-	args := []interface{}{req.UserID, req.VaultID, req.MemoryID}
+               FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`
+	args := []interface{}{req.ActorID, req.VaultID, req.MemoryID}
 	if req.Before != nil {
 		query += " AND creation_time < $4"
 		args = append(args, *req.Before)
@@ -517,7 +517,7 @@ func (e *entries) List(ctx context.Context, req model.ListEntriesRequest) ([]*mo
 		var meta, tags sql.NullString
 		var corrTime, corrEntryTime, lastUpd sql.NullTime
 		var corrMemID sql.NullString
-		if err := rows.Scan(&m.UserID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
+		if err := rows.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
 			&corrTime, &corrMemID, &corrEntryTime, &corrMemID, &lastUpd); err != nil {
 			return nil, err
 		}
@@ -538,12 +538,12 @@ func (e *entries) GetByID(ctx context.Context, userID, vaultID, memoryID, entryI
 	var corrTime, corrEntryTime, lastUpd sql.NullTime
 	var corrMemID sql.NullString
 	row := e.db.QueryRowContext(ctx, `
-        SELECT user_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
+        SELECT actor_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
                correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                correction_reason, last_update_time
-        FROM memory_entries WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3 AND entry_id=$4
+        FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND entry_id=$4
     `, userID, vaultID, memoryID, entryID)
-	if err := row.Scan(&m.UserID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
+	if err := row.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
 		&corrTime, &corrMemID, &corrEntryTime, &corrMemID, &lastUpd); err != nil {
 		return nil, err
 	}
@@ -558,7 +558,7 @@ func (e *entries) GetByID(ctx context.Context, userID, vaultID, memoryID, entryI
 
 func (e *entries) UpdateTags(ctx context.Context, userID, vaultID, memoryID, entryID string, tags map[string]interface{}) (*model.MemoryEntry, error) {
 	tagsJSON, _ := json.Marshal(tags)
-	if _, err := e.db.ExecContext(ctx, `UPDATE memory_entries SET tags=$1, last_update_time=now() WHERE user_id=$2 AND vault_id=$3 AND memory_id=$4 AND entry_id=$5`, nullIfEmpty(tagsJSON), userID, vaultID, memoryID, entryID); err != nil {
+	if _, err := e.db.ExecContext(ctx, `UPDATE memory_entries SET tags=$1, last_update_time=now() WHERE actor_id=$2 AND vault_id=$3 AND memory_id=$4 AND entry_id=$5`, nullIfEmpty(tagsJSON), userID, vaultID, memoryID, entryID); err != nil {
 		return nil, err
 	}
 	return e.GetByID(ctx, userID, vaultID, memoryID, entryID)
@@ -570,12 +570,12 @@ func (e *entries) DeleteByID(ctx context.Context, userID, vaultID, memoryID, ent
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	res, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3 AND entry_id=$4`, userID, vaultID, memoryID, entryID)
+	res, err := tx.ExecContext(ctx, `DELETE FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND entry_id=$4`, userID, vaultID, memoryID, entryID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
-		if err := writeOutbox(ctx, tx, "delete_entry", entryID, map[string]interface{}{"userId": userID}); err != nil {
+		if err := writeOutbox(ctx, tx, "delete_entry", entryID, map[string]interface{}{"actorId": userID}); err != nil {
 			return err
 		}
 	}
@@ -597,15 +597,15 @@ func (c *contexts) Put(ctx context.Context, mc *model.MemoryContext) (*model.Mem
 	}
 	var created time.Time
 	row := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_contexts (user_id, vault_id, memory_id, context_id, context)
+        INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mc.UserID, mc.VaultID, mc.MemoryID, ctxID, []byte(mc.ContextJSON))
+    `, mc.ActorID, mc.VaultID, mc.MemoryID, ctxID, []byte(mc.ContextJSON))
 	if err := row.Scan(&created); err != nil {
 		return nil, err
 	}
 	payload := map[string]interface{}{
-		"userId":       mc.UserID,
+		"actorId":      mc.ActorID,
 		"memoryId":     mc.MemoryID,
 		"contextId":    ctxID,
 		"context":      string(mc.ContextJSON),
@@ -625,13 +625,13 @@ func (c *contexts) Put(ctx context.Context, mc *model.MemoryContext) (*model.Mem
 
 func (c *contexts) Latest(ctx context.Context, userID, vaultID, memoryID string) (*model.MemoryContext, error) {
 	var out model.MemoryContext
-	out.UserID = userID
+	out.ActorID = userID
 	out.VaultID = vaultID
 	out.MemoryID = memoryID
 	var ctxBytes []byte
 	row := c.db.QueryRowContext(ctx, `
         SELECT context_id, context, creation_time
-        FROM memory_contexts WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3
+        FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3
         ORDER BY creation_time DESC LIMIT 1
     `, userID, vaultID, memoryID)
 	if err := row.Scan(&out.ContextID, &ctxBytes, &out.CreationTime); err != nil {
@@ -647,12 +647,12 @@ func (c *contexts) DeleteByID(ctx context.Context, userID, vaultID, memoryID, co
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	res, err := tx.ExecContext(ctx, `DELETE FROM memory_contexts WHERE user_id=$1 AND vault_id=$2 AND memory_id=$3 AND context_id=$4`, userID, vaultID, memoryID, contextID)
+	res, err := tx.ExecContext(ctx, `DELETE FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND context_id=$4`, userID, vaultID, memoryID, contextID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
-		if err := writeOutbox(ctx, tx, "delete_context", contextID, map[string]interface{}{"userId": userID}); err != nil {
+		if err := writeOutbox(ctx, tx, "delete_context", contextID, map[string]interface{}{"actorId": userID}); err != nil {
 			return err
 		}
 	}
