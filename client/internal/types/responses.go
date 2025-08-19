@@ -23,7 +23,7 @@ type ListEntriesResponse struct {
 
 // PutContextResponse contains metadata about a stored context
 type PutContextResponse struct {
-	UserID       string    `json:"userId"`
+	UserID       string    `json:"actorId"`
 	MemoryID     string    `json:"memoryId"`
 	ContextID    string    `json:"contextId"`
 	CreationTime time.Time `json:"creationTime"`

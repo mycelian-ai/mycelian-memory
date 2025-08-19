@@ -18,7 +18,7 @@ type User struct {
 
 // Vault represents a vault
 type Vault struct {
-	UserID       string    `json:"userId"`
+	UserID       string    `json:"actorId"`
 	VaultID      string    `json:"vaultId"`
 	Title        string    `json:"title"`
 	Description  string    `json:"description,omitempty"`
@@ -29,18 +29,18 @@ type Vault struct {
 type Memory struct {
 	ID          string    `json:"memoryId"`
 	VaultID     string    `json:"vaultId"`
-	UserID      string    `json:"userId"`
+	UserID      string    `json:"actorId"`
 	Title       string    `json:"title"`
 	Description string    `json:"description,omitempty"`
-	MemoryType  string    `json:"memory_type"`
-	CreatedAt   time.Time `json:"created_at"`
+	MemoryType  string    `json:"memoryType"`
+	CreatedAt   time.Time `json:"creationTime"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Entry represents an entry
 type Entry struct {
 	ID             string            `json:"entryId"`
-	UserID         string            `json:"userId"`
+	UserID         string            `json:"actorId"`
 	MemoryID       string            `json:"memoryId"`
 	VaultID        string            `json:"vaultId"`
 	CreationTime   time.Time         `json:"creationTime"`

@@ -3,15 +3,12 @@ package auth
 import (
 	"context"
 	"errors"
-)
 
-const (
-	// LocalDevAPIKey is the hardcoded API key for local development only
-	LocalDevAPIKey = "sk_local_mycelian_dev_key"
+	"github.com/mycelian/mycelian-memory/devmode"
 )
 
 // MockAuthorizer provides a simple authorizer for local development
-// It only recognizes the hardcoded LocalDevAPIKey and resolves it to a mycelian-dev actor
+// It only recognizes the shared dev API key and resolves it to a mycelian-dev actor
 type MockAuthorizer struct{}
 
 // NewMockAuthorizer creates a new MockAuthorizer for local development
@@ -19,9 +16,9 @@ func NewMockAuthorizer() *MockAuthorizer {
 	return &MockAuthorizer{}
 }
 
-// Authorize validates the hardcoded API key and checks permissions in one call
+// Authorize validates the shared dev API key and checks permissions in one call
 func (m *MockAuthorizer) Authorize(ctx context.Context, apiKey, operation, resource string) (*ActorInfo, error) {
-	if apiKey != LocalDevAPIKey {
+	if apiKey != devmode.APIKey {
 		return nil, errors.New("invalid API key for local development")
 	}
 

@@ -3,6 +3,12 @@ module github.com/mycelian/mycelian-memory/server
 go 1.24.6
 
 require (
+	github.com/mycelian/mycelian-memory/devmode v0.0.0
+)
+
+replace github.com/mycelian/mycelian-memory/devmode => ../devmode
+
+require (
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1

@@ -103,7 +103,7 @@ func createVault(t *testing.T, memSvc, userID, title string) (string, string) {
 		t.Fatalf("create vault request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -136,7 +136,7 @@ func createEntry(t *testing.T, baseVaultPath string, _, memoryID, raw, summary s
 		t.Fatalf("create entry request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -195,7 +195,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	vid, baseVaultPath := createVault(t, memSvc, userResp.UserID, title)
 	defer func() {
 		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vid), nil)
-		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 	var memResp struct {
@@ -207,7 +207,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		t.Fatalf("create memory request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 
 	respM, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -303,13 +303,13 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	vidT, baseVaultPathT := createVault(t, memSvc, user.UserID, "tagvault")
 	defer func() {
 		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vidT), nil)
-		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
 	req2, _ := http.NewRequest("POST", baseVaultPathT+"/memories", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"Tag"}`))
 	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req2.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	respM, _ := http.DefaultClient.Do(req2)
 	mustJSON(t, respM, &mem)
 
@@ -384,12 +384,12 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 	vidM, baseVaultPathM := createVault(t, memSvc, user.UserID, "metavault")
 	defer func() {
 		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vidM), nil)
-		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 	req3, _ := http.NewRequest("POST", baseVaultPathM+"/memories", bytes.NewBufferString(`{"memoryType":"CONVERSATION","title":"meta"}`))
 	req3.Header.Set("Content-Type", "application/json")
-	req3.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req3.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	respM2, _ := http.DefaultClient.Do(req3)
 	mustJSON(t, respM2, &mem)
 

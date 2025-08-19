@@ -27,11 +27,13 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 	defer c.Close()
 
 	// 1) Create vault, memory (user management is now external)
-	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: "del-vault"})
+	vaultTitle := fmt.Sprintf("del-vault-%s", uuid.NewString()[:8])
+	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: vaultTitle})
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
 	}
-	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "del-mem", MemoryType: "NOTES"})
+	memTitle := fmt.Sprintf("del-mem-%s", uuid.NewString()[:8])
+	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: memTitle, MemoryType: "NOTES"})
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
 	}

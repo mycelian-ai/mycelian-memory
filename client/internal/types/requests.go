@@ -43,7 +43,7 @@ type PutContextRequest struct {
 
 // SearchRequest holds search parameters
 type SearchRequest struct {
-	UserID   string `json:"userId"`
+	UserID   string `json:"actorId"`
 	VaultID  string `json:"vaultId,omitempty"`
 	MemoryID string `json:"memoryId"`
 	Query    string `json:"query"`

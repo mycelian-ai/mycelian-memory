@@ -26,7 +26,7 @@ func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 		Vectorizer: "none",
 		Properties: []*models.Property{
 			{Name: "entryId", DataType: []string{"uuid"}},
-			{Name: "userId", DataType: []string{"text"}},
+			{Name: "actorId", DataType: []string{"text"}},
 			{Name: "memoryId", DataType: []string{"uuid"}},
 			{Name: "rawEntry", DataType: []string{"text"}},
 			{Name: "summary", DataType: []string{"text"}},
@@ -41,7 +41,7 @@ func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 		Vectorizer: "none",
 		Properties: []*models.Property{
 			{Name: "contextId", DataType: []string{"uuid"}},
-			{Name: "userId", DataType: []string{"text"}},
+			{Name: "actorId", DataType: []string{"text"}},
 			{Name: "memoryId", DataType: []string{"uuid"}},
 			{Name: "context", DataType: []string{"text"}},
 			{Name: "creationTime", DataType: []string{"date"}},

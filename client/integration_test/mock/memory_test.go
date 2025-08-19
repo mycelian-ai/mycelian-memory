@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	client "github.com/mycelian/mycelian-memory/client"
+	"github.com/mycelian/mycelian-memory/devmode"
 )
 
 func TestClient_MemoryCRUD(t *testing.T) {
 	t.Parallel()
 
-	userID := "mycelian-dev" // This matches what getUserID() returns for the local dev API key
+	userID := "mycelian-dev" // This matches the actor ID that the server resolves for the local dev API key
 	vaultID := "v1"
 	memoryID := "m1"
 
@@ -26,7 +27,7 @@ func TestClient_MemoryCRUD(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// Check Authorization header
-		if r.Header.Get("Authorization") != "Bearer sk_local_mycelian_dev_key" {
+		if r.Header.Get("Authorization") != "Bearer "+devmode.APIKey {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

@@ -84,7 +84,7 @@ func ensureWeaviateTenants(t *testing.T, weaviateURL, tenant string) {
 	for _, class := range []string{"MemoryEntry", "MemoryContext"} {
 		// Minimal payload with required fields
 		id := "00000000-0000-0000-0000-000000000000"
-		payload := fmt.Sprintf(`{"userId":%q}`, tenant)
+		payload := fmt.Sprintf(`{"actorId":%q}`, tenant)
 		// Create
 		url := fmt.Sprintf("%s/v1/objects", weaviateURL)
 		body := fmt.Sprintf(`{"class":"%s","id":%q,"tenant":%q,"properties":%s}`, class, id, tenant, payload)

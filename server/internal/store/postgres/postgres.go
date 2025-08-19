@@ -126,7 +126,7 @@ func (v *vaults) GetByID(ctx context.Context, userID, vaultID string) (*model.Va
 	out.ActorID = userID
 	out.VaultID = vaultID
 	row := v.db.QueryRowContext(ctx, `
-        SELECT title, description, creation_time FROM vaults WHERE user_id=$1 AND vault_id=$2
+        SELECT title, description, creation_time FROM vaults WHERE actor_id=$1 AND vault_id=$2
     `, userID, vaultID)
 	var created time.Time
 	var desc *string

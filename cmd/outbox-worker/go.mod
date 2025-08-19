@@ -3,6 +3,7 @@ module github.com/mycelian/mycelian-memory/cmd/outbox-worker
 go 1.24.6
 
 require (
+	github.com/mycelian/mycelian-memory/devmode v0.0.0
 	github.com/mycelian/mycelian-memory/server v0.0.0
 	github.com/rs/zerolog v1.34.0
 )
@@ -52,4 +53,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+replace github.com/mycelian/mycelian-memory/devmode => ../../devmode
 replace github.com/mycelian/mycelian-memory/server => ../../server

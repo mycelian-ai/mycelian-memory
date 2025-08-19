@@ -55,7 +55,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		t.Fatalf("create vault request: %v", err)
 	}
 	req1.Header.Set("Content-Type", "application/json")
-	req1.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req1.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	vResp, err := http.DefaultClient.Do(req1)
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
@@ -64,7 +64,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	// Cleanup vault at end
 	defer func() {
 		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vaultResp.VaultID), nil)
-		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
@@ -80,7 +80,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		t.Fatalf("create memory request: %v", err)
 	}
 	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req2.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	respM, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
@@ -93,7 +93,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get context request: %v", err)
 	}
-	ctxReq.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	ctxReq.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	ctxResp, err := http.DefaultClient.Do(ctxReq)
 	if err != nil {
 		t.Fatalf("get default context: %v", err)
@@ -138,7 +138,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		t.Fatalf("create entry request: %v", err)
 	}
 	entryReq.Header.Set("Content-Type", "application/json")
-	entryReq.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	entryReq.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	respE, err := http.DefaultClient.Do(entryReq)
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
@@ -229,7 +229,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Fatalf("create vault request: %v", err)
 	}
 	req3.Header.Set("Content-Type", "application/json")
-	req3.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req3.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	vResp, err := http.DefaultClient.Do(req3)
 	if err != nil {
 		t.Fatalf("create vault: %v", err)
@@ -238,7 +238,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	// Cleanup vault at end
 	defer func() {
 		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, vaultResp.VaultID), nil)
-		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
@@ -254,7 +254,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Fatalf("create memory request: %v", err)
 	}
 	req4.Header.Set("Content-Type", "application/json")
-	req4.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req4.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	resp, err := http.DefaultClient.Do(req4)
 	if err != nil {
 		t.Fatalf("create memory: %v", err)
@@ -269,7 +269,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Fatalf("create entry request: %v", err)
 	}
 	req5.Header.Set("Content-Type", "application/json")
-	req5.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req5.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	resp, err = http.DefaultClient.Do(req5)
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
@@ -306,7 +306,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 			t.Fatalf("search request: %v", err)
 		}
 		searchReq.Header.Set("Content-Type", "application/json")
-		searchReq.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		searchReq.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		rs, err := http.DefaultClient.Do(searchReq)
 		if err != nil {
 			t.Fatalf("search request: %v", err)
@@ -351,7 +351,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 		t.Fatalf("create vault request: %v", err)
 	}
 	req6.Header.Set("Content-Type", "application/json")
-	req6.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req6.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	vResp2, err := http.DefaultClient.Do(req6)
 	if err != nil {
 		t.Fatalf("create vault2: %v", err)
@@ -364,7 +364,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	// Cleanup vault at end
 	defer func() {
 		req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v0/vaults/%s", memSvc, v2.VaultID), nil)
-		req.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+		req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 		_, _ = http.DefaultClient.Do(req)
 	}()
 
@@ -378,7 +378,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 		t.Fatalf("create memory request: %v", err)
 	}
 	req7.Header.Set("Content-Type", "application/json")
-	req7.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req7.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	respMem, err := http.DefaultClient.Do(req7)
 	if err != nil {
 		t.Fatalf("create memory2: %v", err)
@@ -391,7 +391,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	ctxPayload := `{"context":{"note":"smoke-test"}}`
 	req8, _ := http.NewRequest(http.MethodPut, putURL, bytes.NewBufferString(ctxPayload))
 	req8.Header.Set("Content-Type", "application/json")
-	req8.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req8.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	resp, err := http.DefaultClient.Do(req8)
 	if err != nil {
 		t.Fatalf("put context: %v", err)
@@ -409,7 +409,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get context request: %v", err)
 	}
-	req9.Header.Set("Authorization", "Bearer sk_local_mycelian_dev_key")
+	req9.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	resp, err = http.DefaultClient.Do(req9)
 	if err != nil {
 		t.Fatalf("get context: %v", err)

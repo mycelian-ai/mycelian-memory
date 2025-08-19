@@ -50,7 +50,7 @@ func (w *weavNative) Search(ctx context.Context, userID, memoryID, query string,
 		WithLimit(topK).
 		WithFields(
 			gql.Field{Name: "entryId"},
-			gql.Field{Name: "userId"},
+			gql.Field{Name: "actorId"},
 			gql.Field{Name: "memoryId"},
 			gql.Field{Name: "summary"},
 			gql.Field{Name: "rawEntry"},
@@ -282,7 +282,7 @@ func (w *weavNative) UpsertEntry(ctx context.Context, entryID string, vec []floa
 	if w == nil || w.client == nil {
 		return nil
 	}
-	tenant, _ := payload["userId"].(string)
+	tenant, _ := payload["actorId"].(string)
 	if tenant == "" {
 		return nil
 	}
@@ -298,7 +298,7 @@ func (w *weavNative) UpsertContext(ctx context.Context, contextID string, vec []
 	if w == nil || w.client == nil {
 		return nil
 	}
-	tenant, _ := payload["userId"].(string)
+	tenant, _ := payload["actorId"].(string)
 	if tenant == "" {
 		return nil
 	}

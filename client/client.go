@@ -10,6 +10,7 @@ import (
 	"github.com/mycelian/mycelian-memory/client/internal/job"
 	"github.com/mycelian/mycelian-memory/client/internal/shardqueue"
 	promptsinternal "github.com/mycelian/mycelian-memory/client/prompts"
+	"github.com/mycelian/mycelian-memory/devmode"
 )
 
 // Errors moved to errors.go
@@ -69,13 +70,12 @@ func New(baseURL, apiKey string, opts ...Option) *Client {
 	return c
 }
 
-// NewWithDevMode constructs a Client for development mode using the hardcoded local dev API key.
+// NewWithDevMode constructs a Client for development mode using the shared dev API key.
 // This only works when the server is running in development mode with MockAuthorizer.
 // Convenience constructor for local development.
 func NewWithDevMode(baseURL string, opts ...Option) *Client {
-	// Use the hardcoded API key that MockAuthorizer recognizes
-	const localDevAPIKey = "sk_local_mycelian_dev_key"
-	return New(baseURL, localDevAPIKey, opts...)
+	// Use the shared dev API key that MockAuthorizer recognizes
+	return New(baseURL, devmode.APIKey, opts...)
 }
 
 // wrapTransportWithAPIKey wraps the HTTP client's transport to automatically
@@ -103,24 +103,6 @@ func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Add the Authorization header with Bearer token
 	cloned.Header.Set("Authorization", "Bearer "+t.apiKey)
 	return t.base.RoundTrip(cloned)
-}
-
-// getUserID returns a userID for backward compatibility with existing API endpoints.
-// In the actor-based model, this maps to the actorID. In local development, this will be "mycelian-dev".
-// TODO: This is a transitional method - eventually API endpoints should be actor-based.
-func (c *Client) getUserID() string {
-	// For now, extract actor ID from the API key
-	// In local development with "sk_local_mycelian_dev_key", this should resolve to "mycelian-dev"
-	// In production, this would be the actual actor ID resolved from the API key
-
-	// For the hardcoded local dev case:
-	if c.apiKey == "sk_local_mycelian_dev_key" {
-		return "mycelian-dev"
-	}
-
-	// For production, we'd need to resolve this through the server, but for now use a fallback
-	// TODO: Implement proper actor ID resolution for production keys
-	return "default-actor" // This is a temporary fallback
 }
 
 // Close stops the background executor (if any). Safe to call multiple times.

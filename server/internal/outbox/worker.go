@@ -174,7 +174,7 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 		normalizeEntryTags(j.payload)
 		return w.index.UpsertEntry(ctx, j.aggregateID, vec, j.payload)
 	case OpDeleteEntry:
-		return w.index.DeleteEntry(ctx, stringField(j.payload, "userId"), j.aggregateID)
+		return w.index.DeleteEntry(ctx, stringField(j.payload, "actorId"), j.aggregateID)
 	case OpUpsertContext:
 		text := stringField(j.payload, "context")
 		vec, err := w.embed(text, ctx)
@@ -183,7 +183,7 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 		}
 		return w.index.UpsertContext(ctx, j.aggregateID, vec, j.payload)
 	case OpDeleteContext:
-		return w.index.DeleteContext(ctx, stringField(j.payload, "userId"), j.aggregateID)
+		return w.index.DeleteContext(ctx, stringField(j.payload, "actorId"), j.aggregateID)
 	default:
 		return fmt.Errorf("unknown op: %s", j.op)
 	}
