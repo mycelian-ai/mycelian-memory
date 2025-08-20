@@ -6,20 +6,19 @@ package client
 
 import (
 	"fmt"
-	"net/http"
+	"time"
 )
 
 // Option mutates the Client during New().
 type Option func(*Client) error
 
-// WithHTTPClient injects a custom *http.Client. Useful for setting transport
-// timeouts, tracing, custom TLS settings, etc.
-func WithHTTPClient(hc *http.Client) Option {
+// WithHTTPTimeout sets the HTTP client timeout. Keep initial surface minimal.
+func WithHTTPTimeout(d time.Duration) Option {
 	return func(c *Client) error {
-		if hc == nil {
-			return fmt.Errorf("nil http client")
+		if d <= 0 {
+			return fmt.Errorf("http timeout must be > 0")
 		}
-		c.http = hc
+		c.http.Timeout = d
 		return nil
 	}
 }
@@ -29,11 +28,7 @@ func WithHTTPClient(hc *http.Client) Option {
 func WithDebugLogging(enabled bool) Option {
 	return func(c *Client) error {
 		if enabled {
-			transport := c.http.Transport
-			if transport == nil {
-				transport = http.DefaultTransport
-			}
-			c.http.Transport = &debugTransport{base: transport}
+			c.http.Transport = &debugTransport{base: c.http.Transport}
 		}
 		return nil
 	}

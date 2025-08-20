@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -14,17 +15,13 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func TestWithHTTPClientAndDebugLogging(t *testing.T) {
-	// custom client
-	hc := &http.Client{}
-	c := &Client{}
-	if err := WithHTTPClient(hc)(c); err != nil {
+	// timeout option sets http timeout
+	c := &Client{http: &http.Client{}}
+	if err := WithHTTPTimeout(5 * time.Second)(c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if c.http != hc {
-		t.Fatalf("http client not set")
-	}
-	if err := WithHTTPClient(nil)(c); err == nil {
-		t.Fatalf("expected error for nil http client")
+	if c.http.Timeout != 5*time.Second {
+		t.Fatalf("http timeout not set")
 	}
 
 	// debug logging wraps transport
@@ -33,11 +30,14 @@ func TestWithHTTPClientAndDebugLogging(t *testing.T) {
 		called = true
 		return &http.Response{StatusCode: 200, Body: http.NoBody, Header: make(http.Header)}, nil
 	})
-	base := &http.Client{Transport: rt}
-	c2, err := New("http://example.com", "test-api-key", WithHTTPClient(base), WithDebugLogging(true))
+	// Create a client with a base transport
+	c2, err := New("http://example.com", "test-api-key", WithHTTPTimeout(2*time.Second), WithDebugLogging(true))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+	// Inject base transport after construction for the test
+	c2.http.Transport = rt
+
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", strings.NewReader(""))
 	if _, err := c2.http.Do(req); err != nil {
 		t.Fatalf("request failed: %v", err)

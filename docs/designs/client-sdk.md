@@ -182,7 +182,7 @@ if err != nil { /* handle */ }
 c, err := client.New(
     "http://localhost:11545",
     "<api-key>",
-    client.WithHTTPClient(customHTTP),
+    client.WithHTTPTimeout(10*time.Second),
     client.WithDebugLogging(true),
 )
 if err != nil { /* handle */ }
@@ -197,9 +197,8 @@ if err != nil { /* handle */ }
 ### Functional Options
 
 ```go
-WithHTTPClient(*http.Client)              // Custom HTTP client
-WithDebugLogging(bool)                    // Enable request/response logging  
-WithShardQueueConfig(shardqueue.Config)   // Custom async execution config
+WithHTTPTimeout(time.Duration)  // Set HTTP timeout
+WithDebugLogging(bool)          // Enable request/response logging
 ```
 
 ## Error Handling

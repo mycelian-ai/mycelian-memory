@@ -3,7 +3,9 @@ package client
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -39,6 +41,9 @@ type Client struct {
 	closedOnce uint32 // ensures Close is idempotent
 }
 
+// Verify Client implements io.Closer
+var _ io.Closer = (*Client)(nil)
+
 // New constructs a Client with the specified baseURL and apiKey.
 // It returns an error for invalid inputs or option failures.
 // Additional options can be provided via functional arguments.
@@ -49,6 +54,9 @@ func New(baseURL, apiKey string, opts ...Option) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("apiKey cannot be empty")
 	}
+
+	// Normalize baseURL to avoid trailing-slash issues when composing URLs
+	baseURL = strings.TrimRight(baseURL, "/")
 
 	c := &Client{
 		baseURL: baseURL,
@@ -203,10 +211,6 @@ func (c *Client) GetVaultByTitle(ctx context.Context, vaultTitle string) (*Vault
 }
 
 // --------------------------------------------------------------------
-// User operations - REMOVED: user management is now external
-// --------------------------------------------------------------------
-
-// --------------------------------------------------------------------
 // Search operations - delegated to internal/api
 // --------------------------------------------------------------------
 
@@ -272,7 +276,7 @@ func (c *Client) DeleteContext(ctx context.Context, vaultID, memID, contextID st
 
 // LoadDefaultPrompts returns the embedded default prompts for the given memory
 // type (e.g., "chat", "code"). No network calls are made.
-func (c *Client) LoadDefaultPrompts(ctx context.Context, memoryType string) (*promptsinternal.DefaultPromptResponse, error) {
+func (c *Client) LoadDefaultPrompts(ctx context.Context, memoryType string) (*DefaultPromptResponse, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

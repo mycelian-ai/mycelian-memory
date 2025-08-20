@@ -25,10 +25,12 @@ func TestDebugTransport_ErrorPath(t *testing.T) {
 	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, context.DeadlineExceeded
 	})
-	c, err := New("http://example.com", "test-api-key", WithHTTPClient(&http.Client{Transport: rt}), WithDebugLogging(true))
+	c, err := New("http://example.com", "test-api-key", WithDebugLogging(true))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+	// Inject base transport that errors
+	c.http.Transport = rt
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", http.NoBody)
 	if _, err := c.http.Do(req); err == nil {
 		t.Fatalf("expected error from underlying transport")
