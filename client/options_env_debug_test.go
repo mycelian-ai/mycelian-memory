@@ -8,7 +8,10 @@ import (
 
 func TestNew_AutoEnableDebugViaEnv(t *testing.T) {
 	t.Setenv("MYCELIAN_DEBUG", "true")
-	c := New("http://example.com", "test-api-key")
+	c, err := New("http://example.com", "test-api-key")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 	// Debug transport should be wrapped inside the API key transport
 	if apiKeyT, ok := c.http.Transport.(*apiKeyTransport); !ok {
 		t.Fatalf("expected apiKeyTransport to be outermost transport")
@@ -22,7 +25,10 @@ func TestDebugTransport_ErrorPath(t *testing.T) {
 	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, context.DeadlineExceeded
 	})
-	c := New("http://example.com", "test-api-key", WithHTTPClient(&http.Client{Transport: rt}), WithDebugLogging(true))
+	c, err := New("http://example.com", "test-api-key", WithHTTPClient(&http.Client{Transport: rt}), WithDebugLogging(true))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", http.NoBody)
 	if _, err := c.http.Do(req); err == nil {
 		t.Fatalf("expected error from underlying transport")

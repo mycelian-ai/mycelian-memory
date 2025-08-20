@@ -118,7 +118,10 @@ func RunMCPServer() error {
 	cfg.initLogger()
 
 	// Initialize the new Client SDK
-	synapseClient := client.NewWithDevMode(cfg.MemoryServiceURL)
+	synapseClient, err := client.NewWithDevMode(cfg.MemoryServiceURL)
+	if err != nil {
+		return err
+	}
 
 	// Create a new MCP server
 	s := server.NewMCPServer(

@@ -48,7 +48,10 @@ func TestClient_MemoryCRUD(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewWithDevMode(srv.URL)
+	c, err := client.NewWithDevMode(srv.URL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	t.Cleanup(func() { _ = c.Close() })
 	ctx := context.Background()
 

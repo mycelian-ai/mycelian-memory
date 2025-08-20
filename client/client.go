@@ -2,28 +2,33 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync/atomic"
 	"time"
 
 	"github.com/mycelian/mycelian-memory/client/internal/api"
-	"github.com/mycelian/mycelian-memory/client/internal/job"
 	"github.com/mycelian/mycelian-memory/client/internal/shardqueue"
 	promptsinternal "github.com/mycelian/mycelian-memory/client/prompts"
 	"github.com/mycelian/mycelian-memory/devmode"
 )
 
-// Errors moved to errors.go
+// Errors are defined in errors.go
 
-// --------------------------------------------------------------------
-// (Functional options moved to options.go)
-// --------------------------------------------------------------------
+// See options.go for functional options
 
-// Executor abstraction lives in executor.go
+// Executor abstraction is in executor.go
 
 // --------------------------------------------------------------------
 // Client core
 // --------------------------------------------------------------------
+
+// Client is a lightweight, context-aware SDK for the Mycelian Memory Service.
+// Responsibilities:
+//   - Own an HTTP client and add the Authorization header on every request
+//   - Own an async shard executor to preserve FIFO ordering per memory
+//   - Expose thin, type-safe methods that forward to the internal API layer
+//   - Provide client-side utilities like AwaitConsistency and embedded prompts
 
 type Client struct {
 	baseURL string
@@ -35,13 +40,14 @@ type Client struct {
 }
 
 // New constructs a Client with the specified baseURL and apiKey.
+// It returns an error for invalid inputs or option failures.
 // Additional options can be provided via functional arguments.
-func New(baseURL, apiKey string, opts ...Option) *Client {
+func New(baseURL, apiKey string, opts ...Option) (*Client, error) {
 	if baseURL == "" {
-		panic("baseURL cannot be empty")
+		return nil, fmt.Errorf("baseURL cannot be empty")
 	}
 	if apiKey == "" {
-		panic("apiKey cannot be empty")
+		return nil, fmt.Errorf("apiKey cannot be empty")
 	}
 
 	c := &Client{
@@ -57,7 +63,7 @@ func New(baseURL, apiKey string, opts ...Option) *Client {
 
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
 	if c.exec == nil {
@@ -67,19 +73,20 @@ func New(baseURL, apiKey string, opts ...Option) *Client {
 	// Wrap HTTP transport to automatically add Authorization header
 	c.wrapTransportWithAPIKey()
 
-	return c
+	return c, nil
 }
 
 // NewWithDevMode constructs a Client for development mode using the shared dev API key.
 // This only works when the server is running in development mode with MockAuthorizer.
-// Convenience constructor for local development.
-func NewWithDevMode(baseURL string, opts ...Option) *Client {
+// Convenience constructor for local development; not for production use.
+func NewWithDevMode(baseURL string, opts ...Option) (*Client, error) {
 	// Use the shared dev API key that MockAuthorizer recognizes
 	return New(baseURL, devmode.APIKey, opts...)
 }
 
-// wrapTransportWithAPIKey wraps the HTTP client's transport to automatically
-// add the Authorization header to all requests using the configured API key.
+// wrapTransportWithAPIKey wraps the HTTP client's transport so every request
+// carries the Authorization header. This is the single authoritative place
+// that sets the header for the SDK.
 func (c *Client) wrapTransportWithAPIKey() {
 	baseTransport := c.http.Transport
 	if baseTransport == nil {
@@ -91,17 +98,25 @@ func (c *Client) wrapTransportWithAPIKey() {
 	}
 }
 
-// apiKeyTransport wraps an http.RoundTripper to automatically add Authorization header
+// apiKeyTransport wraps an http.RoundTripper to automatically add the
+// Authorization header. A minimal default User-Agent is also added when absent
+// to aid observability during debugging.
 type apiKeyTransport struct {
 	base   http.RoundTripper
 	apiKey string
 }
 
+const defaultUserAgent = "mycelian-memory-go-client"
+
 func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Clone the request to avoid modifying the original
 	cloned := req.Clone(req.Context())
-	// Add the Authorization header with Bearer token
+	// Set Authorization in one authoritative place
 	cloned.Header.Set("Authorization", "Bearer "+t.apiKey)
+	// Add a default User-Agent only if caller didn't set one
+	if cloned.Header.Get("User-Agent") == "" {
+		cloned.Header.Set("User-Agent", defaultUserAgent)
+	}
 	return t.base.RoundTrip(cloned)
 }
 
@@ -116,32 +131,21 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// AwaitConsistency blocks until all previously submitted jobs for the given memoryID
-// have been executed by the internal executor. It works by submitting a no-op job
-// and waiting for it to run, thereby guaranteeing FIFO ordering has flushed.
+// AwaitConsistency blocks until all previously submitted jobs for memoryID
+// have been executed by the internal executor. It delegates to the executor's
+// Barrier so the client does not manipulate jobs directly.
 func (c *Client) AwaitConsistency(ctx context.Context, memoryID string) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	done := make(chan struct{})
-	job := job.New(func(context.Context) error {
-		close(done)
-		return nil
-	})
-	if err := c.exec.Submit(ctx, memoryID, job); err != nil {
-		return err
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-done:
-		return nil
-	}
+	return c.exec.Barrier(ctx, memoryID)
 }
 
 // newDefaultExecutor constructs the shardqueue executor with sane defaults.
+const (
+	defaultExecutorShards    = 4
+	defaultExecutorQueueSize = 1000
+)
+
 func newDefaultExecutor() *shardqueue.ShardExecutor {
-	cfg := shardqueue.Config{Shards: 4, QueueSize: 1000}
+	cfg := shardqueue.Config{Shards: defaultExecutorShards, QueueSize: defaultExecutorQueueSize}
 	return shardqueue.NewShardExecutor(cfg)
 }
 
@@ -263,20 +267,14 @@ func (c *Client) DeleteContext(ctx context.Context, vaultID, memID, contextID st
 }
 
 // --------------------------------------------------------------------
-// Prompts operations - delegated to internal/api (sync-only)
+// Prompts operations - embedded (sync-only, no network)
 // --------------------------------------------------------------------
 
-// LoadDefaultPrompts returns the default prompts for the given memory type ("chat", "code", ...).
+// LoadDefaultPrompts returns the embedded default prompts for the given memory
+// type (e.g., "chat", "code"). No network calls are made.
 func (c *Client) LoadDefaultPrompts(ctx context.Context, memoryType string) (*promptsinternal.DefaultPromptResponse, error) {
-	apiResponse, err := api.LoadDefaultPrompts(ctx, memoryType)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-
-	// Convert API response to client response
-	return &promptsinternal.DefaultPromptResponse{
-		Version:             apiResponse.Version,
-		ContextSummaryRules: apiResponse.ContextSummaryRules,
-		Templates:           apiResponse.Templates,
-	}, nil
+	return promptsinternal.LoadDefaultPrompts(memoryType)
 }

@@ -9,6 +9,7 @@ import (
 // executor abstracts the internal async job runner used by async APIs.
 type executor interface {
 	Submit(context.Context, string, shardqueue.Job) error
+	Barrier(context.Context, string) error
 	Stop()
 }
 

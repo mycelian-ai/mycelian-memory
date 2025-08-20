@@ -28,7 +28,10 @@ func TestListAndDeleteEntries(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewWithDevMode(srv.URL)
+	c, err := NewWithDevMode(srv.URL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	ctx := context.Background()
 	lr, err := c.ListEntries(ctx, vaultID, memID, map[string]string{"limit": "10"})
 	if err != nil || lr.Count != 1 {

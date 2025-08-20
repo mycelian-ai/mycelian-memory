@@ -122,6 +122,26 @@ func (p *ShardExecutor) Submit(ctx context.Context, key string, job Job) error {
 	}
 }
 
+// Barrier enqueues a no-op job on the shard for key and waits until it runs,
+// ensuring all previously submitted jobs for that key have completed.
+func (p *ShardExecutor) Barrier(ctx context.Context, key string) error {
+	done := make(chan struct{})
+	// Reuse JobFunc adapter to avoid exposing details to callers.
+	j := JobFunc(func(context.Context) error {
+		close(done)
+		return nil
+	})
+	if err := p.Submit(ctx, key, j); err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
+	}
+}
+
 // Stop signals every worker to finish draining its current queue, waits for
 // them to terminate, and then returns.  It is idempotent and safe for
 // concurrent use.

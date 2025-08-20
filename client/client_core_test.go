@@ -11,6 +11,7 @@ import (
 type stubExec struct{ stops int }
 
 func (s *stubExec) Submit(context.Context, string, shardqueue.Job) error { return nil }
+func (s *stubExec) Barrier(context.Context, string) error                { return nil }
 func (s *stubExec) Stop()                                                { s.stops++ }
 
 func TestIsBackPressure(t *testing.T) {
@@ -37,7 +38,8 @@ func TestCloseIdempotent(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	if New("http://example.com", "test-api-key") == nil {
-		t.Fatalf("expected client")
+	c, err := New("http://example.com", "test-api-key")
+	if err != nil || c == nil {
+		t.Fatalf("expected client, got err=%v", err)
 	}
 }

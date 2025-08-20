@@ -10,7 +10,10 @@ import (
 )
 
 func TestAwaitConsistency(t *testing.T) {
-	c := New("http://example.com", "test-api-key")
+	c, err := New("http://example.com", "test-api-key")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 
 	memID := "mem-123"
 	var ranFirst int32

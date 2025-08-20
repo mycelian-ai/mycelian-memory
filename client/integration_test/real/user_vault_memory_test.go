@@ -22,7 +22,10 @@ func TestUserVaultMemoryCRUD(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	c := client.NewWithDevMode(baseURL)
+	c, err := client.NewWithDevMode(baseURL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	defer c.Close()
 
 	// User management is now external - use MockAuthorizer's actor ID

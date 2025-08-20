@@ -45,7 +45,10 @@ func TestHandlersEndToEnd(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	sdk := client.NewWithDevMode(ts.URL)
+	sdk, err := client.NewWithDevMode(ts.URL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 
 	// ----- ContextHandler -----
 	ch := NewContextHandler(sdk)
@@ -117,6 +120,7 @@ func TestHandlersEndToEnd(t *testing.T) {
 	sh := NewSearchHandler(sdk)
 	if _, err := sh.handleSearch(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
 		"user_id":   "u1",
+		"vault_id":  "v1",
 		"memory_id": "m1",
 		"query":     "foo",
 	}}}); err != nil {

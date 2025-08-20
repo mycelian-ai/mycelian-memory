@@ -26,7 +26,10 @@ func TestSearchMemoriesTool(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	sdk := client.NewWithDevMode(ts.URL)
+	sdk, err := client.NewWithDevMode(ts.URL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	sh := NewSearchHandler(sdk)
 	// Build request
 	req := mcp.CallToolRequest{

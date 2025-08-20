@@ -37,7 +37,10 @@ func TestMCPServerTransports(t *testing.T) {
 	)
 
 	// Initialize client SDK pointing to stub backend
-	sdk := mclient.New(memSrv.URL)
+	sdk, err := mclient.New(memSrv.URL, "test-api-key")
+	if err != nil {
+		t.Fatalf("client.New: %v", err)
+	}
 
 	// Register all handlers
 	handlers := []struct {

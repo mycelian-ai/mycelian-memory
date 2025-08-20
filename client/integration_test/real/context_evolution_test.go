@@ -22,7 +22,10 @@ func TestContextEvolutionE2E(t *testing.T) {
 		baseURL = "http://localhost:11545"
 	}
 
-	c := client.NewWithDevMode(baseURL)
+	c, err := client.NewWithDevMode(baseURL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	defer c.Close()
@@ -80,7 +83,10 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 	defer cancel()
 
 	// Agent A
-	agentA := client.NewWithDevMode(baseURL)
+	agentA, err := client.NewWithDevMode(baseURL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode (A): %v", err)
+	}
 	defer agentA.Close()
 
 	// User management is now external - both agents use same MockAuthorizer actor ID
@@ -108,7 +114,10 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 	_ = agentA.AwaitConsistency(ctx, mem.ID)
 
 	// Agent B
-	agentB := client.NewWithDevMode(baseURL)
+	agentB, err := client.NewWithDevMode(baseURL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode (B): %v", err)
+	}
 	defer agentB.Close()
 
 	resCtx, err := agentB.GetContext(ctx, vault.VaultID, mem.ID)

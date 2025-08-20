@@ -3,7 +3,6 @@ module github.com/mycelian/mycelian-memory/cmd/memory-service
 go 1.24.6
 
 require (
-	github.com/mycelian/mycelian-memory/devmode v0.0.0
 	github.com/mycelian/mycelian-memory/server v0.0.0
 	github.com/rs/zerolog v1.34.0
 )
@@ -32,6 +31,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/mycelian/mycelian-memory/devmode v0.0.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -55,4 +55,5 @@ require (
 )
 
 replace github.com/mycelian/mycelian-memory/devmode => ../../devmode
+
 replace github.com/mycelian/mycelian-memory/server => ../../server

@@ -99,7 +99,10 @@ func TestClient_AddEntry(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			c := client.NewWithDevMode(srv.URL)
+			c, err := client.NewWithDevMode(srv.URL)
+			if err != nil {
+				t.Fatalf("NewWithDevMode: %v", err)
+			}
 			ctx := context.Background()
 			if tt.cancelCtx {
 				var cancel context.CancelFunc
@@ -113,7 +116,7 @@ func TestClient_AddEntry(t *testing.T) {
 			}
 
 			// Note: userID validation is now handled by server-side authentication
-			_, err := c.AddEntry(ctx, "vlt-1", "mem-1", client.AddEntryRequest{RawEntry: "hello"})
+			_, err = c.AddEntry(ctx, "vlt-1", "mem-1", client.AddEntryRequest{RawEntry: "hello"})
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}
@@ -142,7 +145,10 @@ func TestClient_DeleteEntry_Success(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	c := client.NewWithDevMode(srv.URL)
+	c, err := client.NewWithDevMode(srv.URL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	t.Cleanup(func() { _ = c.Close() })
 	if err := c.DeleteEntry(context.Background(), vaultID, memID, entryID); err != nil {
 		t.Fatalf("delete entry: %v", err)
@@ -170,7 +176,10 @@ func TestClient_GetEntry_Success(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	c := client.NewWithDevMode(srv.URL)
+	c, err := client.NewWithDevMode(srv.URL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	t.Cleanup(func() { _ = c.Close() })
 	got, err := c.GetEntry(context.Background(), vaultID, memID, entryID)
 	if err != nil {

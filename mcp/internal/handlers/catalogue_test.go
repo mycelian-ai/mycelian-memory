@@ -13,7 +13,10 @@ func TestToolCatalogue(t *testing.T) {
 	// Build minimal MCP server.
 	s := server.NewMCPServer("test", "dev", server.WithToolCapabilities(true))
 
-	stubClient := client.NewWithDevMode("http://stub")
+	stubClient, err := client.NewWithDevMode("http://stub")
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 
 	// Register all handlers.
 	_ = NewMemoryHandler(stubClient).RegisterTools(s)

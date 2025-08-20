@@ -1,13 +1,13 @@
 # Client SDK
 
-**Type**: Component Documentation  
-**Status**: Active  
+**Type**: Component Documentation
+**Status**: Stable
 
 ## Overview
 
 The Mycelian Go Client SDK provides a type-safe, idiomatic Go interface for interacting with the Memory Service backend. It serves as the primary library for applications, tools, and the MCP server to perform memory operations.
 
-The SDK replaced the legacy `pkg/memoryclient` to eliminate code duplication, provide proper retry/sharding support, and deliver a cleaner developer experience.
+This SDK provides an idiomatic Go interface to the Memory Service with a focus on simplicity, ordering guarantees, and clear error handling.
 
 ## Architecture
 
@@ -46,9 +46,9 @@ type Client struct {
 The SDK uses a direct method pattern instead of resource namespaces:
 
 ```go
-// Clean, idiomatic Go API
-client.CreateMemory(ctx, userID, vaultID, req)
-client.AddEntry(ctx, userID, vaultID, memID, entry)
+// Clean, idiomatic Go API (no user ID at call sites)
+client.CreateMemory(ctx, vaultID, req)
+client.AddEntry(ctx, vaultID, memID, entry)
 client.Search(ctx, searchReq)
 
 // Instead of namespaced resources (old pattern)
@@ -63,6 +63,7 @@ Critical operations that require ordering use an async executor:
 ```go
 type executor interface {
     Submit(context.Context, string, shardqueue.Job) error
+    Barrier(context.Context, string) error
     Stop()
 }
 ```
@@ -80,42 +81,38 @@ type executor interface {
 ## API Surface
 
 ### User Management
-```go
-CreateUser(ctx, req) (*User, error)
-GetUser(ctx, userID) (*User, error)  
-DeleteUser(ctx, userID) error
-```
+User management is now external to the service and not provided by this SDK.
 
 ### Vault Operations
 ```go
-CreateVault(ctx, userID, req) (*Vault, error)
-ListVaults(ctx, userID) ([]Vault, error)
-GetVault(ctx, userID, vaultID) (*Vault, error)
-GetVaultByTitle(ctx, userID, title) (*Vault, error)
-DeleteVault(ctx, userID, vaultID) error
+CreateVault(ctx, req) (*Vault, error)
+ListVaults(ctx) ([]Vault, error)
+GetVault(ctx, vaultID) (*Vault, error)
+GetVaultByTitle(ctx, title) (*Vault, error)
+DeleteVault(ctx, vaultID) error
 ```
 
 ### Memory Operations
 ```go
-CreateMemory(ctx, userID, vaultID, req) (*Memory, error)
-ListMemories(ctx, userID, vaultID) ([]Memory, error)
-GetMemory(ctx, userID, vaultID, memoryID) (*Memory, error)
-DeleteMemory(ctx, userID, vaultID, memoryID) error
+CreateMemory(ctx, vaultID, req) (*Memory, error)
+ListMemories(ctx, vaultID) ([]Memory, error)
+GetMemory(ctx, vaultID, memoryID) (*Memory, error)
+DeleteMemory(ctx, vaultID, memoryID) error
 ```
 
 ### Entry Operations
 ```go
-AddEntry(ctx, userID, vaultID, memID, req) (*EnqueueAck, error)     // Async
-ListEntries(ctx, userID, vaultID, memID, params) (*ListEntriesResponse, error)
-GetEntry(ctx, userID, vaultID, memID, entryID) (*Entry, error)
-DeleteEntry(ctx, userID, vaultID, memID, entryID) error             // Async
+AddEntry(ctx, vaultID, memID, req) (*EnqueueAck, error) // Async
+ListEntries(ctx, vaultID, memID, params) (*ListEntriesResponse, error)
+GetEntry(ctx, vaultID, memID, entryID) (*Entry, error)
+DeleteEntry(ctx, vaultID, memID, entryID) error         // Sync; awaits prior writes before HTTP delete
 ```
 
-### Context Management  
+### Context Management
 ```go
-PutContext(ctx, userID, vaultID, memID, req) (*EnqueueAck, error)   // Async
-GetContext(ctx, userID, vaultID, memID) (*GetContextResponse, error)
-DeleteContext(ctx, userID, vaultID, memID, contextID) error         // Async
+PutContext(ctx, vaultID, memID, req) (*EnqueueAck, error)   // Async
+GetContext(ctx, vaultID, memID) (*GetContextResponse, error)
+DeleteContext(ctx, vaultID, memID, contextID) error         // Sync; awaits prior writes before HTTP delete
 ```
 
 ### Search & Consistency
@@ -126,6 +123,7 @@ AwaitConsistency(ctx, memoryID) error                               // Wait for 
 
 ### Prompt Management
 ```go
+// Reads embedded defaults locally; no network call
 LoadDefaultPrompts(ctx, memoryType) (*DefaultPromptResponse, error)
 ```
 
@@ -176,15 +174,18 @@ type EnqueueAck = types.EnqueueAck
 ### Client Creation
 
 ```go
-// Basic client
-client := client.New("http://localhost:11545")
+// Basic client (error-returning constructor)
+c, err := client.New("http://localhost:11545", "<api-key>")
+if err != nil { /* handle */ }
 
 // With options
-client := client.New("http://localhost:11545",
+c, err := client.New(
+    "http://localhost:11545",
+    "<api-key>",
     client.WithHTTPClient(customHTTP),
     client.WithDebugLogging(true),
-    client.WithShardQueueConfig(cfg),
 )
+if err != nil { /* handle */ }
 ```
 
 ### Environment Configuration
@@ -192,9 +193,6 @@ client := client.New("http://localhost:11545",
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MYCELIAN_DEBUG` | `false` | Enable debug HTTP logging |
-| `SQ_SHARDS` | `4` | Number of shard workers |
-| `SQ_QUEUE_SIZE` | `1000` | Queue buffer per shard |
-| `SQ_ENQUEUE_TIMEOUT` | `100ms` | Queue full timeout |
 
 ### Functional Options
 
@@ -243,42 +241,35 @@ import (
 
 func main() {
     ctx := context.Background()
-    client := client.New("http://localhost:11545")
-    defer client.Close()
+    c, _ := client.New("http://localhost:11545", "<api-key>")
+    defer c.Close()
 
-    // Create user and vault
-    user, _ := client.CreateUser(ctx, client.CreateUserRequest{
-        Email: "user@example.com",
-    })
-    
-    vault, _ := client.CreateVault(ctx, user.ID, client.CreateVaultRequest{
-        Title: "My Vault",
-    })
-    
+    // Create vault
+    vault, _ := c.CreateVault(ctx, client.CreateVaultRequest{Title: "My Vault"})
+
     // Create memory and add entries
-    memory, _ := client.CreateMemory(ctx, user.ID, vault.VaultID, client.CreateMemoryRequest{
-        Title: "Project Notes",
-        Type:  "code",
+    memory, _ := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{
+        Title:      "Project Notes",
+        MemoryType: "code",
     })
-    
+
     // Add entries asynchronously
-    ack1, _ := client.AddEntry(ctx, user.ID, vault.VaultID, memory.ID, client.AddEntryRequest{
-        Text: "Initial project setup complete",
+    _, _ = c.AddEntry(ctx, vault.VaultID, memory.ID, client.AddEntryRequest{
+        RawEntry: "Initial project setup complete",
     })
-    
-    ack2, _ := client.AddEntry(ctx, user.ID, vault.VaultID, memory.ID, client.AddEntryRequest{
-        Text: "Added authentication module",
+    _, _ = c.AddEntry(ctx, vault.VaultID, memory.ID, client.AddEntryRequest{
+        RawEntry: "Added authentication module",
     })
-    
+
     // Wait for consistency before reading
-    client.AwaitConsistency(ctx, memory.ID)
-    
+    _ = c.AwaitConsistency(ctx, memory.ID)
+
     // Search entries
-    results, _ := client.Search(ctx, client.SearchRequest{
-        UserID:  user.ID,
-        VaultID: vault.VaultID,
-        Query:   "authentication",
+    results, _ := c.Search(ctx, client.SearchRequest{
+        MemoryID: memory.ID,
+        Query:    "authentication",
     })
+    _ = results
 }
 ```
 
@@ -287,16 +278,16 @@ func main() {
 ```go
 // MCP handlers use the SDK directly
 func (h *Handler) CreateMemory(ctx context.Context, req CreateMemoryRequest) (*Memory, error) {
-    return h.client.CreateMemory(ctx, req.UserID, req.VaultID, client.CreateMemoryRequest{
+    return h.client.CreateMemory(ctx, req.VaultID, client.CreateMemoryRequest{
         Title:       req.Title,
         Description: req.Description,
-        Type:        req.Type,
+        MemoryType:  req.Type,
     })
 }
 
 func (h *Handler) AddEntry(ctx context.Context, req AddEntryRequest) (*EnqueueAck, error) {
-    return h.client.AddEntry(ctx, req.UserID, req.VaultID, req.MemoryID, client.AddEntryRequest{
-        Text:     req.Text,
+    return h.client.AddEntry(ctx, req.VaultID, req.MemoryID, client.AddEntryRequest{
+        RawEntry: req.Text,
         Metadata: req.Metadata,
     })
 }
@@ -311,17 +302,10 @@ func (h *Handler) AddEntry(ctx context.Context, req AddEntryRequest) (*EnqueueAc
 - **Retry logic** - Automatic retry with exponential backoff for transient failures
 - **Metrics ready** - ShardQueue exposes Prometheus metrics for observability
 
-## Migration from Legacy Client
+## Notes
 
-The SDK replaced `pkg/memoryclient` with these improvements:
-
-| Legacy Pattern | New SDK Pattern | Benefit |
-|----------------|-----------------|---------|
-| `memoryclient.CreateMemory()` | `client.CreateMemory()` | Simpler imports |
-| No retry logic | Automatic retries | Reliability |
-| No ordering guarantees | ShardQueue + `AwaitConsistency()` | Consistency |
-| Scattered types | Consolidated in `client` package | Type safety |
-| Manual HTTP handling | Abstracted away | Developer experience |
+- The client is stateless aside from its executor and HTTP configuration.
+- Async write APIs return quickly and preserve FIFO per memory; call `AwaitConsistency` for read-after-write semantics.
 
 ## References
 

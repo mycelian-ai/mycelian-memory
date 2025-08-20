@@ -26,7 +26,10 @@ func TestAddEntryE2E(t *testing.T) {
 		baseURL = "http://localhost:11545"
 	}
 
-	c := client.NewWithDevMode(baseURL)
+	c, err := client.NewWithDevMode(baseURL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	defer c.Close()
