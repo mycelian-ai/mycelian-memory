@@ -9,10 +9,19 @@ import (
 	"time"
 )
 
-// Option mutates the Client during New().
+// Option configures a Client during construction in New.
+//
+// Options are applied before the authorization transport wrapper is installed,
+// so transport-related options (like debug logging) will be placed underneath
+// the API-key wrapper. Options must be deterministic and side-effect free.
 type Option func(*Client) error
 
-// WithHTTPTimeout sets the HTTP client timeout. Keep initial surface minimal.
+// WithHTTPTimeout sets the underlying http.Client Timeout used by the SDK.
+//
+// Prefer per-request context deadlines where possible; this timeout is a
+// coarse safety net that bounds the total time spent on a single HTTP request
+// (including connection, TLS handshake, redirects, and reading the response).
+// The value must be greater than zero.
 func WithHTTPTimeout(d time.Duration) Option {
 	return func(c *Client) error {
 		if d <= 0 {
@@ -23,8 +32,13 @@ func WithHTTPTimeout(d time.Duration) Option {
 	}
 }
 
-// WithDebugLogging wraps the client's transport such that every request/response
-// is logged when `enabled` is true.
+// WithDebugLogging wraps the client's transport so each request/response is
+// logged when enabled is true.
+//
+// The debug transport is installed beneath the API-key wrapper; logs are
+// emitted before the request is forwarded to the next transport.
+// Do not enable this option in production environments as it increases
+// verbosity and may include headers and method/URL metadata in logs.
 func WithDebugLogging(enabled bool) Option {
 	return func(c *Client) error {
 		if enabled {

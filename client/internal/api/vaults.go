@@ -17,9 +17,7 @@ func CreateVault(ctx context.Context, httpClient *http.Client, baseURL string, r
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateTitle(req.Title, "title"); err != nil {
-		return nil, err
-	}
+	// Client-side validation removed; server is the authority
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

@@ -56,7 +56,7 @@ func TestContextEvolutionE2E(t *testing.T) {
 
 	_ = c.AwaitConsistency(ctx, mem.ID)
 
-	latestCtx, err := c.GetContext(ctx, vault.VaultID, mem.ID)
+	latestCtx, err := c.GetLatestContext(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("get latest context: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 	}
 	defer agentB.Close()
 
-	resCtx, err := agentB.GetContext(ctx, vault.VaultID, mem.ID)
+	resCtx, err := agentB.GetLatestContext(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("agentB get context: %v", err)
 	}

@@ -19,12 +19,7 @@ func CreateMemory(ctx context.Context, httpClient *http.Client, baseURL, vaultID
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateTitle(req.Title, "title"); err != nil {
-		return nil, err
-	}
+	// Client-side validation removed; server is the authority
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -59,9 +54,7 @@ func ListMemories(ctx context.Context, httpClient *http.Client, baseURL, vaultID
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
+	// Client-side validation removed; server is the authority
 	url := fmt.Sprintf("%s/v0/vaults/%s/memories", baseURL, vaultID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -89,12 +82,7 @@ func GetMemory(ctx context.Context, httpClient *http.Client, baseURL, vaultID, m
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(memoryID, "memoryId"); err != nil {
-		return nil, err
-	}
+	// Client-side validation removed; server is the authority
 	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s", baseURL, vaultID, memoryID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -122,12 +110,7 @@ func DeleteMemory(ctx context.Context, httpClient *http.Client, baseURL, vaultID
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(memoryID, "memoryId"); err != nil {
-		return err
-	}
+	// Client-side validation removed; server is the authority
 	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s", baseURL, vaultID, memoryID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {

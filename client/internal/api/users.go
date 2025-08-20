@@ -17,9 +17,7 @@ func CreateUser(ctx context.Context, httpClient *http.Client, baseURL string, re
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateUserID(req.UserID); err != nil {
-		return nil, err
-	}
+	// Client-side validation removed; server is the authority
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -53,9 +51,7 @@ func GetUser(ctx context.Context, httpClient *http.Client, baseURL, userID strin
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateUserID(userID); err != nil {
-		return nil, err
-	}
+	// Client-side validation removed; server is the authority
 	url := fmt.Sprintf("%s/v0/users/%s", baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -83,9 +79,7 @@ func DeleteUser(ctx context.Context, httpClient *http.Client, baseURL, userID st
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := types.ValidateUserID(userID); err != nil {
-		return err
-	}
+	// Client-side validation removed; server is the authority
 	url := fmt.Sprintf("%s/v0/users/%s", baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {

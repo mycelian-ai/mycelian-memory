@@ -14,7 +14,7 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	t.Parallel()
 	vaultID, memID := "v1", "m1"
 	var putCalled bool
-	ctxResp := client.GetContextResponse{Context: map[string]interface{}{"activeContext": "foo"}}
+	ctxResp := client.Context{Context: map[string]interface{}{"activeContext": "foo"}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.Method {
@@ -44,7 +44,7 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	if !putCalled {
 		t.Fatalf("PUT not called")
 	}
-	got, err := c.GetContext(ctx, vaultID, memID)
+	got, err := c.GetLatestContext(ctx, vaultID, memID)
 	if err != nil {
 		t.Fatalf("GetContext: %v", err)
 	}

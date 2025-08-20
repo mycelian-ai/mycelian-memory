@@ -22,12 +22,6 @@ func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Clien
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
-		return nil, err
-	}
 
 	// Create job that makes the actual HTTP request
 	putJob := job.New(func(jobCtx context.Context) error {
@@ -62,15 +56,9 @@ func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Clien
 	return &types.EnqueueAck{MemoryID: memID, Status: "enqueued"}, nil
 }
 
-// GetContext retrieves the most recent context snapshot for a memory (synchronous).
-func GetContext(ctx context.Context, httpClient *http.Client, baseURL, vaultID, memID string) (*types.GetContextResponse, error) {
+// GetLatestContext retrieves the most recent context snapshot for a memory (synchronous).
+func GetLatestContext(ctx context.Context, httpClient *http.Client, baseURL, vaultID, memID string) (*types.Context, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
 		return nil, err
 	}
 	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", baseURL, vaultID, memID)
@@ -86,7 +74,7 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, vaultID, 
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var res types.GetContextResponse
+		var res types.Context
 		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 			return nil, err
 		}
@@ -102,15 +90,6 @@ func GetContext(ctx context.Context, httpClient *http.Client, baseURL, vaultID, 
 // It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
 func DeleteContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID, contextID string) error {
 	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(contextID, "contextId"); err != nil {
 		return err
 	}
 

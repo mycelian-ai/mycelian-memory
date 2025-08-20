@@ -16,29 +16,29 @@ func TestHandlersEndToEnd(t *testing.T) {
 	// stub backend responding to various endpoints
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/users/u1/vaults/v1/memories/m1/entries":
+		case r.Method == http.MethodPost && r.URL.Path == "/v0/vaults/v1/memories/m1/entries":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"entryId":"e1"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/u1/vaults/v1/memories/m1/entries":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1/entries":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"entries":[{"entryId":"e1","context":"{\"activeContext\":\"hello\"}"}],"count":1}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/search":
+		case r.Method == http.MethodPost && r.URL.Path == "/v0/search":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"entries":[],"count":0,"latestContext":"{}"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/u1/vaults/v1/memories/m1":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"memoryId":"m1","title":"demo"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/u1":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/u1":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"userId":"u1","email":"x@example.com"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/users/u1/vaults/v1/memories/m1/contexts":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1/contexts":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"userId":"u1","memoryId":"m1","contextId":"ctx1","context":{"activeContext":"hello"},"creationTime":"2025-07-02T00:00:00Z"}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/users/u1/vaults/v1/memories/m1/contexts":
+			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"u1","context":{"activeContext":"hello"},"creationTime":"2025-07-02T00:00:00Z"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v0/vaults/v1/memories/m1/contexts":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"userId":"u1","memoryId":"m1","contextId":"ctx1","creationTime":"2025-07-02T00:00:00Z"}`))
+			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"u1","creationTime":"2025-07-02T00:00:00Z"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -128,7 +128,7 @@ func TestHandlersEndToEnd(t *testing.T) {
 	}
 
 	// verify backend context reflects the write
-	resCtx, err := sdk.GetContext(context.Background(), "v1", "m1")
+	resCtx, err := sdk.GetLatestContext(context.Background(), "v1", "m1")
 	if err != nil || resCtx == nil {
 		t.Fatalf("get latest context failed: %v", err)
 	}

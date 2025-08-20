@@ -97,32 +97,7 @@ func newCreateMemoryCmd() *cobra.Command {
 		Use:   "create-memory",
 		Short: "Create a new memory for a user",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate vault ID format (UUID)
-			if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-				return fmt.Errorf("invalid --vault-id: %w", err)
-			}
-
-			// Validate title format
-			if err := client.ValidateTitle(title, "title"); err != nil {
-				return fmt.Errorf("invalid --title: %w", err)
-			}
-
-			// Validate memory type
-			if err := client.ValidateMemoryType(memoryType); err != nil {
-				return fmt.Errorf("invalid --memory-type: %w", err)
-			}
-
-			// Validate description if provided
-			if description != "" {
-				if err := client.ValidateDescription(description); err != nil {
-					return fmt.Errorf("invalid --description: %w", err)
-				}
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
 				Str("user_id", userID).
@@ -196,28 +171,7 @@ func newCreateEntryCmd() *cobra.Command {
 		Use:   "create-entry",
 		Short: "Create a new entry for a memory",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate vault ID format (UUID)
-			if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-				return fmt.Errorf("invalid --vault-id: %w", err)
-			}
-
-			// Validate memory ID format (UUID)
-			if err := client.ValidateUUID(memoryID, "memory-id"); err != nil {
-				return fmt.Errorf("invalid --memory-id: %w", err)
-			}
-
-			// Validate raw entry content
-			if rawEntry == "" {
-				return fmt.Errorf("--raw-entry is required")
-			}
-			if len(rawEntry) > 9000 {
-				return fmt.Errorf("--raw-entry exceeds 9000 characters")
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
 				Str("user_id", userID).
@@ -292,20 +246,7 @@ func newListEntriesCmd() *cobra.Command {
 		Use:   "list-entries",
 		Short: "List entries for a memory",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate vault ID format (UUID)
-			if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-				return fmt.Errorf("invalid --vault-id: %w", err)
-			}
-
-			// Validate memory ID format (UUID)
-			if err := client.ValidateUUID(memoryID, "memory-id"); err != nil {
-				return fmt.Errorf("invalid --memory-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
 				Str("user_id", userID).
@@ -377,9 +318,7 @@ func newGetPromptsCmd() *cobra.Command {
 		Use:   "get-prompts",
 		Short: "Print default prompt templates for a memory type in JSON",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if memoryType == "" {
-				return fmt.Errorf("--memory-type is required")
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			c, err := client.NewWithDevMode(serviceURL)
 			if err != nil {
@@ -412,25 +351,7 @@ func newPutContextCmd() *cobra.Command {
 		Use:   "put-context",
 		Short: "Update context document for a memory (enqueue write)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate vault ID format (UUID)
-			if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-				return fmt.Errorf("invalid --vault-id: %w", err)
-			}
-
-			// Validate memory ID format (UUID)
-			if err := client.ValidateUUID(memoryID, "memory-id"); err != nil {
-				return fmt.Errorf("invalid --memory-id: %w", err)
-			}
-
-			// Validate content is provided
-			if content == "" {
-				return fmt.Errorf("--content is required")
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
 				Str("user_id", userID).
@@ -497,20 +418,7 @@ func newGetContextCmd() *cobra.Command {
 		Use:   "get-context",
 		Short: "Fetch the latest context document for a memory",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate vault ID format (UUID)
-			if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-				return fmt.Errorf("invalid --vault-id: %w", err)
-			}
-
-			// Validate memory ID format (UUID)
-			if err := client.ValidateUUID(memoryID, "memory-id"); err != nil {
-				return fmt.Errorf("invalid --memory-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
 				Str("user_id", userID).
@@ -527,7 +435,7 @@ func newGetContextCmd() *cobra.Command {
 			defer cancel()
 
 			start := time.Now()
-			resp, err := c.GetContext(ctx, vaultID, memoryID)
+			resp, err := c.GetLatestContext(ctx, vaultID, memoryID)
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -635,15 +543,7 @@ func newSearchCmd() *cobra.Command {
 		Use:   "search",
 		Short: "Search within a memory (hybrid semantic/keyword)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate memory ID format (UUID)
-			if err := client.ValidateUUID(memoryID, "memory-id"); err != nil {
-				return fmt.Errorf("invalid --memory-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			// Validate query is provided
 			if query == "" {
@@ -810,15 +710,7 @@ func newAwaitConsistencyCmd() *cobra.Command {
 		Use:   "await-consistency",
 		Short: "Block until previous writes for the memory are durably visible",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate memory ID format (UUID)
-			if err := client.ValidateUUID(memoryID, "memory-id"); err != nil {
-				return fmt.Errorf("invalid --memory-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
 				Str("user_id", userID).
@@ -922,22 +814,7 @@ func newCreateVaultCmd() *cobra.Command {
 		Use:   "create-vault",
 		Short: "Create a new vault for a user",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate title format
-			if err := client.ValidateTitle(title, "title"); err != nil {
-				return fmt.Errorf("invalid --title: %w", err)
-			}
-
-			// Validate description if provided
-			if description != "" {
-				if err := client.ValidateDescription(description); err != nil {
-					return fmt.Errorf("invalid --description: %w", err)
-				}
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			c, err := client.NewWithDevMode(serviceURL)
 			if err != nil {
@@ -970,10 +847,7 @@ func newListVaultsCmd() *cobra.Command {
 		Use:   "list-vaults",
 		Short: "List all vaults for a user",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			c, err := client.NewWithDevMode(serviceURL)
 			if err != nil {
@@ -1004,15 +878,7 @@ func newGetVaultCmd() *cobra.Command {
 		Use:   "get-vault",
 		Short: "Retrieve a vault by title",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate title format
-			if err := client.ValidateTitle(title, "title"); err != nil {
-				return fmt.Errorf("invalid --title: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			c, err := client.NewWithDevMode(serviceURL)
 			if err != nil {
@@ -1044,15 +910,7 @@ func newDeleteVaultCmd() *cobra.Command {
 		Use:   "delete-vault",
 		Short: "Delete an empty vault (must contain no memories)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
-
-			// Validate vault ID format (UUID)
-			if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-				return fmt.Errorf("invalid --vault-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			c, err := client.NewWithDevMode(serviceURL)
 			if err != nil {
@@ -1085,10 +943,7 @@ func newListMemoriesCmd() *cobra.Command {
 		Use:   "list-memories",
 		Short: "List memories within a vault (by ID or title)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate user ID format
-			if err := client.ValidateUserID(userID); err != nil {
-				return fmt.Errorf("invalid --user-id: %w", err)
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			if vaultID == "" && vaultTitle == "" {
 				return fmt.Errorf("either --vault-id or --vault-title must be provided")
@@ -1097,19 +952,7 @@ func newListMemoriesCmd() *cobra.Command {
 				return fmt.Errorf("provide only one of --vault-id or --vault-title, not both")
 			}
 
-			// Validate vault ID if provided (UUID)
-			if vaultID != "" {
-				if err := client.ValidateUUID(vaultID, "vault-id"); err != nil {
-					return fmt.Errorf("invalid --vault-id: %w", err)
-				}
-			}
-
-			// Validate vault title if provided
-			if vaultTitle != "" {
-				if err := client.ValidateTitle(vaultTitle, "vault-title"); err != nil {
-					return fmt.Errorf("invalid --vault-title: %w", err)
-				}
-			}
+			// Client-side validation removed; rely on server-side validation
 
 			c, err := client.NewWithDevMode(serviceURL)
 			if err != nil {

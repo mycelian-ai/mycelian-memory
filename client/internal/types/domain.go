@@ -49,3 +49,13 @@ type Entry struct {
 	Tags           map[string]string `json:"tags,omitempty"`
 	ExpirationTime *time.Time        `json:"expirationTime,omitempty"`
 }
+
+// Context represents a context snapshot
+type Context struct {
+	ContextID    string    `json:"contextId"`
+	MemoryID     string    `json:"memoryId"`
+	VaultID      string    `json:"vaultId"`
+	UserID       string    `json:"actorId"`
+	CreationTime time.Time `json:"creationTime"`
+	Context      any       `json:"context"`
+}

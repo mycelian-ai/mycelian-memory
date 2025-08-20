@@ -20,12 +20,6 @@ func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client,
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
-		return nil, err
-	}
 
 	// Create job that makes the actual HTTP request
 	addJob := job.New(func(jobCtx context.Context) error {
@@ -66,12 +60,6 @@ func ListEntries(ctx context.Context, httpClient *http.Client, baseURL, vaultID,
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
-		return nil, err
-	}
 	query := ""
 	first := true
 	for k, v := range params {
@@ -109,15 +97,6 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, vaultID, me
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
-		return nil, err
-	}
-	if err := types.ValidateIDPresent(entryID, "entryId"); err != nil {
-		return nil, err
-	}
 
 	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/entries/%s", baseURL, vaultID, memID, entryID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -144,15 +123,6 @@ func GetEntry(ctx context.Context, httpClient *http.Client, baseURL, vaultID, me
 // It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
 func DeleteEntry(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID, entryID string) error {
 	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(vaultID, "vaultId"); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(memID, "memoryId"); err != nil {
-		return err
-	}
-	if err := types.ValidateIDPresent(entryID, "entryId"); err != nil {
 		return err
 	}
 

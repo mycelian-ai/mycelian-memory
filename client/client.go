@@ -259,9 +259,9 @@ func (c *Client) PutContext(ctx context.Context, vaultID, memID string, payload 
 	return api.PutContext(ctx, c.exec, c.http, c.baseURL, vaultID, memID, payload)
 }
 
-// GetContext retrieves the most recent context snapshot for a memory (synchronous).
-func (c *Client) GetContext(ctx context.Context, vaultID, memID string) (*GetContextResponse, error) {
-	return api.GetContext(ctx, c.http, c.baseURL, vaultID, memID)
+// GetLatestContext retrieves the most recent context snapshot for a memory (synchronous).
+func (c *Client) GetLatestContext(ctx context.Context, vaultID, memID string) (*Context, error) {
+	return api.GetLatestContext(ctx, c.http, c.baseURL, vaultID, memID)
 }
 
 // DeleteContext removes a context snapshot by ID synchronously via HTTP.

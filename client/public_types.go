@@ -5,30 +5,37 @@ import (
 	prompts "github.com/mycelian/mycelian-memory/client/prompts"
 )
 
-// Public re-exports so SDK users only import package client.
+// Public type surface
+//
+// Re-export a small set of types so callers only import
+// "github.com/mycelian/mycelian-memory/client". These are zero-cost aliases,
+// identical to the original definitions in their source packages.
+
+// DefaultPromptResponse is returned by LoadDefaultPrompts.
+// Re-exported to avoid importing the prompts subpackage in user code.
 type DefaultPromptResponse = prompts.DefaultPromptResponse
 
-// Public type aliases so SDK consumers can import only the client package.
-// Requests
-// Note: User-related requests are intentionally omitted (external user management).
+// Request, entity, and response types
+// Note: user-related types are intentionally omitted.
 type (
+	// Requests
 	CreateVaultRequest  = types.CreateVaultRequest
 	CreateMemoryRequest = types.CreateMemoryRequest
 	AddEntryRequest     = types.AddEntryRequest
 	PutContextRequest   = types.PutContextRequest
 	SearchRequest       = types.SearchRequest
 
-	// Domain entities
-	Vault  = types.Vault
-	Memory = types.Memory
-	Entry  = types.Entry
+	// Entities
+	Vault   = types.Vault
+	Memory  = types.Memory
+	Entry   = types.Entry
+	Context = types.Context
 
 	// Responses
 	EnqueueAck          = types.EnqueueAck
 	ListEntriesResponse = types.ListEntriesResponse
-	GetContextResponse  = types.GetContextResponse
 	SearchEntry         = types.SearchEntry
 	SearchResponse      = types.SearchResponse
 )
 
-// Errors re-exported in errors.go
+// See errors.go for exported error variables (e.g., ErrNotFound).

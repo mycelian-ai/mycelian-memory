@@ -37,7 +37,7 @@ func TestGetContext_NotFoundMapsToErr(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
-	if _, err := GetContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
+	if _, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
 		t.Fatal("expected ErrNotFound")
 	}
 }
@@ -57,8 +57,8 @@ func TestContexts_NonOKStatuses(t *testing.T) {
 	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.PutContextRequest{Context: map[string]any{"x": 1}}); err == nil {
 		t.Fatal("expected error for PutContext non-201")
 	}
-	if _, err := GetContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
-		t.Fatal("expected error for GetContext non-OK non-404")
+	if _, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
+		t.Fatal("expected error for GetLatestContext non-OK non-404")
 	}
 }
 
@@ -69,8 +69,8 @@ func TestGetContext_DecodeError(t *testing.T) {
 		_, _ = w.Write([]byte("{bad json"))
 	}))
 	defer srv.Close()
-	if _, err := GetContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
-		t.Fatal("expected decode error for GetContext")
+	if _, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
+		t.Fatal("expected decode error for GetLatestContext")
 	}
 }
 
@@ -81,9 +81,9 @@ func TestGetContext_Success(t *testing.T) {
 		_, _ = w.Write([]byte(`{"context": {"activeContext": "x"}}`))
 	}))
 	defer srv.Close()
-	res, err := GetContext(context.Background(), srv.Client(), srv.URL, "v1", "m1")
+	res, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1")
 	if err != nil || res == nil {
-		t.Fatalf("GetContext success unexpected err=%v res=%+v", err, res)
+		t.Fatalf("GetLatestContext success unexpected err=%v res=%+v", err, res)
 	}
 }
 
@@ -118,16 +118,16 @@ func TestGetContext_CtxCanceled(t *testing.T) {
 	cancel()
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	if _, err := GetContext(ctx, srv.Client(), srv.URL, "v1", "m1"); err == nil {
-		t.Fatal("expected context canceled error for GetContext")
+	if _, err := GetLatestContext(ctx, srv.Client(), srv.URL, "v1", "m1"); err == nil {
+		t.Fatal("expected context canceled error for GetLatestContext")
 	}
 }
 
 func TestGetContext_HTTPDoError(t *testing.T) {
 	t.Parallel()
 	hc := &http.Client{Transport: &errRT{}}
-	if _, err := GetContext(context.Background(), hc, "http://example.com", "v1", "m1"); err == nil {
-		t.Fatal("expected http Do error for GetContext")
+	if _, err := GetLatestContext(context.Background(), hc, "http://example.com", "v1", "m1"); err == nil {
+		t.Fatal("expected http Do error for GetLatestContext")
 	}
 }
 

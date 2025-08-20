@@ -110,7 +110,7 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 		Msg("handling get_context request")
 
 	start := time.Now()
-	res, err := ch.client.GetContext(ctx, vaultID, memID)
+	res, err := ch.client.GetLatestContext(ctx, vaultID, memID)
 	elapsed := time.Since(start)
 
 	if err != nil {
