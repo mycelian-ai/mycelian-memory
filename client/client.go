@@ -18,6 +18,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Constants
+const defaultUserAgent = "mycelian-memory-go-client"
+
+const (
+	defaultExecutorShards    = 4
+	defaultExecutorQueueSize = 1000
+)
+
 // Errors are defined in errors.go
 
 // See options.go for functional options
@@ -64,7 +72,10 @@ func New(baseURL, apiKey string, opts ...Option) (*Client, error) {
 	c := &Client{
 		baseURL: baseURL,
 		apiKey:  apiKey,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: http.DefaultTransport, // Initialize transport early
+		},
 	}
 
 	// Auto-enable debug via env variable without changing code.
@@ -99,12 +110,9 @@ func NewWithDevMode(baseURL string, opts ...Option) (*Client, error) {
 // carries the Authorization header. This is the single authoritative place
 // that sets the header for the SDK.
 func (c *Client) wrapTransportWithAPIKey() {
-	baseTransport := c.http.Transport
-	if baseTransport == nil {
-		baseTransport = http.DefaultTransport
-	}
+	// Transport is guaranteed to be non-nil after constructor initialization
 	c.http.Transport = &apiKeyTransport{
-		base:   baseTransport,
+		base:   c.http.Transport,
 		apiKey: c.apiKey,
 	}
 }
@@ -116,8 +124,6 @@ type apiKeyTransport struct {
 	base   http.RoundTripper
 	apiKey string
 }
-
-const defaultUserAgent = "mycelian-memory-go-client"
 
 func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Clone the request to avoid modifying the original
@@ -150,11 +156,6 @@ func (c *Client) AwaitConsistency(ctx context.Context, memoryID string) error {
 }
 
 // newDefaultExecutor constructs the shardqueue executor with sane defaults.
-const (
-	defaultExecutorShards    = 4
-	defaultExecutorQueueSize = 1000
-)
-
 func newDefaultExecutor() *shardqueue.ShardExecutor {
 	cfg := shardqueue.Config{
 		Shards:    defaultExecutorShards,

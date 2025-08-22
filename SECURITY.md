@@ -1,59 +1,27 @@
 # Security Policy
 
-## ⚠️ Security Status
+## ⚠️ Early Development Notice
 
-This is an **MVP implementation** for demonstration purposes. This codebase is NOT production-ready and lacks several critical security features.
+**Mycelian is in early development and not ready for production use.** A thorough security review has not been done yet, as the current focus is on building core functionality and experimenting with architecture.
 
-## Known Security Limitations
+## Current Approach
 
-### Currently NOT Implemented:
-1. **Authentication** - All API endpoints are publicly accessible
-2. **Authorization** - No user access control or data isolation
-3. **Rate Limiting** - No protection against DoS attacks
-4. **Input Sanitization** - Basic validation only
-5. **HTTPS Enforcement** - Must be configured externally
+**Right now, I'm focused on:**
+- Building core functionality
+- Iterative improvements through PRs
+- Architectural experimentation
+- Learning from community feedback
 
-### Partially Implemented:
-- Basic input validation for length and format
-- SQL parameterization (needs audit)
-- Error handling (may leak information)
+**For security specifically:**
+- Feel free to open issues for security concerns
+- PRs welcome for security improvements
+- Let's brainstorm architectural security patterns together
+- Formal security processes will come when approaching production readiness
 
-## Security Roadmap
+## Getting Involved
 
-See [Security MVP Roadmap](issues/security-mvp-roadmap.md) for our plan to address these issues:
-- **Phase 1**: GitHub Ready - Basic security hygiene
-- **Phase 2**: Production Ready - Full security implementation
-
-## Reporting Security Issues
-
-As this is an MVP, we're aware of the major security gaps. However, if you discover additional vulnerabilities:
-
-1. **Do NOT** use the public issue tracker
-2. **Do NOT** deploy this code with real user data
-3. Create a private security advisory or contact the maintainers directly
-
-## Deployment Warning
-
-**DO NOT DEPLOY TO PRODUCTION** without implementing:
-- JWT or OAuth2 authentication
-- User-based authorization
-- HTTPS/TLS encryption
-- Rate limiting
-- Comprehensive input validation
-
-## For Developers
-
-If you're contributing to this project:
-1. Don't add hardcoded secrets
-2. Use environment variables for configuration
-3. Follow the validation patterns in `internal/api/validate`
-4. Add tests for any security-related code
-
-## Timeline
-
-- **Current**: MVP for demonstration only
-- **Before GitHub Public**: Remove hardcoded values, add disclaimers
-- **Before Beta Users**: Implement authentication and basic security
-- **Before GA**: Full security audit and penetration testing
-
-Remember: This is a learning/demonstration project. Security will be properly implemented before any production use.
+If you're interested in helping improve Mycelian's security:
+- Open GitHub issues for security concerns
+- Submit PRs with security improvements
+- Discuss architecture ideas in issues/discussions
+- Help design security-first patterns as we build

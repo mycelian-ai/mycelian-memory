@@ -42,6 +42,7 @@ func WithHTTPTimeout(d time.Duration) Option {
 func WithDebugLogging(enabled bool) Option {
 	return func(c *Client) error {
 		if enabled {
+			// Transport is guaranteed to be non-nil after constructor initialization
 			c.http.Transport = &debugTransport{base: c.http.Transport}
 		}
 		return nil

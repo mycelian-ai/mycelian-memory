@@ -8,7 +8,33 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// debugTransport – optional HTTP round-trip logger
+// debugTransport provides detailed HTTP request/response logging for debugging client issues.
+//
+// Purpose:
+//   - Troubleshoot API communication problems (timeouts, malformed requests, unexpected responses)
+//   - Debug authentication/authorization issues by inspecting headers and payloads
+//   - Analyze performance bottlenecks by examining request/response sizes and timing
+//   - Validate request formatting during development and testing
+//
+// When to use:
+//   - Set MYCELIAN_DEBUG=true or DEBUG=true environment variable
+//   - During development when building new API integrations
+//   - When investigating production issues (temporarily, with log level controls)
+//   - In CI/CD pipelines for integration test debugging
+//
+// Security considerations:
+//   - Logs full request/response bodies including sensitive data (tokens, user data)
+//   - Only enable in development/staging environments
+//   - Ensure log outputs are properly secured and not exposed
+//
+// Performance impact:
+//   - Adds overhead for request/response dumping and logging
+//   - Should be disabled in production for optimal performance
+//
+// Example usage:
+//
+//	export MYCELIAN_DEBUG=true
+//	go run main.go  # Client will now log all HTTP traffic
 type debugTransport struct{ base http.RoundTripper }
 
 func (dt *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -34,6 +60,17 @@ func (dt *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+// debugLoggingRequested checks if HTTP debug logging should be enabled.
+//
+// Activation methods:
+//   - MYCELIAN_DEBUG=true (mycelian-specific debug flag)
+//   - DEBUG=true (general debug flag, common in development workflows)
+//
+// Both environment variables are supported for flexibility:
+//   - Use MYCELIAN_DEBUG for targeted mycelian client debugging
+//   - Use DEBUG for broader application debugging that includes HTTP traffic
+//
+// Returns true if either environment variable is set to "true" (case-sensitive).
 func debugLoggingRequested() bool {
 	return os.Getenv("MYCELIAN_DEBUG") == "true" || os.Getenv("DEBUG") == "true"
 }
