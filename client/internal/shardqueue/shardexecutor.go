@@ -16,6 +16,7 @@ import (
 	"time"
 
 	backoff "github.com/cenkalti/backoff/v4"
+	"github.com/mycelian/mycelian-memory/client/internal/errors"
 )
 
 type queuedJob struct {
@@ -205,12 +206,23 @@ func (p *ShardExecutor) runWorker(idx int, ch <-chan queuedJob) {
 					start := time.Now()
 					err = qj.job.Run(qj.ctx)
 					runDuration.WithLabelValues(label).Observe(time.Since(start).Seconds())
-					if err == nil || attempts >= p.cfg.MaxAttempts-1 {
-						if err != nil {
-							p.safeHandleError(err)
-						}
+
+					if err == nil {
+						break // Success - exit retry loop
+					}
+
+					// Check if this is an irrecoverable error (fail fast)
+					if isIrrecoverableError(err) {
+						p.safeHandleError(err)
+						break // Don't retry irrecoverable errors
+					}
+
+					// Retry logic for recoverable errors
+					if attempts >= p.cfg.MaxAttempts-1 {
+						p.safeHandleError(err) // Max retries exceeded
 						break
 					}
+
 					attempts++
 					wait := exp.NextBackOff()
 					select {
@@ -272,4 +284,9 @@ func (p *ShardExecutor) shardFor(key string) int {
 	h := fnv.New32a() // fast and sufficient at our scale
 	_, _ = h.Write([]byte(key))
 	return int(h.Sum32()) % p.cfg.Shards
+}
+
+// isIrrecoverableError checks if an error should not be retried.
+func isIrrecoverableError(err error) bool {
+	return errors.IsIrrecoverable(err)
 }

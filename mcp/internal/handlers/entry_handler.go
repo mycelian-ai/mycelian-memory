@@ -30,7 +30,6 @@ func (eh *EntryHandler) RegisterTools(s *server.MCPServer) error {
 	// add_entry (vault scoped)
 	addEntry := mcp.NewTool("add_entry",
 		mcp.WithDescription("Append a new message or note to a memory inside a vault. RawEntry should contain the full text; Summary is a short recap."),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("The UUID of the user")),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("The UUID of the vault")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("raw_entry", mcp.Required(), mcp.Description("Raw entry text")),
@@ -42,7 +41,6 @@ func (eh *EntryHandler) RegisterTools(s *server.MCPServer) error {
 	// list_entries (vault scoped)
 	listEntries := mcp.NewTool("list_entries",
 		mcp.WithDescription("List entries for a memory within a vault with pagination cursors"),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("The UUID of the user")),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("The UUID of the vault")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("limit", mcp.Description("Max rows (1-50), default 25")),
@@ -54,7 +52,6 @@ func (eh *EntryHandler) RegisterTools(s *server.MCPServer) error {
 	// get_entry (vault scoped)
 	getEntry := mcp.NewTool("get_entry",
 		mcp.WithDescription("Get a single entry by entryId within a memory"),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("The UUID of the user")),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("The UUID of the vault")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("entry_id", mcp.Required(), mcp.Description("The UUID of the entry")),
@@ -65,7 +62,6 @@ func (eh *EntryHandler) RegisterTools(s *server.MCPServer) error {
 }
 
 func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	memoryID, _ := req.RequireString("memory_id")
 	rawEntry, _ := req.RequireString("raw_entry")
@@ -76,25 +72,29 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Int("raw_entry_len", len(rawEntry)).
 		Str("summary", summary).
 		Msg("handling add_entry request")
 
+	log.Debug().Msg("About to call eh.client.AddEntry")
 	start := time.Now()
-	ack, err := eh.client.AddEntry(ctx, vaultID, memoryID, clientpkg.AddEntryRequest{
+	// CRITICAL: Use background context for async job to prevent cancellation when MCP tool call completes.
+	// The MCP context (ctx) is only used for immediate validation, while the async job needs to survive
+	// beyond the tool call completion.
+	jobCtx := context.Background()
+	ack, err := eh.client.AddEntry(jobCtx, vaultID, memoryID, clientpkg.AddEntryRequest{
 		RawEntry: rawEntry,
 		Summary:  summary,
 		Tags:     tags,
 	})
 	elapsed := time.Since(start)
+	log.Debug().Err(err).Interface("ack", ack).Dur("elapsed", elapsed).Msg("AddEntry completed")
 
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memoryID).
 			Dur("elapsed", elapsed).
@@ -103,7 +103,6 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Dur("elapsed", elapsed).
@@ -114,7 +113,6 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 }
 
 func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	memoryID, _ := req.RequireString("memory_id")
 
@@ -149,7 +147,6 @@ func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolR
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Int("limit", limitInt).
@@ -164,7 +161,6 @@ func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolR
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memoryID).
 			Dur("elapsed", elapsed).
@@ -173,7 +169,6 @@ func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolR
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Dur("elapsed", elapsed).
@@ -204,13 +199,11 @@ func (eh *EntryHandler) handleListEntries(ctx context.Context, req mcp.CallToolR
 }
 
 func (eh *EntryHandler) handleGetEntry(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	memoryID, _ := req.RequireString("memory_id")
 	entryID, _ := req.RequireString("entry_id")
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Str("entry_id", entryID).
@@ -221,7 +214,6 @@ func (eh *EntryHandler) handleGetEntry(ctx context.Context, req mcp.CallToolRequ
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Error().Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memoryID).
 			Str("entry_id", entryID).

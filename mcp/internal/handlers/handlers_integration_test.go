@@ -29,16 +29,16 @@ func TestHandlersEndToEnd(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"memoryId":"m1","title":"demo"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/v0/users/u1":
+		case r.Method == http.MethodGet && r.URL.Path == "/v0/actors/mycelian-dev":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"userId":"u1","email":"x@example.com"}`))
+			_, _ = w.Write([]byte(`{"actorId":"mycelian-dev","email":"dev@localhost"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1/contexts":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"u1","context":{"activeContext":"hello"},"creationTime":"2025-07-02T00:00:00Z"}`))
+			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"mycelian-dev","context":{"activeContext":"hello"},"creationTime":"2025-07-02T00:00:00Z"}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v0/vaults/v1/memories/m1/contexts":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"u1","creationTime":"2025-07-02T00:00:00Z"}`))
+			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"mycelian-dev","creationTime":"2025-07-02T00:00:00Z"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -54,7 +54,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 	ch := NewContextHandler(sdk)
 	// put_context
 	putRes, err := ch.handlePutContext(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id":   "u1",
 		"vault_id":  "v1",
 		"memory_id": "m1",
 		"content":   "hello",
@@ -66,7 +65,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 	_ = sdk.AwaitConsistency(context.Background(), "m1")
 	// get_context
 	getRes, err := ch.handleGetContext(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id":   "u1",
 		"vault_id":  "v1",
 		"memory_id": "m1",
 	}}})
@@ -81,7 +79,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 	// ----- EntryHandler -----
 	eh := NewEntryHandler(sdk)
 	if _, err := eh.handleAddEntry(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id":   "u1",
 		"vault_id":  "v1",
 		"memory_id": "m1",
 		"raw_entry": "test",
@@ -90,7 +87,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 		t.Fatalf("add_entry error: %v", err)
 	}
 	if _, err := eh.handleListEntries(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id":   "u1",
 		"vault_id":  "v1",
 		"memory_id": "m1",
 		"limit":     1,
@@ -109,7 +105,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 	// ----- MemoryHandler -----
 	mh := NewMemoryHandler(sdk)
 	if _, err := mh.handleGetMemory(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id":   "u1",
 		"vault_id":  "v1",
 		"memory_id": "m1",
 	}}}); err != nil {
@@ -119,8 +114,6 @@ func TestHandlersEndToEnd(t *testing.T) {
 	// ----- SearchHandler -----
 	sh := NewSearchHandler(sdk)
 	if _, err := sh.handleSearch(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-		"user_id":   "u1",
-		"vault_id":  "v1",
 		"memory_id": "m1",
 		"query":     "foo",
 	}}}); err != nil {

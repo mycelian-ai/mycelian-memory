@@ -18,7 +18,7 @@ func TestSearch_Success(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(want)
 	}))
 	defer srv.Close()
-	got, err := Search(context.Background(), srv.Client(), srv.URL, types.SearchRequest{UserID: "user_1", MemoryID: "m1", Query: "q"})
+	got, err := Search(context.Background(), srv.Client(), srv.URL, types.SearchRequest{MemoryID: "m1", Query: "q"})
 	if err != nil || got == nil || got.Count != 1 {
 		t.Fatalf("Search unexpected: %+v, err=%v", got, err)
 	}
@@ -31,7 +31,7 @@ func TestSearch_NonOKAndDecodeError(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer srv1.Close()
-	if _, err := Search(context.Background(), srv1.Client(), srv1.URL, types.SearchRequest{UserID: "u", MemoryID: "m", Query: "q"}); err == nil {
+	if _, err := Search(context.Background(), srv1.Client(), srv1.URL, types.SearchRequest{MemoryID: "m", Query: "q"}); err == nil {
 		t.Fatal("expected error for non-OK status")
 	}
 
@@ -41,7 +41,7 @@ func TestSearch_NonOKAndDecodeError(t *testing.T) {
 		_, _ = w.Write([]byte("{bad json"))
 	}))
 	defer srv2.Close()
-	if _, err := Search(context.Background(), srv2.Client(), srv2.URL, types.SearchRequest{UserID: "u", MemoryID: "m", Query: "q"}); err == nil {
+	if _, err := Search(context.Background(), srv2.Client(), srv2.URL, types.SearchRequest{MemoryID: "m", Query: "q"}); err == nil {
 		t.Fatal("expected decode error")
 	}
 }
@@ -49,7 +49,7 @@ func TestSearch_NonOKAndDecodeError(t *testing.T) {
 func TestSearch_HTTPDoError(t *testing.T) {
 	t.Parallel()
 	hc := &http.Client{Transport: &errRT{}}
-	if _, err := Search(context.Background(), hc, "http://example.com", types.SearchRequest{UserID: "u", MemoryID: "m", Query: "q"}); err == nil {
+	if _, err := Search(context.Background(), hc, "http://example.com", types.SearchRequest{MemoryID: "m", Query: "q"}); err == nil {
 		t.Fatal("expected Do error for Search")
 	}
 }

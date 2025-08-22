@@ -27,7 +27,7 @@ func TestClient_Search_Success(t *testing.T) {
 		t.Fatalf("client.New error: %v", err)
 	}
 	t.Cleanup(func() { _ = c.Close() })
-	res, err := c.Search(context.Background(), client.SearchRequest{UserID: "user1", MemoryID: "m1", Query: "x"})
+	res, err := c.Search(context.Background(), client.SearchRequest{MemoryID: "m1", Query: "x"})
 	if err != nil || len(res.Entries) != 1 {
 		t.Fatalf("Search error: %v", err)
 	}

@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 
+	"github.com/mycelian/mycelian-memory/client/internal/errors"
 	"github.com/mycelian/mycelian-memory/client/internal/job"
 	"github.com/mycelian/mycelian-memory/client/internal/types"
 )
@@ -23,26 +26,49 @@ func AddEntry(ctx context.Context, exec types.Executor, httpClient *http.Client,
 
 	// Create job that makes the actual HTTP request
 	addJob := job.New(func(jobCtx context.Context) error {
+		// CRITICAL: Explicit logging to trace job execution
+		fmt.Fprintf(os.Stderr, "🚀 ADD_ENTRY JOB STARTING: url=%s\n", baseURL)
+
 		body, err := json.Marshal(req)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ ADD_ENTRY JSON marshal error: %v\n", err)
 			return err
 		}
+
 		url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/entries", baseURL, vaultID, memID)
 		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodPost, url, bytes.NewBuffer(body))
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ ADD_ENTRY request creation error: %v\n", err)
 			return err
 		}
 		httpReq.Header.Set("Content-Type", "application/json")
 
+		fmt.Fprintf(os.Stderr, "🌐 ADD_ENTRY making HTTP request to: %s\n", url)
 		resp, err := httpClient.Do(httpReq)
 		if err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "❌ ADD_ENTRY HTTP Do error: %v\n", err)
+			// Network errors are recoverable
+			return errors.NewNetworkError("add entry", err)
 		}
 		defer func() { _ = resp.Body.Close() }()
 
+		fmt.Fprintf(os.Stderr, "📡 ADD_ENTRY HTTP response: status=%d\n", resp.StatusCode)
 		if resp.StatusCode != http.StatusCreated {
-			return fmt.Errorf("add entry: status %d", resp.StatusCode)
+			// Read error response body for debugging (especially 401/403/500)
+			bodyBytes, readErr := io.ReadAll(resp.Body)
+			if readErr != nil {
+				fmt.Fprintf(os.Stderr, "❌ ADD_ENTRY error body read failed: %v\n", readErr)
+				// Still classify the HTTP error even if we can't read the body
+				return errors.NewHTTPError(resp.StatusCode, "", "add entry")
+			}
+
+			// Create classified error with full response details
+			errorMsg := fmt.Sprintf("add entry failed: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+			fmt.Fprintf(os.Stderr, "❌ ADD_ENTRY CLASSIFIED ERROR: %s\n", errorMsg)
+			return errors.ClassifyHTTPError(resp.StatusCode, string(bodyBytes), fmt.Errorf("add entry failed"))
 		}
+
+		fmt.Fprintf(os.Stderr, "✅ ADD_ENTRY HTTP job completed successfully\n")
 		return nil
 	})
 

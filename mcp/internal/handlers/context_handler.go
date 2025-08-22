@@ -28,7 +28,6 @@ func (ch *ContextHandler) RegisterTools(s *server.MCPServer) error {
 	// put_context (vault scoped)
 	putCtx := mcp.NewTool("put_context",
 		mcp.WithDescription("Persist the activeContext document for a memory inside a vault"),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("User UUID")),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("Vault UUID")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("Memory UUID")),
 		mcp.WithString("content", mcp.Required(), mcp.Description("Raw context text")),
@@ -38,7 +37,6 @@ func (ch *ContextHandler) RegisterTools(s *server.MCPServer) error {
 	// get_context (vault scoped)
 	getCtx := mcp.NewTool("get_context",
 		mcp.WithDescription("Fetch specific fragments of the current context document for a memory inside a vault"),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("User UUID")),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("Vault UUID")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("Memory UUID")),
 		mcp.WithArray("fragments", mcp.Description("Optional list of top-level keys to return")),
@@ -49,26 +47,37 @@ func (ch *ContextHandler) RegisterTools(s *server.MCPServer) error {
 }
 
 func (ch *ContextHandler) handlePutContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	memID, _ := req.RequireString("memory_id")
 	content, _ := req.RequireString("content")
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memID).
 		Int("content_len", len(content)).
 		Msg("handling put_context request")
 
 	start := time.Now()
-	ack, err := ch.client.PutContext(ctx, vaultID, memID, client.PutContextRequest{Context: content})
+	// CRITICAL: Use background context for async job to prevent cancellation when MCP tool call completes.
+	jobCtx := context.Background()
+
+	// CRITICAL: Backend expects Context to be a JSON object (map[string]interface{}), not a plain string.
+	// Try to parse content as JSON first, fallback to wrapping it in activeContext structure.
+	var contextObj interface{}
+	if json.Unmarshal([]byte(content), &contextObj) == nil {
+		// Content is valid JSON, use it directly
+		// (contextObj is already populated by json.Unmarshal)
+	} else {
+		// Content is plain text, wrap it in standard activeContext structure
+		contextObj = map[string]interface{}{"activeContext": content}
+	}
+
+	ack, err := ch.client.PutContext(jobCtx, vaultID, memID, client.PutContextRequest{Context: contextObj})
 	elapsed := time.Since(start)
 
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memID).
 			Dur("elapsed", elapsed).
@@ -77,7 +86,6 @@ func (ch *ContextHandler) handlePutContext(ctx context.Context, req mcp.CallTool
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memID).
 		Str("status", ack.Status).
@@ -88,7 +96,6 @@ func (ch *ContextHandler) handlePutContext(ctx context.Context, req mcp.CallTool
 }
 
 func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	memID, _ := req.RequireString("memory_id")
 
@@ -103,7 +110,6 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memID).
 		Strs("fragments", wanted).
@@ -116,7 +122,6 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 	if err != nil {
 		if errors.Is(err, client.ErrNotFound) {
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memID).
 				Dur("elapsed", elapsed).
@@ -125,7 +130,6 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 		}
 		log.Error().
 			Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memID).
 			Dur("elapsed", elapsed).
@@ -137,7 +141,6 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 	if !ok {
 		raw, _ := json.Marshal(res.Context)
 		log.Debug().
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memID).
 			Dur("elapsed", elapsed).
@@ -151,7 +154,6 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 	if len(wanted) == 0 {
 		raw, _ := json.Marshal(obj)
 		log.Debug().
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memID).
 			Dur("elapsed", elapsed).
@@ -171,7 +173,6 @@ func (ch *ContextHandler) handleGetContext(ctx context.Context, req mcp.CallTool
 	raw, _ := json.Marshal(filtered)
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memID).
 		Dur("elapsed", elapsed).

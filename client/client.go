@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/mycelian/mycelian-memory/client/internal/api"
+	"github.com/mycelian/mycelian-memory/client/internal/errors"
 	"github.com/mycelian/mycelian-memory/client/internal/shardqueue"
 	promptsinternal "github.com/mycelian/mycelian-memory/client/prompts"
 	"github.com/mycelian/mycelian-memory/devmode"
+	"github.com/rs/zerolog/log"
 )
 
 // Errors are defined in errors.go
@@ -153,7 +156,42 @@ const (
 )
 
 func newDefaultExecutor() *shardqueue.ShardExecutor {
-	cfg := shardqueue.Config{Shards: defaultExecutorShards, QueueSize: defaultExecutorQueueSize}
+	cfg := shardqueue.Config{
+		Shards:    defaultExecutorShards,
+		QueueSize: defaultExecutorQueueSize,
+		// CRITICAL: Enhanced error handler with classification awareness
+		ErrorHandler: func(err error) {
+			// Check if this is a classified error
+			if classifiedErr, ok := err.(*errors.ClassifiedError); ok {
+				// Log with error classification context
+				if classifiedErr.Category == errors.Irrecoverable {
+					log.Error().
+						Str("category", "IRRECOVERABLE").
+						Int("status_code", classifiedErr.StatusCode).
+						Str("response_body", classifiedErr.Body).
+						Stack().Err(classifiedErr.Underlying).
+						Msg("IRRECOVERABLE ERROR - failed immediately, no retries")
+
+					// Explicit stderr logging for immediate visibility
+					fmt.Fprintf(os.Stderr, "🚨 IRRECOVERABLE ERROR [HTTP %d]: %s\n",
+						classifiedErr.StatusCode, classifiedErr.Body)
+				} else {
+					log.Error().
+						Str("category", "RECOVERABLE").
+						Int("status_code", classifiedErr.StatusCode).
+						Stack().Err(classifiedErr.Underlying).
+						Msg("RECOVERABLE ERROR - max retries exceeded")
+
+					fmt.Fprintf(os.Stderr, "⚠️ RECOVERABLE ERROR [HTTP %d] - max retries exceeded: %v\n",
+						classifiedErr.StatusCode, classifiedErr.Underlying)
+				}
+			} else {
+				// Unclassified error - log with stack trace
+				log.Error().Stack().Err(err).Msg("UNCLASSIFIED ASYNC JOB ERROR")
+				fmt.Fprintf(os.Stderr, "🔥 UNCLASSIFIED ERROR: %v\n", err)
+			}
+		},
+	}
 	return shardqueue.NewShardExecutor(cfg)
 }
 

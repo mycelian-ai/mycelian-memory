@@ -1,1 +1,0 @@
-Store a code snippet only when it represents a stable solution, final review comment, or decision. Ignore intermediate errors, drafts, or tentative explorations. 

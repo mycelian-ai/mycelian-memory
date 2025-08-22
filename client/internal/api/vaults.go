@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
+	"github.com/mycelian/mycelian-memory/client/internal/errors"
 	"github.com/mycelian/mycelian-memory/client/internal/types"
 )
 
@@ -37,7 +39,12 @@ func CreateVault(ctx context.Context, httpClient *http.Client, baseURL string, r
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("create vault: status %d", resp.StatusCode)
+		// Read error response body for debugging (especially 401/403/500)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("create vault failed: status %d (could not read error body: %v)", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("create vault failed: status %d, body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var vault types.Vault
@@ -65,7 +72,14 @@ func ListVaults(ctx context.Context, httpClient *http.Client, baseURL string) ([
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("list vaults: status %d", resp.StatusCode)
+		// Read error response body for debugging (especially 401/403/500)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			// Create classified error even if we can't read the body
+			return nil, errors.NewHTTPError(resp.StatusCode, "", "list vaults")
+		}
+		// Return classified error with full response details
+		return nil, errors.ClassifyHTTPError(resp.StatusCode, string(bodyBytes), fmt.Errorf("list vaults failed"))
 	}
 
 	var lr types.ListVaultsResponse
@@ -92,7 +106,12 @@ func GetVault(ctx context.Context, httpClient *http.Client, baseURL, vaultID str
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("get vault: status %d", resp.StatusCode)
+		// Read error response body for debugging (especially 401/403/500)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("get vault failed: status %d (could not read error body: %v)", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("get vault failed: status %d, body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var vault types.Vault

@@ -13,7 +13,7 @@ import (
 func TestSearchMemoriesTool(t *testing.T) {
 	// stub backend search endpoint
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/search" {
+		if r.URL.Path != "/v0/search" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -35,7 +35,6 @@ func TestSearchMemoriesTool(t *testing.T) {
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]any{
-				"user_id":   "u1",
 				"memory_id": "m1",
 				"query":     "hello",
 				"top_k":     5,

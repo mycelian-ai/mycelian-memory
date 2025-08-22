@@ -29,7 +29,6 @@ func (mh *MemoryHandler) RegisterTools(s *server.MCPServer) error {
 	// get_memory – read-only
 	getMem := mcp.NewTool("get_memory",
 		mcp.WithDescription("Get memory details by ID inside a vault"),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("User UUID")),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("Vault UUID")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("Memory UUID")),
 	)
@@ -40,8 +39,7 @@ func (mh *MemoryHandler) RegisterTools(s *server.MCPServer) error {
 
 	// NEW: create_memory_in_vault – write path that requires vault ID
 	createMemInVault := mcp.NewTool("create_memory_in_vault",
-		mcp.WithDescription("CAUTION: Use ONLY after the human has explicitly confirmed they want to create a new memory **inside a vault**. First ask for permission, then call this tool to create the memory for the given user and vault."),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("User UUID")),
+		mcp.WithDescription("CAUTION: Use ONLY after the human has explicitly confirmed they want to create a new memory **inside a vault**. First ask for permission, then call this tool to create the memory in the vault."),
 		mcp.WithString("vault_id", mcp.Required(), mcp.Description("Vault UUID")),
 		mcp.WithString("title", mcp.Required(), mcp.Description("Memory title (≤50 chars, lowercase/hyphen)")),
 		mcp.WithString("memory_type", mcp.Required(), mcp.Description("Memory type e.g. NOTES, PROJECT")),
@@ -54,12 +52,10 @@ func (mh *MemoryHandler) RegisterTools(s *server.MCPServer) error {
 }
 
 func (mh *MemoryHandler) handleGetMemory(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	memoryID, _ := req.RequireString("memory_id")
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Msg("handling get_memory request")
@@ -71,7 +67,6 @@ func (mh *MemoryHandler) handleGetMemory(ctx context.Context, req mcp.CallToolRe
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("memory_id", memoryID).
 			Dur("elapsed", elapsed).
@@ -80,7 +75,6 @@ func (mh *MemoryHandler) handleGetMemory(ctx context.Context, req mcp.CallToolRe
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", memoryID).
 		Str("title", mem.Title).
@@ -93,7 +87,6 @@ func (mh *MemoryHandler) handleGetMemory(ctx context.Context, req mcp.CallToolRe
 }
 
 func (mh *MemoryHandler) handleCreateMemoryInVault(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	vaultID, _ := req.RequireString("vault_id")
 	title, _ := req.RequireString("title")
 	memoryType, _ := req.RequireString("memory_type")
@@ -103,7 +96,6 @@ func (mh *MemoryHandler) handleCreateMemoryInVault(ctx context.Context, req mcp.
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("title", title).
 		Str("memory_type", memoryType).
@@ -121,7 +113,6 @@ func (mh *MemoryHandler) handleCreateMemoryInVault(ctx context.Context, req mcp.
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("user_id", userID).
 			Str("vault_id", vaultID).
 			Str("title", title).
 			Dur("elapsed", elapsed).
@@ -130,7 +121,6 @@ func (mh *MemoryHandler) handleCreateMemoryInVault(ctx context.Context, req mcp.
 	}
 
 	log.Debug().
-		Str("user_id", userID).
 		Str("vault_id", vaultID).
 		Str("memory_id", mem.ID).
 		Str("title", mem.Title).

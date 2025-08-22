@@ -130,8 +130,27 @@ func (h *MemoryHandler) ListMemoryEntries(w http.ResponseWriter, r *http.Request
 	}
 
 	v := mux.Vars(r)
+	vaultID := v["vaultId"]
+	memoryID := v["memoryId"]
+
+	// SECURITY: Validate vault exists and actor owns it
+	if h.vaultSv != nil {
+		_, err := h.vaultSv.GetVault(r.Context(), actorInfo.ActorID, vaultID)
+		if err != nil {
+			respond.WriteNotFound(w, "vault not found")
+			return
+		}
+	}
+
+	// SECURITY: Validate memory exists in the vault and actor owns it
+	_, err = h.svc.GetMemory(r.Context(), actorInfo.ActorID, vaultID, memoryID)
+	if err != nil {
+		respond.WriteNotFound(w, "memory not found")
+		return
+	}
+
 	q := r.URL.Query()
-	req := model.ListEntriesRequest{ActorID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"]}
+	req := model.ListEntriesRequest{ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryID: memoryID}
 	if s := q.Get("limit"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
 			req.Limit = n
@@ -175,6 +194,25 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 	}
 
 	v := mux.Vars(r)
+	vaultID := v["vaultId"]
+	memoryID := v["memoryId"]
+
+	// SECURITY: Validate vault exists and actor owns it
+	if h.vaultSv != nil {
+		_, err := h.vaultSv.GetVault(r.Context(), actorInfo.ActorID, vaultID)
+		if err != nil {
+			respond.WriteNotFound(w, "vault not found")
+			return
+		}
+	}
+
+	// SECURITY: Validate memory exists in the vault and actor owns it
+	_, err = h.svc.GetMemory(r.Context(), actorInfo.ActorID, vaultID, memoryID)
+	if err != nil {
+		respond.WriteNotFound(w, "memory not found")
+		return
+	}
+
 	var in struct {
 		RawEntry       string                 `json:"rawEntry"`
 		Summary        *string                `json:"summary,omitempty"`
@@ -187,7 +225,7 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	e := &model.MemoryEntry{
-		ActorID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"],
+		ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryID: memoryID,
 		RawEntry: in.RawEntry, Summary: in.Summary, Metadata: in.Metadata, Tags: in.Tags, ExpirationTime: in.ExpirationTime,
 	}
 	out, err := h.svc.CreateEntry(r.Context(), e)
@@ -240,6 +278,26 @@ func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Req
 	}
 
 	v := mux.Vars(r)
+	vaultID := v["vaultId"]
+	memoryID := v["memoryId"]
+	entryID := v["entryId"]
+
+	// SECURITY: Validate vault exists and actor owns it
+	if h.vaultSv != nil {
+		_, err := h.vaultSv.GetVault(r.Context(), actorInfo.ActorID, vaultID)
+		if err != nil {
+			respond.WriteNotFound(w, "vault not found")
+			return
+		}
+	}
+
+	// SECURITY: Validate memory exists in the vault and actor owns it
+	_, err = h.svc.GetMemory(r.Context(), actorInfo.ActorID, vaultID, memoryID)
+	if err != nil {
+		respond.WriteNotFound(w, "memory not found")
+		return
+	}
+
 	var in struct {
 		Tags map[string]interface{} `json:"tags"`
 	}
@@ -247,7 +305,7 @@ func (h *MemoryHandler) UpdateMemoryEntryTags(w http.ResponseWriter, r *http.Req
 		respond.WriteBadRequest(w, "Invalid JSON")
 		return
 	}
-	out, err := h.svc.UpdateEntryTags(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"], v["entryId"], in.Tags)
+	out, err := h.svc.UpdateEntryTags(r.Context(), actorInfo.ActorID, vaultID, memoryID, entryID, in.Tags)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return
@@ -272,6 +330,25 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 	}
 
 	v := mux.Vars(r)
+	vaultID := v["vaultId"]
+	memoryID := v["memoryId"]
+
+	// SECURITY: Validate vault exists and actor owns it
+	if h.vaultSv != nil {
+		_, err := h.vaultSv.GetVault(r.Context(), actorInfo.ActorID, vaultID)
+		if err != nil {
+			respond.WriteNotFound(w, "vault not found")
+			return
+		}
+	}
+
+	// SECURITY: Validate memory exists in the vault and actor owns it
+	_, err = h.svc.GetMemory(r.Context(), actorInfo.ActorID, vaultID, memoryID)
+	if err != nil {
+		respond.WriteNotFound(w, "memory not found")
+		return
+	}
+
 	var body struct {
 		Context map[string]interface{} `json:"context"`
 	}
@@ -284,7 +361,7 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 		respond.WriteBadRequest(w, "context must be a valid JSON object")
 		return
 	}
-	mc := &model.MemoryContext{ActorID: actorInfo.ActorID, VaultID: v["vaultId"], MemoryID: v["memoryId"], ContextJSON: raw}
+	mc := &model.MemoryContext{ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryID: memoryID, ContextJSON: raw}
 	out, err := h.svc.PutContext(r.Context(), mc)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
@@ -310,7 +387,26 @@ func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Re
 	}
 
 	v := mux.Vars(r)
-	out, err := h.svc.GetLatestContext(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"])
+	vaultID := v["vaultId"]
+	memoryID := v["memoryId"]
+
+	// SECURITY: Validate vault exists and actor owns it
+	if h.vaultSv != nil {
+		_, err := h.vaultSv.GetVault(r.Context(), actorInfo.ActorID, vaultID)
+		if err != nil {
+			respond.WriteNotFound(w, "vault not found")
+			return
+		}
+	}
+
+	// SECURITY: Validate memory exists in the vault and actor owns it
+	_, err = h.svc.GetMemory(r.Context(), actorInfo.ActorID, vaultID, memoryID)
+	if err != nil {
+		respond.WriteNotFound(w, "memory not found")
+		return
+	}
+
+	out, err := h.svc.GetLatestContext(r.Context(), actorInfo.ActorID, vaultID, memoryID)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
 		return

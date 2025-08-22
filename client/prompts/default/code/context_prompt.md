@@ -1,1 +1,0 @@
-Select up to 5 summaries relevant to the current coding query (same language or file). Return newest first. 

@@ -23,7 +23,6 @@ func NewSearchHandler(c *client.Client) *SearchHandler {
 func (sh *SearchHandler) RegisterTools(s *server.MCPServer) error {
 	searchTool := mcp.NewTool("search_memories",
 		mcp.WithDescription("Hybrid semantic + keyword search within a memory. Results include:\n • entries – top-K entry hits.\n • latestContext – the most recent consolidated context snapshot (string).\n • bestContext – the context snapshot that most closely matches the query, if found, plus score & timestamp."),
-		mcp.WithString("user_id", mcp.Required(), mcp.Description("The UUID of the user")),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query text")),
 		mcp.WithNumber("top_k", mcp.Description("Number of results to return (1-100, default 10)")),
@@ -33,7 +32,6 @@ func (sh *SearchHandler) RegisterTools(s *server.MCPServer) error {
 }
 
 func (sh *SearchHandler) handleSearch(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	userID, _ := req.RequireString("user_id")
 	memoryID, _ := req.RequireString("memory_id")
 	query, _ := req.RequireString("query")
 
@@ -45,7 +43,6 @@ func (sh *SearchHandler) handleSearch(ctx context.Context, req mcp.CallToolReque
 	}
 
 	resp, err := sh.client.Search(ctx, client.SearchRequest{
-		UserID:   userID,
 		MemoryID: memoryID,
 		Query:    query,
 		TopK:     topK,

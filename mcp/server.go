@@ -49,7 +49,7 @@ func loadConfig() *config {
 
 	// Command line flags (will override env vars)
 	var rawLogLevel string
-	flag.StringVar(&cfg.MemoryServiceURL, "memory-service-url", cfg.MemoryServiceURL, "Base URL of the Synapse memory service")
+	flag.StringVar(&cfg.MemoryServiceURL, "memory-service-url", cfg.MemoryServiceURL, "Base URL of the Mycelian Memory Service")
 	flag.StringVar(&cfg.ContextDataDir, "context-data-dir", cfg.ContextDataDir, "Filesystem directory where context docs are stored")
 	flag.StringVar(&rawLogLevel, "log-level", cfg.LogLevel.String(), "Log level: debug|info|warn|error")
 	flag.Parse()
@@ -118,10 +118,13 @@ func RunMCPServer() error {
 	cfg.initLogger()
 
 	// Initialize the new Client SDK
-	synapseClient, err := client.NewWithDevMode(cfg.MemoryServiceURL)
+	log.Info().Str("memory_service_url", cfg.MemoryServiceURL).Msg("Creating client with dev mode")
+	mycelianClient, err := client.NewWithDevMode(cfg.MemoryServiceURL)
 	if err != nil {
+		log.Error().Stack().Err(err).Msg("Failed to create client")
 		return err
 	}
+	log.Info().Msg("Client created successfully")
 
 	// Create a new MCP server
 	s := server.NewMCPServer(
@@ -135,13 +138,13 @@ func RunMCPServer() error {
 	)
 
 	// Initialize and register handlers
-	registerHandler(s, handlers.NewMemoryHandler(synapseClient), "memory")
-	registerHandler(s, handlers.NewEntryHandler(synapseClient), "entry")
-	registerHandler(s, handlers.NewSearchHandler(synapseClient), "search")
-	registerHandler(s, handlers.NewPromptsHandler(synapseClient), "prompts")
-	registerHandler(s, handlers.NewVaultHandler(synapseClient), "vault")
-	registerHandler(s, handlers.NewContextHandler(synapseClient), "context")
-	registerHandler(s, handlers.NewConsistencyHandler(synapseClient), "consistency")
+	registerHandler(s, handlers.NewMemoryHandler(mycelianClient), "memory")
+	registerHandler(s, handlers.NewEntryHandler(mycelianClient), "entry")
+	registerHandler(s, handlers.NewSearchHandler(mycelianClient), "search")
+	registerHandler(s, handlers.NewPromptsHandler(mycelianClient), "prompts")
+	registerHandler(s, handlers.NewVaultHandler(mycelianClient), "vault")
+	registerHandler(s, handlers.NewContextHandler(mycelianClient), "context")
+	registerHandler(s, handlers.NewConsistencyHandler(mycelianClient), "consistency")
 
 	// Auto-detect transport method
 	if shouldUseStdio() {
@@ -205,12 +208,12 @@ func RunMCPServer() error {
 				log.Info().Msg("MCP server shutdown complete")
 			}
 
-			// Shutdown Synapse client
-			log.Info().Msg("Shutting down Synapse client...")
-			if err := synapseClient.Close(); err != nil {
-				log.Error().Err(err).Msg("Error closing Synapse client")
+			// Shutdown Mycelian client
+			log.Info().Msg("Shutting down Mycelian client...")
+			if err := mycelianClient.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing Mycelian client")
 			} else {
-				log.Info().Msg("Synapse client shutdown complete")
+				log.Info().Msg("Mycelian client shutdown complete")
 			}
 		}()
 
