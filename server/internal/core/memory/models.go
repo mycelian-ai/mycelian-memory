@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,5 +56,5 @@ type CreateMemoryContextRequest struct {
 	ActorID   string
 	MemoryID  string
 	ContextID *string
-	Context   json.RawMessage
+	Context   string
 }

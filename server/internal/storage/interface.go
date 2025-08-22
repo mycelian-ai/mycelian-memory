@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,18 +39,16 @@ type MemoryEntry struct {
 	ExpirationTime             *time.Time             `json:"expirationTime,omitempty"`
 }
 
-// MemoryContext represents a snapshot of JSON context for a memory
-// Introduced in schema v3 to decouple context from every entry.
+// MemoryContext represents a snapshot of text context for a memory
 // Primary key: (ActorID, MemoryID, ContextID)
-// JSON is stored raw to allow arbitrary structure.
 // CreationTime is the commit timestamp when inserted.
 type MemoryContext struct {
-	ActorID      string          `json:"actorId"`
-	VaultID      uuid.UUID       `json:"vaultId"`
-	MemoryID     string          `json:"memoryId"`
-	ContextID    string          `json:"contextId"`
-	Context      json.RawMessage `json:"context"`
-	CreationTime time.Time       `json:"creationTime"`
+	ActorID      string    `json:"actorId"`
+	VaultID      uuid.UUID `json:"vaultId"`
+	MemoryID     string    `json:"memoryId"`
+	ContextID    string    `json:"contextId"`
+	Context      string    `json:"context"`
+	CreationTime time.Time `json:"creationTime"`
 }
 
 // CreateUserRequest removed - user management is now external
@@ -122,11 +119,11 @@ type UpdateMemoryEntryTagsRequest struct {
 // CreateMemoryContextRequest represents the request to insert a new context snapshot
 // ContextID is optional – if empty, the storage layer should generate a UUID.
 type CreateMemoryContextRequest struct {
-	VaultID   uuid.UUID       `json:"vaultId"`
-	ActorID   string          `json:"actorId"`
-	MemoryID  string          `json:"memoryId"`
-	ContextID *string         `json:"contextId,omitempty"`
-	Context   json.RawMessage `json:"context"`
+	VaultID   uuid.UUID `json:"vaultId"`
+	ActorID   string    `json:"actorId"`
+	MemoryID  string    `json:"memoryId"`
+	ContextID *string   `json:"contextId,omitempty"`
+	Context   string    `json:"context"`
 }
 
 // GetLatestMemoryContextRequest retrieves the most recent context snapshot

@@ -303,15 +303,15 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 		return nil, err
 	}
 
-	// default context snapshot
+	// default context snapshot (store JSON-shaped string in TEXT column)
 	ctxID := uuid.New().String()
-	defaultCtx := json.RawMessage(`{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`)
+	defaultCtx := `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
 	var ctxCreated time.Time
 	if err := tx.QueryRowContext(ctx, `
         INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mm.ActorID, mm.VaultID, memID, ctxID, []byte(defaultCtx)).Scan(&ctxCreated); err != nil {
+    `, mm.ActorID, mm.VaultID, memID, ctxID, defaultCtx).Scan(&ctxCreated); err != nil {
 		return nil, err
 	}
 
@@ -319,7 +319,7 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 		"actorId":      mm.ActorID,
 		"memoryId":     memID,
 		"contextId":    ctxID,
-		"context":      string(defaultCtx),
+		"context":      defaultCtx,
 		"creationTime": ctxCreated,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_context", ctxID, payload); err != nil {
@@ -600,7 +600,7 @@ func (c *contexts) Put(ctx context.Context, mc *model.MemoryContext) (*model.Mem
         INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mc.ActorID, mc.VaultID, mc.MemoryID, ctxID, []byte(mc.ContextJSON))
+    `, mc.ActorID, mc.VaultID, mc.MemoryID, ctxID, mc.Context)
 	if err := row.Scan(&created); err != nil {
 		return nil, err
 	}
@@ -608,7 +608,7 @@ func (c *contexts) Put(ctx context.Context, mc *model.MemoryContext) (*model.Mem
 		"actorId":      mc.ActorID,
 		"memoryId":     mc.MemoryID,
 		"contextId":    ctxID,
-		"context":      string(mc.ContextJSON),
+		"context":      mc.Context,
 		"creationTime": created,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_context", ctxID, payload); err != nil {
@@ -628,16 +628,16 @@ func (c *contexts) Latest(ctx context.Context, userID, vaultID, memoryID string)
 	out.ActorID = userID
 	out.VaultID = vaultID
 	out.MemoryID = memoryID
-	var ctxBytes []byte
+	var ctxText string
 	row := c.db.QueryRowContext(ctx, `
         SELECT context_id, context, creation_time
         FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3
         ORDER BY creation_time DESC LIMIT 1
     `, userID, vaultID, memoryID)
-	if err := row.Scan(&out.ContextID, &ctxBytes, &out.CreationTime); err != nil {
+	if err := row.Scan(&out.ContextID, &ctxText, &out.CreationTime); err != nil {
 		return nil, err
 	}
-	out.ContextJSON = ctxBytes
+	out.Context = ctxText
 	return &out, nil
 }
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Memory Service provides a REST API for managing users, vaults, memories, entries, and contexts. All endpoints are versioned under `/v0` and respond with JSON.
+The Memory Service provides a REST API for managing users, vaults, memories, entries, and contexts. All endpoints are versioned under `/v0`. Most endpoints respond with JSON. Context endpoints use plain text for request/response bodies.
 
 **Base URL**: `http://localhost:11545/v0`
 
@@ -439,17 +439,17 @@ PATCH /v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/entries/{entryId}/
 PUT /v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts
 ```
 
-**Parameters**:
-- `userId` (path): User identifier
-- `vaultId` (path): Vault identifier
-- `memoryId` (path): Memory identifier
+**Headers**:
+- `Content-Type: text/plain; charset=utf-8`
 
-**Request Body**:
-```json
-{
-  "context": "object"
-}
-```
+**Body**:
+- Raw text (entire context document), UTF‑8.
+
+**Validation**:
+- Valid UTF‑8 only
+- Allowed control chars: TAB, LF, CR
+- Rejects other control chars and Unicode noncharacters
+- Max length limited by characters via `MEMORY_SERVER_MAX_CONTEXT_CHARS` (default 65536)
 
 **Response**: `201 Created`
 
@@ -458,20 +458,11 @@ PUT /v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts
 GET /v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts
 ```
 
-**Parameters**:
-- `userId` (path): User identifier
-- `vaultId` (path): Vault identifier
-- `memoryId` (path): Memory identifier
+**Headers**:
+- `Accept: text/plain`
 
 **Response**: `200 OK`
-```json
-{
-  "contextId": "context123",
-  "memoryId": "memory123",
-  "context": "object",
-  "createdAt": "2025-01-01T12:00:00Z"
-}
-```
+- Body is raw text of the latest context document (`text/plain; charset=utf-8`).
 
 ### Delete Memory Context
 ```
@@ -570,7 +561,7 @@ POST /v0/search
 ### Context
 - `contextId`: String, unique identifier
 - `memoryId`: String, parent memory identifier
-- `context`: Object, context data (structure varies)
+- `context`: String (raw text document)
 - `createdAt`: ISO 8601 timestamp
 
 ## Error Handling

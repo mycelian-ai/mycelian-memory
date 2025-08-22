@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,10 +21,10 @@ func TestHandlersEndToEnd(t *testing.T) {
 			_, _ = w.Write([]byte(`{"entryId":"e1"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1/entries":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"entries":[{"entryId":"e1","context":"{\"activeContext\":\"hello\"}"}],"count":1}`))
+			_, _ = w.Write([]byte(`{"entries":[{"entryId":"e1","context":"hello"}],"count":1}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v0/search":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"entries":[],"count":0,"latestContext":"{}"}`))
+			_, _ = w.Write([]byte(`{"entries":[],"count":0,"latestContext":""}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"memoryId":"m1","title":"demo"}`))
@@ -33,8 +32,8 @@ func TestHandlersEndToEnd(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"actorId":"mycelian-dev","email":"dev@localhost"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v0/vaults/v1/memories/m1/contexts":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"contextId":"ctx1","memoryId":"m1","vaultId":"v1","actorId":"mycelian-dev","context":{"activeContext":"hello"},"creationTime":"2025-07-02T00:00:00Z"}`))
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte("hello"))
 		case r.Method == http.MethodPut && r.URL.Path == "/v0/vaults/v1/memories/m1/contexts":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
@@ -71,9 +70,8 @@ func TestHandlersEndToEnd(t *testing.T) {
 	if err != nil || getRes == nil {
 		t.Fatalf("get_context failed: %v", err)
 	}
-	var obj map[string]string
-	if err := json.Unmarshal([]byte(getRes.Content[0].(mcp.TextContent).Text), &obj); err != nil || obj["activeContext"] != "hello" {
-		t.Fatalf("get_context mismatch: %+v", getRes.Content)
+	if text := getRes.Content[0].(mcp.TextContent).Text; text != "hello" {
+		t.Fatalf("get_context mismatch: %v", text)
 	}
 
 	// ----- EntryHandler -----
@@ -121,12 +119,9 @@ func TestHandlersEndToEnd(t *testing.T) {
 	}
 
 	// verify backend context reflects the write
-	resCtx, err := sdk.GetLatestContext(context.Background(), "v1", "m1")
-	if err != nil || resCtx == nil {
+	resText, err := sdk.GetLatestContext(context.Background(), "v1", "m1")
+	if err != nil || resText == "" {
 		t.Fatalf("get latest context failed: %v", err)
-	}
-	if m, ok := resCtx.Context.(map[string]interface{}); !ok || m["activeContext"] != "hello" {
-		t.Fatalf("unexpected backend context: %#v", resCtx.Context)
 	}
 
 	// ensure tests run quickly

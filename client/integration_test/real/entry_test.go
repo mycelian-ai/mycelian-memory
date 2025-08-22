@@ -47,7 +47,7 @@ func TestAddEntryE2E(t *testing.T) {
 	}
 
 	// set context
-	_, err = c.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "ctx"}})
+	_, err = c.PutContext(ctx, vault.VaultID, mem.ID, "ctx")
 	if err != nil {
 		t.Fatalf("put context: %v", err)
 	}

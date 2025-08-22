@@ -36,11 +36,6 @@ type AddEntryRequest struct {
 	ExpirationTime *time.Time             `json:"expirationTime,omitempty"`
 }
 
-// PutContextRequest stores a context snapshot
-type PutContextRequest struct {
-	Context any `json:"context"`
-}
-
 // SearchRequest holds search parameters
 type SearchRequest struct {
 	UserID   string `json:"actorId"`

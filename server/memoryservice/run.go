@@ -127,7 +127,7 @@ func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.Embeddin
 
 	// Memories
 	memorySvc := services.NewMemoryService(st, idx, embProvider)
-	memory := api.NewMemoryHandler(memorySvc, vaultSvc, authorizer)
+	memory := api.NewMemoryHandler(memorySvc, vaultSvc, authorizer, cfg)
 	root.HandleFunc("/v0/vaults/{vaultId}/memories", memory.CreateMemory).Methods("POST")
 	root.HandleFunc("/v0/vaults/{vaultId}/memories", memory.ListMemories).Methods("GET")
 	root.HandleFunc("/v0/vaults/{vaultId}/memories/{memoryId}", memory.GetMemory).Methods("GET")

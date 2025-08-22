@@ -87,8 +87,8 @@ func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
 	}
 
 	// Contexts
-	ctxBody := json.RawMessage(`{"foo":"bar"}`)
-	c, err := s.Contexts().Put(ctx, &model.MemoryContext{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, ContextJSON: ctxBody})
+	ctxBody := `{"foo":"bar"}`
+	c, err := s.Contexts().Put(ctx, &model.MemoryContext{ActorID: userID, VaultID: v.VaultID, MemoryID: m.MemoryID, Context: ctxBody})
 	if err != nil {
 		t.Fatalf("PutContext: %v", err)
 	}

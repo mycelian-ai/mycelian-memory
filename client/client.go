@@ -289,16 +289,13 @@ func (c *Client) DeleteEntry(ctx context.Context, vaultID, memID, entryID string
 // Context operations - delegated to internal/api (CRITICAL: mixed sync/async)
 // --------------------------------------------------------------------
 
-// PutContext stores a snapshot for the memory via the sharded executor.
-// This ensures FIFO ordering per memory and provides offline resilience.
-// CRITICAL: This MUST preserve the async executor pattern!
-func (c *Client) PutContext(ctx context.Context, vaultID, memID string, payload PutContextRequest) (*EnqueueAck, error) {
-	// CRITICAL: Pass the executor for async operation
-	return api.PutContext(ctx, c.exec, c.http, c.baseURL, vaultID, memID, payload)
+// PutContext stores the plain-text context document via the sharded executor.
+func (c *Client) PutContext(ctx context.Context, vaultID, memID string, doc string) (*EnqueueAck, error) {
+	return api.PutContext(ctx, c.exec, c.http, c.baseURL, vaultID, memID, doc)
 }
 
-// GetLatestContext retrieves the most recent context snapshot for a memory (synchronous).
-func (c *Client) GetLatestContext(ctx context.Context, vaultID, memID string) (*Context, error) {
+// GetLatestContext fetches the latest context document as plain text.
+func (c *Client) GetLatestContext(ctx context.Context, vaultID, memID string) (string, error) {
 	return api.GetLatestContext(ctx, c.http, c.baseURL, vaultID, memID)
 }
 

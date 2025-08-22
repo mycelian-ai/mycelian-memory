@@ -2,14 +2,19 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/gorilla/mux"
 
 	respond "github.com/mycelian/mycelian-memory/server/internal/api/respond"
 	"github.com/mycelian/mycelian-memory/server/internal/auth"
+	"github.com/mycelian/mycelian-memory/server/internal/config"
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/services"
 )
@@ -18,10 +23,11 @@ type MemoryHandler struct {
 	svc        *services.MemoryService
 	vaultSv    *services.VaultService
 	authorizer auth.Authorizer
+	cfg        *config.Config
 }
 
-func NewMemoryHandler(svc *services.MemoryService, vaultSvc *services.VaultService, authorizer auth.Authorizer) *MemoryHandler {
-	return &MemoryHandler{svc: svc, vaultSv: vaultSvc, authorizer: authorizer}
+func NewMemoryHandler(svc *services.MemoryService, vaultSvc *services.VaultService, authorizer auth.Authorizer, cfg *config.Config) *MemoryHandler {
+	return &MemoryHandler{svc: svc, vaultSv: vaultSvc, authorizer: authorizer, cfg: cfg}
 }
 
 // CreateMemory POST /api/vaults/{vaultId}/memories
@@ -349,19 +355,49 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var body struct {
-		Context map[string]interface{} `json:"context"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		respond.WriteBadRequest(w, "Invalid JSON")
+	if ct := r.Header.Get("Content-Type"); ct != "" && ct != "text/plain" && ct != "text/plain; charset=utf-8" {
+		respond.WriteError(w, http.StatusUnsupportedMediaType, "Content-Type must be text/plain")
 		return
 	}
-	raw, err := json.Marshal(body.Context)
+	doc, err := io.ReadAll(r.Body)
 	if err != nil {
-		respond.WriteBadRequest(w, "context must be a valid JSON object")
+		respond.WriteBadRequest(w, "unable to read body")
 		return
 	}
-	mc := &model.MemoryContext{ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryID: memoryID, ContextJSON: raw}
+	if len(doc) == 0 {
+		respond.WriteBadRequest(w, "context document must not be empty")
+		return
+	}
+	// UTF-8 and character-set validation
+	if !utf8.Valid(doc) {
+		respond.WriteBadRequest(w, "context must be valid UTF-8")
+		return
+	}
+	s := string(doc)
+	for _, r := range s {
+		// Allow common whitespace
+		if r == '\n' || r == '\r' || r == '\t' {
+			continue
+		}
+		// Disallow other control characters
+		if unicode.IsControl(r) {
+			respond.WriteBadRequest(w, fmt.Sprintf("invalid control character: U+%04X", r))
+			return
+		}
+		// Disallow Unicode noncharacters (U+FDD0..U+FDEF and U+..FFFE/FFFF in every plane)
+		if (r&0xFFFE == 0xFFFE) || (r >= 0xFDD0 && r <= 0xFDEF) {
+			respond.WriteBadRequest(w, fmt.Sprintf("invalid noncharacter: U+%04X", r))
+			return
+		}
+	}
+	if h.cfg != nil && h.cfg.MaxContextChars > 0 {
+		if utf8.RuneCount(doc) > h.cfg.MaxContextChars {
+			respond.WriteError(w, http.StatusRequestEntityTooLarge, "context exceeds maximum size")
+			return
+		}
+	}
+
+	mc := &model.MemoryContext{ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryID: memoryID, Context: s}
 	out, err := h.svc.PutContext(r.Context(), mc)
 	if err != nil {
 		respond.WriteInternalError(w, err.Error())
@@ -411,21 +447,9 @@ func (h *MemoryHandler) GetLatestMemoryContext(w http.ResponseWriter, r *http.Re
 		respond.WriteInternalError(w, err.Error())
 		return
 	}
-	// Decode stored JSON context into a native JSON value so clients receive an object rather than base64.
-	var ctxVal interface{}
-	if err := json.Unmarshal(out.ContextJSON, &ctxVal); err != nil {
-		// Fallback to raw string if not valid JSON
-		ctxVal = string(out.ContextJSON)
-	}
-	resp := map[string]interface{}{
-		"contextId":    out.ContextID,
-		"actorId":      out.ActorID,
-		"vaultId":      out.VaultID,
-		"memoryId":     out.MemoryID,
-		"creationTime": out.CreationTime,
-		"context":      ctxVal,
-	}
-	respond.WriteJSON(w, http.StatusOK, resp)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(out.Context))
 }
 
 // GetMemoryByTitle GET /api/vaults/{vaultTitle}/memories/{memoryTitle}

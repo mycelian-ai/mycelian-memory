@@ -221,13 +221,13 @@ func (s *PostgresStorage) CreateMemory(ctx context.Context, req storage.CreateMe
 
 	// default context
 	ctxID := uuid.New().String()
-	defaultCtx := json.RawMessage(`{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`)
+	defaultCtx := "This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."
 	var ctxCreated time.Time
 	if err := tx.QueryRowContext(ctx, `
         INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mem.ActorID, mem.VaultID.String(), mem.MemoryID, ctxID, []byte(defaultCtx)).Scan(&ctxCreated); err != nil {
+    `, mem.ActorID, mem.VaultID.String(), mem.MemoryID, ctxID, defaultCtx).Scan(&ctxCreated); err != nil {
 		return nil, err
 	}
 
@@ -236,7 +236,7 @@ func (s *PostgresStorage) CreateMemory(ctx context.Context, req storage.CreateMe
 		"actorId":      mem.ActorID,
 		"memoryId":     mem.MemoryID,
 		"contextId":    ctxID,
-		"context":      string(defaultCtx),
+		"context":      defaultCtx,
 		"creationTime": ctxCreated,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_context", ctxID, payload); err != nil {
@@ -743,16 +743,16 @@ func (s *PostgresStorage) GetLatestMemoryContext(ctx context.Context, actorID st
 	mc.ActorID = actorID
 	mc.VaultID = vaultID
 	mc.MemoryID = memoryID
-	var ctxBytes []byte
+	var ctxText string
 	row := s.db.QueryRowContext(ctx, `
         SELECT context_id, context, creation_time
         FROM memory_contexts WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3
         ORDER BY creation_time DESC LIMIT 1
     `, actorID, vaultID.String(), memoryID)
-	if err := row.Scan(&mc.ContextID, &ctxBytes, &mc.CreationTime); err != nil {
+	if err := row.Scan(&mc.ContextID, &ctxText, &mc.CreationTime); err != nil {
 		return nil, err
 	}
-	mc.Context = json.RawMessage(ctxBytes)
+	mc.Context = ctxText
 	return &mc, nil
 }
 

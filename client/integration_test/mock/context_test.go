@@ -2,7 +2,6 @@ package client_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,15 +13,15 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	t.Parallel()
 	vaultID, memID := "v1", "m1"
 	var putCalled bool
-	ctxResp := client.Context{Context: map[string]interface{}{"activeContext": "foo"}}
+	ctxText := "foo"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		switch r.Method {
 		case http.MethodPut:
 			putCalled = true
 			w.WriteHeader(http.StatusCreated)
 		case http.MethodGet:
-			_ = json.NewEncoder(w).Encode(&ctxResp)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte(ctxText))
 		default:
 			t.Fatalf("unexpected method %s", r.Method)
 		}
@@ -35,7 +34,7 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 	ctx := context.Background()
-	if _, err := c.PutContext(ctx, vaultID, memID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "foo"}}); err != nil {
+	if _, err := c.PutContext(ctx, vaultID, memID, ctxText); err != nil {
 		t.Fatalf("PutContext: %v", err)
 	}
 	if err := c.AwaitConsistency(ctx, memID); err != nil {
@@ -46,10 +45,9 @@ func TestClient_PutAndGetContext(t *testing.T) {
 	}
 	got, err := c.GetLatestContext(ctx, vaultID, memID)
 	if err != nil {
-		t.Fatalf("GetContext: %v", err)
+		t.Fatalf("GetLatestContext: %v", err)
 	}
-	ctxMap, ok := got.Context.(map[string]interface{})
-	if !ok || ctxMap["activeContext"].(string) != "foo" {
-		t.Fatalf("unexpected context")
+	if got != ctxText {
+		t.Fatalf("unexpected context: %q", got)
 	}
 }

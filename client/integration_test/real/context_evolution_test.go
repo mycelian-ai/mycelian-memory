@@ -5,7 +5,6 @@ package client_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -45,7 +44,7 @@ func TestContextEvolutionE2E(t *testing.T) {
 
 	snapshots := []string{"ctx-1", "ctx-2", "ctx-3"}
 	for i, snap := range snapshots {
-		if _, err := c.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": snap}}); err != nil {
+		if _, err := c.PutContext(ctx, vault.VaultID, mem.ID, snap); err != nil {
 			t.Fatalf("put context %d: %v", i, err)
 		}
 		raw := fmt.Sprintf("entry-%d", i+1)
@@ -56,12 +55,11 @@ func TestContextEvolutionE2E(t *testing.T) {
 
 	_ = c.AwaitConsistency(ctx, mem.ID)
 
-	latestCtx, err := c.GetLatestContext(ctx, vault.VaultID, mem.ID)
+	latestText, err := c.GetLatestContext(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("get latest context: %v", err)
 	}
-	rawJSON, _ := json.Marshal(latestCtx.Context)
-	if string(rawJSON) == "" {
+	if latestText == "" {
 		t.Fatalf("latest context empty")
 	}
 
@@ -103,7 +101,7 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 	}
 
 	originalCtx := "Agent A context"
-	if _, err := agentA.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": originalCtx}}); err != nil {
+	if _, err := agentA.PutContext(ctx, vault.VaultID, mem.ID, originalCtx); err != nil {
 		t.Fatalf("agentA put context: %v", err)
 	}
 	_ = agentA.AwaitConsistency(ctx, mem.ID)
@@ -120,13 +118,12 @@ func TestMultiAgentContextAccessE2E(t *testing.T) {
 	}
 	defer agentB.Close()
 
-	resCtx, err := agentB.GetLatestContext(ctx, vault.VaultID, mem.ID)
+	resText, err := agentB.GetLatestContext(ctx, vault.VaultID, mem.ID)
 	if err != nil {
 		t.Fatalf("agentB get context: %v", err)
 	}
-	m, ok := resCtx.Context.(map[string]interface{})
-	if !ok || m["activeContext"] != originalCtx {
-		t.Fatalf("context mismatch: %#v", resCtx.Context)
+	if resText != originalCtx {
+		t.Fatalf("context mismatch: %q", resText)
 	}
 
 	if _, err := agentB.AddEntry(ctx, vault.VaultID, mem.ID, client.AddEntryRequest{RawEntry: "B entry", Summary: "sum"}); err != nil {

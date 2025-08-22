@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS memory_contexts (
   vault_id       TEXT NOT NULL,
   memory_id      TEXT NOT NULL,
   context_id     TEXT NOT NULL,
-  context        JSONB NOT NULL,
+  context        TEXT NOT NULL,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (actor_id, vault_id, memory_id, context_id)
 );

@@ -5,7 +5,6 @@ package client_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -45,8 +44,7 @@ func TestSearchE2E(t *testing.T) {
 	}
 
 	// 3. write context and wait for consistency
-	_, err = c.PutContext(ctx, vault.VaultID, mem.ID, client.PutContextRequest{Context: map[string]interface{}{"activeContext": "integration context"}})
-	if err != nil {
+	if _, err := c.PutContext(ctx, vault.VaultID, mem.ID, "integration context"); err != nil {
 		t.Fatalf("put context: %v", err)
 	}
 	if err := c.AwaitConsistency(ctx, mem.ID); err != nil {
@@ -91,30 +89,8 @@ func TestSearchE2E(t *testing.T) {
 	if sr.Count == 0 {
 		t.Fatalf("search returned zero results")
 	}
-
-	expectedCtx := "integration context"
-	var val any
-	if err := json.Unmarshal(sr.LatestContext, &val); err != nil {
-		t.Fatalf("unmarshal latestContext: %v", err)
-	}
-	switch v := val.(type) {
-	case string:
-		var raw2 string
-		if err := json.Unmarshal([]byte(v), &raw2); err == nil {
-			v = raw2
-		}
-		if v != expectedCtx {
-			var frag map[string]string
-			if err := json.Unmarshal([]byte(v), &frag); err != nil || frag["activeContext"] != expectedCtx {
-				t.Fatalf("latestContext mismatch: %q", v)
-			}
-		}
-	case map[string]interface{}:
-		if s, ok := v["activeContext"].(string); !ok || s != expectedCtx {
-			t.Fatalf("latestContext mismatch: %#v", v)
-		}
-	default:
-		t.Fatalf("unexpected latestContext type: %#v", v)
+	if string(sr.LatestContext) != "\"integration context\"" && string(sr.LatestContext) != "integration context" {
+		t.Fatalf("latestContext mismatch: %s", string(sr.LatestContext))
 	}
 	if sr.ContextTimestamp == nil {
 		t.Fatalf("contextTimestamp nil")

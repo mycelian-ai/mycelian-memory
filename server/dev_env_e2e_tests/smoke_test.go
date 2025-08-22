@@ -5,7 +5,6 @@ package e2e
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -94,40 +93,27 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		t.Fatalf("get context request: %v", err)
 	}
 	ctxReq.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
+	// Accept text/plain; the endpoint returns raw context text
+	ctxReq.Header.Set("Accept", "text/plain")
 	ctxResp, err := http.DefaultClient.Do(ctxReq)
 	if err != nil {
 		t.Fatalf("get default context: %v", err)
 	}
-	// Accept either string or object for the `context` field
-	var raw map[string]interface{}
-	mustJSON(t, ctxResp, &raw)
-	expectedDefault := "This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."
-	ctxVal, ok := raw["context"]
-	if !ok {
-		t.Fatalf("missing context field in response: %+v", raw)
+	if ctxResp.StatusCode != http.StatusOK {
+		bb, _ := io.ReadAll(ctxResp.Body)
+		_ = ctxResp.Body.Close()
+		t.Fatalf("unexpected status for default context: %d: %s", ctxResp.StatusCode, string(bb))
 	}
-	switch v := ctxVal.(type) {
-	case string:
-		// Attempt base64 decode; if JSON with activeContext, extract and compare
-		if dec, err := base64.StdEncoding.DecodeString(v); err == nil {
-			var m map[string]interface{}
-			if json.Unmarshal(dec, &m) == nil {
-				if s, _ := m["activeContext"].(string); s == expectedDefault {
-					break
-				}
-				t.Fatalf("default context mismatch. want %q, got decoded %+v", expectedDefault, m)
-			}
-		}
-		if v != expectedDefault {
-			t.Fatalf("default context mismatch. want %q, got %q", expectedDefault, v)
-		}
-	case map[string]interface{}:
-		active, _ := v["activeContext"].(string)
-		if active != expectedDefault {
-			t.Fatalf("default context mismatch. want %q, got %q", expectedDefault, active)
-		}
-	default:
-		t.Fatalf("unexpected context type %T", v)
+	bb, _ := io.ReadAll(ctxResp.Body)
+	_ = ctxResp.Body.Close()
+	// The default context is a JSON object with activeContext; parse and compare.
+	var m map[string]interface{}
+	if err := json.Unmarshal(bb, &m); err != nil {
+		t.Fatalf("default context decode failed: %v; body=%s", err, string(bb))
+	}
+	expectedDefault := "This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."
+	if s, _ := m["activeContext"].(string); s != expectedDefault {
+		t.Fatalf("default context mismatch. want %q, got %q", expectedDefault, s)
 	}
 
 	// 3. Create entry
@@ -174,12 +160,12 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 				} `json:"data"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&out); err == nil && len(out.Data.Get.MemoryEntry) == 1 {
-				r.Body.Close()
+				_ = r.Body.Close()
 				break // success
 			}
-			r.Body.Close()
+			_ = r.Body.Close()
 		} else if r != nil {
-			r.Body.Close()
+			_ = r.Body.Close()
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
@@ -285,11 +271,11 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	for time.Now().Before(deadline) {
 		r, err := http.Get(objectURL)
 		if err == nil && r.StatusCode == http.StatusOK {
-			r.Body.Close()
+			_ = r.Body.Close()
 			break
 		}
 		if r != nil {
-			r.Body.Close()
+			_ = r.Body.Close()
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -326,7 +312,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 //
-// Test 3: Context API round-trip (PUT + GET)
+//	Test 3: Context API round-trip (PUT + GET)
 //
 // -----------------------------------------------------------------------------
 func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
@@ -387,10 +373,10 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 
 	putURL := fmt.Sprintf("%s/memories/%s/contexts", baseVaultPath2, memResp.MemoryID)
 
-	// 3. PUT context
-	ctxPayload := `{"context":{"note":"smoke-test"}}`
+	// 3. PUT context as text/plain
+	ctxPayload := "smoke-test"
 	req8, _ := http.NewRequest(http.MethodPut, putURL, bytes.NewBufferString(ctxPayload))
-	req8.Header.Set("Content-Type", "application/json")
+	req8.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	req8.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	resp, err := http.DefaultClient.Do(req8)
 	if err != nil {
@@ -403,24 +389,28 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	// 4. GET latest context and verify
+	// 4. GET latest context and verify text
 	getURL := putURL
 	req9, err := http.NewRequest("GET", getURL, nil)
 	if err != nil {
 		t.Fatalf("get context request: %v", err)
 	}
 	req9.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
+	req9.Header.Set("Accept", "text/plain")
 	resp, err = http.DefaultClient.Do(req9)
 	if err != nil {
 		t.Fatalf("get context: %v", err)
 	}
-	var ctxResp struct {
-		Context map[string]interface{} `json:"context"`
+	if resp.StatusCode != http.StatusOK {
+		bb2, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		t.Fatalf("unexpected status: %d body=%s", resp.StatusCode, string(bb2))
 	}
-	mustJSON(t, resp, &ctxResp)
-	note, ok := ctxResp.Context["note"].(string)
-	if !ok || note != "smoke-test" {
-		t.Fatalf("unexpected context note: %+v", ctxResp.Context)
+	bb2, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	got := strings.TrimSpace(string(bb2))
+	if got != ctxPayload {
+		t.Fatalf("unexpected context text: got %q want %q", got, ctxPayload)
 	}
 }
 

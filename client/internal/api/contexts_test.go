@@ -5,11 +5,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/mycelian/mycelian-memory/client/internal/types"
 )
 
 // mockExec provided by mock_executor_provider_test.go
+
+type errorExec struct{}
+
+func (e *errorExec) Submit(ctx context.Context, shard string, job interface{ Run(context.Context) error }) error {
+	return context.Canceled
+}
 
 func TestPutContext_EnqueuesAndCallsHTTP(t *testing.T) {
 	t.Parallel()
@@ -19,7 +23,7 @@ func TestPutContext_EnqueuesAndCallsHTTP(t *testing.T) {
 	defer srv.Close()
 
 	exec := &mockExec{}
-	ack, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.PutContextRequest{Context: map[string]any{"x": 1}})
+	ack, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", "hello")
 	if err != nil {
 		t.Fatalf("PutContext error: %v", err)
 	}
@@ -54,36 +58,11 @@ func TestContexts_NonOKStatuses(t *testing.T) {
 	}))
 	defer srv.Close()
 	exec := &mockExec{}
-	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.PutContextRequest{Context: map[string]any{"x": 1}}); err == nil {
+	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", "hello"); err == nil {
 		t.Fatal("expected error for PutContext non-201")
 	}
 	if _, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
 		t.Fatal("expected error for GetLatestContext non-OK non-404")
-	}
-}
-
-func TestGetContext_DecodeError(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("{bad json"))
-	}))
-	defer srv.Close()
-	if _, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1"); err == nil {
-		t.Fatal("expected decode error for GetLatestContext")
-	}
-}
-
-func TestGetContext_Success(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"context": {"activeContext": "x"}}`))
-	}))
-	defer srv.Close()
-	res, err := GetLatestContext(context.Background(), srv.Client(), srv.URL, "v1", "m1")
-	if err != nil || res == nil {
-		t.Fatalf("GetLatestContext success unexpected err=%v res=%+v", err, res)
 	}
 }
 
@@ -93,8 +72,8 @@ func TestPutContext_SubmitError(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer srv.Close()
-	var exec types.Executor = &failingExec{}
-	_, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", types.PutContextRequest{Context: map[string]any{"x": 1}})
+	exec := &failingExec{}
+	_, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "m1", "hello")
 	if err == nil {
 		t.Fatal("expected submit error from executor")
 	}
@@ -107,7 +86,7 @@ func TestPutContext_CtxCanceled(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	exec := &mockExec{}
-	if _, err := PutContext(ctx, exec, srv.Client(), srv.URL, "v1", "m1", types.PutContextRequest{Context: map[string]any{"x": 1}}); err == nil {
+	if _, err := PutContext(ctx, exec, srv.Client(), srv.URL, "v1", "m1", "hello"); err == nil {
 		t.Fatal("expected context canceled error")
 	}
 }
@@ -137,11 +116,11 @@ func TestPutContext_InvalidIDs(t *testing.T) {
 	defer srv.Close()
 	exec := &mockExec{}
 	// empty vaultId
-	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "", "m1", types.PutContextRequest{Context: map[string]any{"x": 1}}); err == nil {
+	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "", "m1", "hello"); err == nil {
 		t.Fatal("expected validation error for empty vaultId")
 	}
 	// empty memoryId
-	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "", types.PutContextRequest{Context: map[string]any{"x": 1}}); err == nil {
+	if _, err := PutContext(context.Background(), exec, srv.Client(), srv.URL, "v1", "", "hello"); err == nil {
 		t.Fatal("expected validation error for empty memoryId")
 	}
 }

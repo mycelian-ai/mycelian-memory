@@ -370,7 +370,7 @@ func newPutContextCmd() *cobra.Command {
 			defer c.Close() // Ensure queues are drained before process exits
 
 			start := time.Now()
-			ack, err := c.PutContext(ctx, vaultID, memoryID, client.PutContextRequest{Context: content})
+			ack, err := c.PutContext(ctx, vaultID, memoryID, content)
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -435,7 +435,7 @@ func newGetContextCmd() *cobra.Command {
 			defer cancel()
 
 			start := time.Now()
-			resp, err := c.GetLatestContext(ctx, vaultID, memoryID)
+			text, err := c.GetLatestContext(ctx, vaultID, memoryID)
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -459,68 +459,14 @@ func newGetContextCmd() *cobra.Command {
 				return err
 			}
 
-			if resp.Context != nil {
-				switch v := resp.Context.(type) {
-				case string:
-					log.Debug().
-						Str("user_id", userID).
-						Str("vault_id", vaultID).
-						Str("memory_id", memoryID).
-						Dur("elapsed", elapsed).
-						Int("content_len", len(v)).
-						Str("type", "string").
-						Msg("get context completed")
-					fmt.Println(v)
-				case map[string]interface{}:
-					// If the backend wraps the snapshot under {"activeContext": "..."},
-					// print the raw string value so downstream consumers receive exactly
-					// the stored context without additional JSON decoration.
-					if ac, ok := v["activeContext"].(string); ok {
-						log.Debug().
-							Str("user_id", userID).
-							Str("vault_id", vaultID).
-							Str("memory_id", memoryID).
-							Dur("elapsed", elapsed).
-							Int("content_len", len(ac)).
-							Str("type", "activeContext").
-							Msg("get context completed")
-						fmt.Println(ac)
-					} else {
-						// Fallback: pretty-print the JSON map (same as default branch)
-						b, _ := json.MarshalIndent(v, "", "  ")
-						log.Debug().
-							Str("user_id", userID).
-							Str("vault_id", vaultID).
-							Str("memory_id", memoryID).
-							Dur("elapsed", elapsed).
-							Int("content_len", len(b)).
-							Str("type", "json").
-							Msg("get context completed")
-						fmt.Println(string(b))
-					}
-				default:
-					b, _ := json.MarshalIndent(v, "", "  ")
-					log.Debug().
-						Str("user_id", userID).
-						Str("vault_id", vaultID).
-						Str("memory_id", memoryID).
-						Dur("elapsed", elapsed).
-						Int("content_len", len(b)).
-						Str("type", "json").
-						Msg("get context completed")
-					fmt.Println(string(b))
-				}
-			} else {
-				log.Debug().
-					Str("user_id", userID).
-					Str("vault_id", vaultID).
-					Str("memory_id", memoryID).
-					Dur("elapsed", elapsed).
-					Str("type", "empty").
-					Msg("get context completed")
-				fmt.Println("(empty context)")
-			}
-
+			log.Debug().
+				Str("user_id", userID).
+				Str("vault_id", vaultID).
+				Str("memory_id", memoryID).
+				Dur("elapsed", elapsed).
+				Int("content_len", len(text)).
+				Msg("get context completed")
+			fmt.Println(text)
 			return nil
 		},
 	}

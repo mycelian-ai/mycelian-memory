@@ -59,6 +59,10 @@ type Config struct {
 	TestingUseEmulator  bool `envconfig:"TESTING_USE_EMULATOR" default:"true"`
 	TestingTempDatabase bool `envconfig:"TESTING_TEMP_DATABASE" default:"true"`
 	TestingParallel     bool `envconfig:"TESTING_PARALLEL" default:"true"`
+
+	// Context handling
+	// Maximum allowed size in characters (Unicode code points) for a context document (0 disables limit)
+	MaxContextChars int `envconfig:"MAX_CONTEXT_CHARS" default:"65536"`
 }
 
 // ResolveDefaults validates BuildTarget and derives DBDriver when set to "auto" or empty.

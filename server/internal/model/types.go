@@ -52,7 +52,7 @@ type MemoryContext struct {
 	ActorID      string    `json:"actorId"`
 	VaultID      string    `json:"vaultId"`
 	MemoryID     string    `json:"memoryId"`
-	ContextJSON  []byte    `json:"context"`
+	Context      string    `json:"context"`
 	CreationTime time.Time `json:"creationTime"`
 }
 

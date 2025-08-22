@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 )
 
@@ -13,7 +12,7 @@ func TestCreateMemoryContext_Validation(t *testing.T) {
 		return CreateMemoryContextRequest{
 			ActorID:  "u",
 			MemoryID: "m",
-			Context:  json.RawMessage(payload),
+			Context:  payload,
 		}
 	}
 
@@ -22,8 +21,6 @@ func TestCreateMemoryContext_Validation(t *testing.T) {
 		req  CreateMemoryContextRequest
 	}{
 		{"empty payload", mkReq(" ")},
-		{"non string fragment", mkReq(`{"frag":123}`)},
-		{"empty string fragment", mkReq(`{"frag":"  "}`)},
 	}
 
 	for _, c := range cases {

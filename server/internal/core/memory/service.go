@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -247,25 +246,9 @@ func (s *Service) CreateMemoryContext(ctx context.Context, req CreateMemoryConte
 	if req.ActorID == "" || req.MemoryID == "" {
 		return nil, fmt.Errorf("actor ID and memory ID are required")
 	}
-	trimmed := strings.TrimSpace(string(req.Context))
+	trimmed := strings.TrimSpace(req.Context)
 	if trimmed == "" {
 		return nil, NewValidationError("context", "payload must not be empty")
-	}
-
-	// Deep invariant: ensure JSON object with non-empty string fragments
-	var fragments map[string]interface{}
-	if err := json.Unmarshal(req.Context, &fragments); err != nil {
-		return nil, NewValidationError("context", "must be a JSON object")
-	}
-	for k, v := range fragments {
-		str, ok := v.(string)
-		if !ok {
-			return nil, NewValidationError(k, "fragment must be a string")
-		}
-		if strings.TrimSpace(str) == "" {
-			log.Warn().Str("fragment", k).Msg("empty context fragment rejected")
-			return nil, NewValidationError(k, "fragment must not be empty")
-		}
 	}
 
 	storageReq := storage.CreateMemoryContextRequest{

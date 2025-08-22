@@ -22,14 +22,12 @@ type (
 	CreateVaultRequest  = types.CreateVaultRequest
 	CreateMemoryRequest = types.CreateMemoryRequest
 	AddEntryRequest     = types.AddEntryRequest
-	PutContextRequest   = types.PutContextRequest
 	SearchRequest       = types.SearchRequest
 
 	// Entities
-	Vault   = types.Vault
-	Memory  = types.Memory
-	Entry   = types.Entry
-	Context = types.Context
+	Vault  = types.Vault
+	Memory = types.Memory
+	Entry  = types.Entry
 
 	// Responses
 	EnqueueAck          = types.EnqueueAck
