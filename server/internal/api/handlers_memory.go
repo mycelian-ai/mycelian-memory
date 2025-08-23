@@ -391,9 +391,11 @@ func (h *MemoryHandler) PutMemoryContext(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if h.cfg != nil && h.cfg.MaxContextChars > 0 {
-		if utf8.RuneCount(doc) > h.cfg.MaxContextChars {
-			respond.WriteError(w, http.StatusRequestEntityTooLarge, "context exceeds maximum size")
-			return
+		if len(doc) > h.cfg.MaxContextChars {
+			if utf8.RuneCount(doc) > h.cfg.MaxContextChars {
+				respond.WriteError(w, http.StatusRequestEntityTooLarge, "context exceeds maximum size")
+				return
+			}
 		}
 	}
 
