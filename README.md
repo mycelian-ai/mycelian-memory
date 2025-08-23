@@ -6,8 +6,8 @@
   Open, minimal memory service for AI agents with a clean REST API, a typed Go SDK, and an MCP server you can point your IDE/LLM at.
   
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian/mycelian-memory?style=social)](https://github.com/mycelian/mycelian-memory/stargazers)
-  [![License](https://img.shields.io/github/license/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/blob/main/LICENSE)
-  [![Go Version](https://img.shields.io/github/go-mod/go-version/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory)
+  [![License](https://img.shields.io/github/license/mycelian/mycelian-memory?branch=sameerch-dev)](https://github.com/mycelian/mycelian-memory/blob/sameerch-dev/client/LICENSE)
+  [![Go Version](https://img.shields.io/github/go-mod/go-version/mycelian/mycelian-memory?branch=sameerch-dev)](https://github.com/mycelian/mycelian-memory/tree/sameerch-dev)
   [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
   [![GitHub Issues](https://img.shields.io/github/issues/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/issues)
   [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/pulls)
