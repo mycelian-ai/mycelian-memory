@@ -48,6 +48,8 @@ type Config struct {
 	// Vector search index endpoint (provider-agnostic)
 	SearchIndexURL string `envconfig:"SEARCH_INDEX_URL" default:""`
 
+
+
 	// Health checker configuration
 	HealthIntervalSeconds     int `envconfig:"HEALTH_INTERVAL_SECONDS" default:"30"`
 	HealthProbeTimeoutSeconds int `envconfig:"HEALTH_PROBE_TIMEOUT_SECONDS" default:"2"`

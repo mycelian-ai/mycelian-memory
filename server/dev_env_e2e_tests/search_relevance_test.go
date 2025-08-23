@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 
 	embOllama "github.com/mycelian/mycelian-memory/server/internal/embeddings/ollama"
-	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 
 	weaviate "github.com/weaviate/weaviate-go-client/v5/weaviate"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate/filters"
@@ -57,12 +56,12 @@ func newTestEmbedder() interface {
 }
 
 // waitForObjects polls Aggregate meta.count until want is reached or timeout.
-func waitForObjects(t *testing.T, cl *wvClient, tenant string, want int, timeout time.Duration) {
+func waitForObjects(t *testing.T, cl *wvClient, want int, timeout time.Duration) {
 	ctx := context.Background()
 
 	// Establish baseline count first to make the check robust across repeated runs.
 	baseline := 0
-	if resp, err := cl.GraphQL().Aggregate().WithClassName("MemoryEntry").WithTenant(tenant).
+	if resp, err := cl.GraphQL().Aggregate().WithClassName("MemoryEntry").
 		WithFields(gql.Field{Name: "meta", Fields: []gql.Field{{Name: "count"}}}).Do(ctx); err == nil {
 		if agg, ok := resp.Data["Aggregate"].(map[string]interface{}); ok {
 			if memArr, ok := agg["MemoryEntry"].([]interface{}); ok && len(memArr) > 0 {
@@ -77,7 +76,7 @@ func waitForObjects(t *testing.T, cl *wvClient, tenant string, want int, timeout
 
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := cl.GraphQL().Aggregate().WithClassName("MemoryEntry").WithTenant(tenant).
+		resp, err := cl.GraphQL().Aggregate().WithClassName("MemoryEntry").
 			WithFields(gql.Field{Name: "meta", Fields: []gql.Field{{Name: "count"}}}).Do(ctx)
 		if err == nil {
 			if agg, ok := resp.Data["Aggregate"].(map[string]interface{}); ok {
@@ -175,8 +174,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	}
 
 	// Embedder is configured in the service; tests call Weaviate directly here.
-	// Keep a light bootstrap to ensure classes exist.
-	_ = searchindex.BootstrapWeaviate
+	// Bootstrap is handled by the service startup.
 	embedder := newTestEmbedder()
 	// quick health check (skip test if local model isn't loaded)
 	if _, err := embedder.Embed(context.Background(), "healthcheck"); err != nil {
@@ -188,7 +186,6 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		UserID string `json:"userId"`
 	}
 	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
-	ensureWeaviateTenants(t, weaviateURL, userResp.UserID)
 
 	// 2. vault and memory (unique per run) with cleanup
 	title := fmt.Sprintf("alphavault-%d", time.Now().UnixNano())
@@ -227,7 +224,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	}
 	// Allow more time for 60 object ingestion in AlphaSweep only
 	// Hybrid indexing via outbox + embeddings can be slower; allow more time.
-	waitForObjects(t, cl, userResp.UserID, 60, 20*time.Second)
+	waitForObjects(t, cl, 60, 20*time.Second)
 
 	queryTests := []struct {
 		query   string
@@ -240,7 +237,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 		vec, _ := embedder.Embed(context.Background(), tc.query)
 		for _, alpha := range []float32{0.0, 1.0, 0.6} {
 			hy := (&gql.HybridArgumentBuilder{}).WithQuery(tc.query).WithVector(vec).WithAlpha(alpha)
-			resp, err := cl.GraphQL().Get().WithClassName("MemoryEntry").WithTenant(userResp.UserID).
+			resp, err := cl.GraphQL().Get().WithClassName("MemoryEntry").
 				WithHybrid(hy).
 				WithFields(gql.Field{Name: "rawEntry"}, gql.Field{Name: "summary"}).WithLimit(50).Do(context.Background())
 			if err != nil {
@@ -295,7 +292,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 		UserID string `json:"userId"`
 	}
 	user.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
-	ensureWeaviateTenants(t, weaviateURL, user.UserID)
+
 	var mem struct {
 		MemoryID string `json:"memoryId"`
 	}
@@ -326,13 +323,13 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	}
 
 	cl, _ := newWeaviateClient(weaviateURL)
-	waitForObjects(t, cl, user.UserID, 10, 5*time.Second)
+	waitForObjects(t, cl, 10, 5*time.Second)
 
 	query := "playful cat"
 	vec, _ := embedder.Embed(context.Background(), query)
 	hy := (&gql.HybridArgumentBuilder{}).WithQuery(query).WithVector(vec).WithAlpha(0.6)
 	where := filters.Where().WithPath([]string{"tags"}).WithOperator(filters.ContainsAny).WithValueText("featured")
-	resp2, err := cl.GraphQL().Get().WithClassName("MemoryEntry").WithTenant(user.UserID).WithHybrid(hy).WithWhere(where).
+	resp2, err := cl.GraphQL().Get().WithClassName("MemoryEntry").WithHybrid(hy).WithWhere(where).
 		WithFields(gql.Field{Name: "rawEntry"}).WithLimit(10).Do(context.Background())
 	if err != nil {
 		t.Fatalf("hybrid tag filter: %v", err)
@@ -377,7 +374,7 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 		UserID string `json:"userId"`
 	}
 	user.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
-	ensureWeaviateTenants(t, weaviateURL, user.UserID)
+
 	var mem struct {
 		MemoryID string `json:"memoryId"`
 	}

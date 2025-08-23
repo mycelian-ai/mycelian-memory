@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	respond "github.com/mycelian/mycelian-memory/server/internal/api/respond"
 	"github.com/mycelian/mycelian-memory/server/internal/auth"
 	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
@@ -51,17 +53,23 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("topK", req.TopK).Str("actorId", actorInfo.ActorID).Msg("search request received")
+
 	vec, err := h.emb.Embed(r.Context(), req.Query)
 	if err != nil {
+		log.Error().Err(err).Str("query", req.Query).Msg("embedding failed")
 		respond.WriteError(w, http.StatusInternalServerError, "embedding service unavailable")
 		return
 	}
+	log.Debug().Int("vectorLength", len(vec)).Msg("embedding generated")
 
 	hits, err := h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, req.TopK, h.alpha)
 	if err != nil {
+		log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
 		respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")
 		return
 	}
+	log.Info().Int("hitCount", len(hits)).Str("memoryId", req.MemoryID).Msg("search completed")
 
 	// Build response consistent with previous keys
 	resp := map[string]interface{}{

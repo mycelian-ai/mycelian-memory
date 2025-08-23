@@ -4,7 +4,6 @@
 package e2e
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -75,29 +74,6 @@ func waitForHealthy(t *testing.T, baseURL string, timeout time.Duration) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatalf("memory-service /v0/health not responding within %s", timeout)
-}
-
-// ensureWeaviateTenants adds the given tenant to both MemoryEntry and MemoryContext classes.
-func ensureWeaviateTenants(t *testing.T, weaviateURL, tenant string) {
-	// Fallback approach: trigger tenant creation implicitly by creating a dummy object then deleting it
-	// This works in older Weaviate without explicit tenant endpoints
-	for _, class := range []string{"MemoryEntry", "MemoryContext"} {
-		// Minimal payload with required fields
-		id := "00000000-0000-0000-0000-000000000000"
-		payload := fmt.Sprintf(`{"actorId":%q}`, tenant)
-		// Create
-		url := fmt.Sprintf("%s/v1/objects", weaviateURL)
-		body := fmt.Sprintf(`{"class":"%s","id":%q,"tenant":%q,"properties":%s}`, class, id, tenant, payload)
-		req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBufferString(body))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := http.DefaultClient.Do(req)
-		if err == nil {
-			_ = resp.Body.Close()
-		}
-		// Delete best-effort
-		delURL := fmt.Sprintf("%s/v1/objects/%s/%s?tenant=%s", weaviateURL, class, id, tenant)
-		_, _ = http.DefaultClient.Do(mustNewRequest(http.MethodDelete, delURL))
-	}
 }
 
 func mustNewRequest(method, url string) *http.Request {

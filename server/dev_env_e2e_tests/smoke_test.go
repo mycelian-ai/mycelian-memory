@@ -38,11 +38,10 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 		}
 	}
 
-	// 1. Ensure dedicated test user and create weaviate tenant
+	// 1. Ensure dedicated test user
 	userResp := struct {
 		UserID string `json:"userId"`
-	}{UserID: "mycelian-dev"} // Use MockAuthorizer's ActorID for Weaviate tenant consistency
-	ensureWeaviateTenants(t, weaviate, userResp.UserID)
+	}{UserID: "mycelian-dev"} // Use MockAuthorizer's ActorID
 
 	// 2. Create vault then memory (unique per run) and ensure cleanup
 	var vaultResp struct {
@@ -140,7 +139,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	// 4. Poll Weaviate BM25 until entry appears.
 	// NOTE: 5-second window is tuned for one indexer cycle; do NOT extend.
 	deadline := time.Now().Add(5 * time.Second)
-	query := fmt.Sprintf(`{ Get { MemoryEntry(tenant:"%s", where:{operator:And, operands:[{path:["memoryId"], operator:Equal, valueString:"%s"},{path:["entryId"], operator:Equal, valueString:"%s"}]}, limit:1){ entryId } } }`, userResp.UserID, memResp.MemoryID, entryResp.EntryID)
+	query := fmt.Sprintf(`{ Get { MemoryEntry(where:{operator:And, operands:[{path:["memoryId"], operator:Equal, valueString:"%s"},{path:["entryId"], operator:Equal, valueString:"%s"}]}, limit:1){ entryId } } }`, memResp.MemoryID, entryResp.EntryID)
 	t.Logf("BM25 smoke GraphQL query: %s", query)
 	payload := map[string]string{"query": query}
 	buf, _ := json.Marshal(payload)
@@ -198,12 +197,11 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 		t.Fatalf("ollama model %s not available", embedMod)
 	}
 
-	// 1. ensure test_user and create weaviate tenant
+	// 1. ensure test_user
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
-	ensureWeaviateTenants(t, weaviate, userResp.UserID)
+	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID
 
 	// 2. vault then memory
 	var vaultResp struct {
@@ -266,7 +264,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	mustJSON(t, resp, &entryResp)
 
 	// 4. Wait until the object is ingested into Weaviate
-	objectURL := fmt.Sprintf("%s/v1/objects/MemoryEntry/%s?tenant=%s", weaviate, entryResp.EntryID, userResp.UserID)
+	objectURL := fmt.Sprintf("%s/v1/objects/MemoryEntry/%s", weaviate, entryResp.EntryID)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		r, err := http.Get(objectURL)
@@ -329,7 +327,7 @@ func TestDevEnv_ContextAPI_PutGet(t *testing.T) {
 	var userResp struct {
 		UserID string `json:"userId"`
 	}
-	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID for Weaviate tenant consistency
+	userResp.UserID = "mycelian-dev" // Use MockAuthorizer's ActorID
 
 	// 2. vault
 	req6, err := http.NewRequest("POST", fmt.Sprintf("%s/v0/vaults", memSvc), bytes.NewBufferString(`{"title":"CtxVault"}`))

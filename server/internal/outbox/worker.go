@@ -164,15 +164,26 @@ func (w *Worker) leaseBatch(ctx context.Context, tx *sql.Tx, batchSize int) ([]j
 
 // handle executes the outbox operation.
 func (w *Worker) handle(ctx context.Context, j job) error {
+	w.log.Info().Str("op", j.op).Str("aggregateId", j.aggregateID).Int64("id", j.id).Msg("processing outbox job")
+
 	switch j.op {
 	case OpUpsertEntry:
 		text := preferredText(j.payload, "summary", "rawEntry")
+		w.log.Debug().Str("text", text).Str("entryId", j.aggregateID).Msg("upserting entry")
 		vec, err := w.embed(text, ctx)
 		if err != nil {
+			w.log.Error().Err(err).Str("entryId", j.aggregateID).Msg("embedding failed")
 			return err
 		}
+		w.log.Debug().Int("vectorLength", len(vec)).Str("entryId", j.aggregateID).Msg("embedding generated")
 		normalizeEntryTags(j.payload)
-		return w.index.UpsertEntry(ctx, j.aggregateID, vec, j.payload)
+		err = w.index.UpsertEntry(ctx, j.aggregateID, vec, j.payload)
+		if err != nil {
+			w.log.Error().Err(err).Str("entryId", j.aggregateID).Msg("upsert entry failed")
+			return err
+		}
+		w.log.Info().Str("entryId", j.aggregateID).Msg("entry upserted successfully")
+		return nil
 	case OpDeleteEntry:
 		return w.index.DeleteEntry(ctx, stringField(j.payload, "actorId"), j.aggregateID)
 	case OpUpsertContext:

@@ -9,8 +9,7 @@ import (
 	"github.com/weaviate/weaviate/entities/models"
 )
 
-// BootstrapWeaviate ensures required classes exist with multi-tenancy enabled.
-// In dev/e2e, if classes exist without MT enabled, they are dropped and recreated.
+// BootstrapWeaviate ensures required classes exist in the search index.
 func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 	cfg := weaviate.Config{Scheme: "http", Host: baseURL}
 	cl, err := weaviate.NewClient(cfg)
@@ -28,12 +27,12 @@ func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 			{Name: "entryId", DataType: []string{"uuid"}},
 			{Name: "actorId", DataType: []string{"text"}},
 			{Name: "memoryId", DataType: []string{"uuid"}},
+			{Name: "vaultId", DataType: []string{"uuid"}},
 			{Name: "rawEntry", DataType: []string{"text"}},
 			{Name: "summary", DataType: []string{"text"}},
 			{Name: "tags", DataType: []string{"text[]"}},
 			{Name: "creationTime", DataType: []string{"date"}},
 		},
-		MultiTenancyConfig: &models.MultiTenancyConfig{Enabled: true},
 	}
 
 	ctxCls := &models.Class{
@@ -46,30 +45,24 @@ func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 			{Name: "context", DataType: []string{"text"}},
 			{Name: "creationTime", DataType: []string{"date"}},
 		},
-		MultiTenancyConfig: &models.MultiTenancyConfig{Enabled: true},
 	}
 
-	if err := ensureMTClass(cctx, cl, entry); err != nil {
+	if err := ensureClass(cctx, cl, entry); err != nil {
 		return fmt.Errorf("bootstrap MemoryEntry: %w", err)
 	}
 	if err := ensureEntryTagsProperty(cctx, cl); err != nil {
 		return fmt.Errorf("ensure tags property: %w", err)
 	}
-	if err := ensureMTClass(cctx, cl, ctxCls); err != nil {
+	if err := ensureClass(cctx, cl, ctxCls); err != nil {
 		return fmt.Errorf("bootstrap MemoryContext: %w", err)
 	}
 	return nil
 }
 
-func ensureMTClass(ctx context.Context, cl *weaviate.Client, desired *models.Class) error {
+func ensureClass(ctx context.Context, cl *weaviate.Client, desired *models.Class) error {
 	ex, err := cl.Schema().ClassGetter().WithClassName(desired.Class).Do(ctx)
 	if err == nil && ex != nil {
-		if ex.MultiTenancyConfig != nil && ex.MultiTenancyConfig.Enabled {
-			return nil
-		}
-		if err := cl.Schema().ClassDeleter().WithClassName(desired.Class).Do(ctx); err != nil {
-			return fmt.Errorf("delete class %s: %w", desired.Class, err)
-		}
+		return nil // Class already exists
 	}
 	if err := cl.Schema().ClassCreator().WithClass(desired).Do(ctx); err != nil {
 		return fmt.Errorf("create class %s: %w", desired.Class, err)
