@@ -4,6 +4,8 @@
 **Date**: YYYY-MM-DD  
 **Superseded by**: [ADR number if deprecated]
 
+Immutability Policy: Once an ADR is Accepted, it becomes an immutable record of that decision. Future changes to the decision must be captured in a new ADR that references and supersedes this one. Do not edit Accepted ADRs beyond correcting typos or adding the Superseded by link.
+
 ## Context
 
 What is the issue that we're seeing that is motivating this decision or change? What forces are at play that led us to this decision point?
