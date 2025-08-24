@@ -42,29 +42,29 @@ TOOLS_DIR := tools
 
 # Default target - show help
 help:
-	@echo "🚀 Mycelian Memory Backend - Available Commands"
+	@echo "Mycelian Memory Backend - Available Commands"
 	@echo "=============================================="
 	@echo ""
-	@echo "📦 APPLICATION BUILDS:"
+	@echo "APPLICATION BUILDS:"
 	@echo "  make build                    - Build all application code"
 	@echo "  make test                     - Run all tests"
 	@echo ""
-	@echo "🐳 DOCKER TESTING:"
+	@echo "DOCKER TESTING:"
 	@echo "  make docker-start             - Start services in headless mode"
 	@echo "  make docker-stop              - Stop all Docker services"
 	@echo "  make docker-status            - Show Docker service status"
 	@echo "  make docker-help              - Show detailed Docker commands"
 	@echo ""
-	@echo "🔧 POSTGRES BACKEND:"
+	@echo "POSTGRES BACKEND:"
 	@echo "  make run-postgres             - Start Postgres + Weaviate stack"
 	@echo "  make clean-postgres-data      - Reset Postgres data (DANGEROUS)"
 	@echo ""
-	@echo "💡 QUICK START:"
+	@echo "QUICK START:"
 	@echo "  1. make build test"
 	@echo "  2. make run-postgres"
-	@echo "  3. ./bin/memory-service"
+	@echo "  3. ./bin/memory-service (from project root)"
 	@echo ""
-	@echo "📚 For more details, see the file header comments in this Makefile"
+	@echo "For more details, see the file header comments in this Makefile"
 
 # Default target
 .DEFAULT_GOAL := help
@@ -77,16 +77,16 @@ help:
 
 # Build backend binary for macOS
 build-local:
-	@echo "🔨 Building memory-service for macOS (local target)..."
-	cd .. && GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o server/bin/memory-service ./cmd/memory-service
-	@echo "✅ Built server/bin/memory-service"
+	@echo "Building memory-service for macOS (local target)..."
+	cd .. && GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o bin/memory-service ./cmd/memory-service
+	@echo "Built bin/memory-service"
 
 # Run backend in local mode
 run-local: build-local
-	@echo "🛑 Stopping any existing memory-service ..."
-	- pkill -f "server/bin/memory-service" || true
-	@echo "🚀 Starting memory-service (local build target)"
-	MEMORY_SERVER_BUILD_TARGET=local ./bin/memory-service
+	@echo "Stopping any existing memory-service ..."
+	- pkill -f "bin/memory-service" || true
+	@echo "Starting memory-service (local build target)"
+	cd .. && MEMORY_SERVER_BUILD_TARGET=local ./bin/memory-service
 
  
 
@@ -105,7 +105,7 @@ build:
 .PHONY: docker-help docker-build docker-start docker-stop docker-status docker-logs docker-clean
 
 docker-help:
-	@echo "🐳 Docker Commands:"
+	@echo "Docker Commands:"
 	@echo ""
 	@echo "  make docker-build        - Build Docker images"
 	@echo "  make docker-start        - Start services in headless mode"
@@ -114,7 +114,7 @@ docker-help:
 	@echo "  make docker-logs         - Show logs from all services"
 	@echo "  make docker-clean        - Clean up containers and images"
 	@echo ""
-	@echo "💡 For more advanced options, use: ./scripts/start-headless.sh --help"
+	@echo "For more advanced options, use: ./scripts/start-headless.sh --help"
 
 docker-build:
 	./scripts/start-headless.sh --build

@@ -56,9 +56,12 @@ build-mycelian-service-tools: bin
 build-outbox-worker: bin
 	cd cmd/outbox-worker && GOWORK=off go build -o ../../bin/outbox-worker .
 
+# Build memory-service app
+build-memory-service: bin
+	go build -o bin/memory-service ./cmd/memory-service
 
 # Build all binaries
-build-all: build-mycelian-cli build-mcp-server build-mycelian-service-tools build-outbox-worker
+build-all: build-mycelian-cli build-mcp-server build-mycelian-service-tools build-outbox-worker build-memory-service
 
 # Alias for build-all
 build: build-all
@@ -84,7 +87,7 @@ build-check:
 	@cd tools/mycelian-service-tools && go build .
 	@echo "Building tools/invariants-checker module..."
 	@cd tools/invariants-checker && go build .
-	@echo "✅ All modules compiled successfully!"
+	@echo "All modules compiled successfully!"
 
 # Quality check - run full quality gate for release-ready code
 quality-check:
@@ -132,7 +135,7 @@ quality-check:
 	@cd tools/mycelianCli && govulncheck ./...
 	@cd tools/mycelian-service-tools && govulncheck ./...
 	@cd tools/invariants-checker && govulncheck ./...
-	@echo "✅ All quality checks passed!"
+	@echo "All quality checks passed!"
 
 # Clean built binaries
 clean-bin:
@@ -148,6 +151,7 @@ help:
 	@echo "  quality-check          Run full quality gate (fmt, vet, test, lint, vuln scan)"
 	@echo "  build-mycelian-cli     Build mycelianCli to bin/mycelianCli"
 	@echo "  build-mcp-server       Build MCP server to bin/mycelian-mcp-server"
+	@echo "  build-memory-service   Build memory service to bin/memory-service"
 	@echo "  clean-bin              Remove all built binaries"
 	@echo ""
 	@echo "Service Commands:"
