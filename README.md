@@ -5,11 +5,10 @@
   
   Mycelian Memory is an open source framework that aims to provide simple, reliable, and cost-effective long-term memory and context to AI Agents.
   
-  [![GitHub Stars](https://img.shields.io/github/stars/mycelian/mycelian-memory?style=social)](https://github.com/mycelian/mycelian-memory/stargazers)
-  [![License](https://img.shields.io/github/license/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/blob/main/LICENSE)
-  [![Go Version](https://img.shields.io/github/go-mod/go-version/mycelian/mycelian-memory?branch=main)](https://github.com/mycelian/mycelian-memory/tree/sameerch-dev)
+  [![GitHub Stars](https://img.shields.io/github/stars/mycelian-ai/mycelian-memory?style=social)](https://github.com/mycelian-ai/mycelian-memory/stargazers)
+  [![License](https://img.shields.io/github/license/mycelian-ai/mycelian-memory)](https://github.com/mycelian-ai/mycelian-memory/blob/main/LICENSE)
+  [![Go Version](https://img.shields.io/badge/Go-1.24.6-00ADD8?logo=go&logoColor=white)](https://github.com/mycelian-ai/mycelian-memory)
   [![Discord](https://img.shields.io/discord/1396722077792469104?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
-  
 </div>
 
 
