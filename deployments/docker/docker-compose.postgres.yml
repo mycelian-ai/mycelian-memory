@@ -165,6 +165,6 @@ services:
 networks:
   memory-network:
     driver: bridge
-    name: synapse-memory-network
+    name: mycelian-memory-network
 
 

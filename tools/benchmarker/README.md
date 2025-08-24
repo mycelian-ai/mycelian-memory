@@ -1,6 +1,6 @@
-# Synapse Memory Client Benchmarks
+# Mycelian Memory Client Benchmarks
 
-This directory contains benchmarks and tests for the Synapse Memory Client, focusing on testing the integration with Claude and the Synapse memory system.
+This directory contains benchmarks and tests for the Mycelian Memory Client, focusing on testing the integration with Claude and the Mycelian memory system.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The benchmark suite includes:
 - **MSC Dataset Loader**: Loads and processes the MSC (Multi-Session Chat) dataset for testing.
 - **System Prompt Builder**: Constructs system prompts for the Claude model.
 - **Test Suite**: Comprehensive tests for all components.
-- **Note-Taker Semantics**: See [docs/design/msc_dataset_note_taker.md](../../docs/design/msc_dataset_note_taker.md) for the canonical mapping between dataset speaker labels and Synapse roles, and for the ingestion rules followed by the benchmark *note-taker* agent.
+- **Note-Taker Semantics**: See [docs/design/msc_dataset_note_taker.md](../../docs/design/msc_dataset_note_taker.md) for the canonical mapping between dataset speaker labels and Mycelian roles, and for the ingestion rules followed by the benchmark *note-taker* agent.
 
 ## Key Features
 
@@ -39,16 +39,16 @@ source setup-env.sh
 This script will:
 - Create and activate a workspace-wide Python virtual environment in the project root
 - Install all dependencies from `requirements.txt`
-- Build the latest `synapse` CLI binary
-- Configure `PATH` to prioritize the local synapse binary
+- Build the latest `mycelianCli` CLI binary
+- Configure `PATH` to prioritize the local mycelianCli binary
 - Keep you in the project root with access to all tools
 
 ### Prerequisites
 
 - Python 3.8+
-- Go 1.19+ (for building the synapse CLI)
+- Go 1.19+ (for building the mycelianCli CLI)
 - Anthropic API key in `ANTHROPIC_API_KEY` environment variable
-- Synapse Memory Service running (e.g., `http://localhost:8080`)
+- Mycelian Memory Service running (e.g., `http://localhost:8080`)
 
 ### User Management
 
@@ -96,11 +96,11 @@ pytest tests/test_session_simulator.py -v
 # From tools/benchmarker/ directory
 cd tools/benchmarker/  # if not already there
 
-# List available Synapse CLI commands (fast)
-synapse --help
+# List available Mycelian CLI commands (fast)
+mycelianCli --help
 
 # Get MCP tools schema
-synapse get-tools-schema
+mycelianCli get-tools-schema
 
 # Run integration test (slow - tests all tools end-to-end)
 python benchmark_runner.py --synapse-url http://localhost:8080 validate-tools

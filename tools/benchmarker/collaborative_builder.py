@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 import anthropic
 
 from models import BenchmarkConversation, ConversationMessage
-from synapse_client import MycelianMemoryClient
+from mycelian_client import MycelianMemoryClient
 from system_prompt_builder import PromptAssembler
 from session_simulator import SessionSimulator
 # Message annotation prefixes (see docs/design/msc_dataset_note_taker.md)

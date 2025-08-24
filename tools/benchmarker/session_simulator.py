@@ -23,7 +23,7 @@ class ContextData(TypedDict, total=False):
     last_updated_by: str
 
 from system_prompt_builder import PromptAssembler
-from synapse_client import MycelianMemoryClient
+from mycelian_client import MycelianMemoryClient
 
 # Marker the harness sends as last user turn in a session.
 END_SESSION_TOKEN = "control:test_harness SESSION_END"
@@ -58,7 +58,7 @@ class SessionSimulator:
     def __init__(
         self,
         anthropic_client,
-        synapse_client: MycelianMemoryClient,
+        mycelian_client: MycelianMemoryClient,
         system_builder: PromptAssembler,
         *,
         model_name: str = "claude-3-haiku-20240307",
@@ -74,7 +74,7 @@ class SessionSimulator:
             self._ac = anthropic.Anthropic(api_key=anthropic_client)
         else:
             self._ac = anthropic_client
-        self._sc = synapse_client
+        self._sc = mycelian_client
         self._system_builder = system_builder
 
         # Allow caller to override the Anthropic model for cost/perf testing

@@ -13,7 +13,7 @@ from datetime import datetime
 import anthropic
 
 # Direct local imports for tool execution
-from synapse_client import MycelianMemoryClient
+from mycelian_client import MycelianMemoryClient
 from collaborative_builder import ConversationIngestor
 from system_prompt_builder import PromptAssembler
 from session_simulator import SessionSimulator
@@ -154,7 +154,7 @@ class BenchmarkRunner:
     def __init__(
         self,
         anthropic_key: str,
-        synapse_url: str,
+        mycelian_url: str,
         user_id: str | None = None,
         *,
         model_name: str = "claude-3-haiku-20240307",
@@ -170,7 +170,7 @@ class BenchmarkRunner:
 
         # Use asynchronous Anthropic client for non-blocking IO.
         self._ac = anthropic.AsyncAnthropic(api_key=anthropic_key)
-        self._mc = MycelianMemoryClient(synapse_url, user_id)
+        self._mc = MycelianMemoryClient(mycelian_url, user_id)
         self._model_name = model_name
         self._builder = ConversationIngestor(self._ac, self._mc, model_name=self._model_name)
         self._evaluator = BenchmarkEvaluator(self._ac, self._mc, model_name=self._model_name, verbose=verbose)

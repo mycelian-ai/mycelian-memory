@@ -4,7 +4,7 @@
 
 ### Single Source of Truth: CLI Only
 
-**Rule**: All interaction with the Synapse backend MUST use the CLI interface. HTTP API calls are prohibited.
+**Rule**: All interaction with the Mycelian backend MUST use the CLI interface. HTTP API calls are prohibited.
 
 **Rationale**:
 - **Consistency**: CLI commands are the authoritative interface used by developers and tests

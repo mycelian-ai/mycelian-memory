@@ -10,7 +10,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from session_simulator import SessionSimulator, END_SESSION_TOKEN
-from synapse_client import SynapseMemoryClient
+from mycelian_client import MycelianMemoryClient
 from system_prompt_builder import PromptAssembler
 
 @pytest.fixture
@@ -21,8 +21,8 @@ def mock_anthropic():
     return mock
 
 @pytest.fixture
-def mock_synapse_client():
-    client = MagicMock(spec=SynapseMemoryClient)
+def mock_mycelian_client():
+    client = MagicMock(spec=MycelianMemoryClient)
     client.get_context.return_value = {}
     client.put_context.return_value = True
     client.add_entry.return_value = True
@@ -37,10 +37,10 @@ def mock_prompt_builder():
     return builder
 
 @pytest.fixture
-def session_simulator(mock_anthropic, mock_synapse_client, mock_prompt_builder):
+def session_simulator(mock_anthropic, mock_mycelian_client, mock_prompt_builder):
     return SessionSimulator(
         anthropic_client=mock_anthropic,
-        synapse_client=mock_synapse_client,
+        mycelian_client=mock_mycelian_client,
         system_builder=mock_prompt_builder
     )
 
@@ -64,7 +64,7 @@ async def test_message_counter_increments(session_simulator, mock_anthropic):
     assert session_simulator._message_counter == 2
 
 @pytest.mark.asyncio
-async def test_context_update_after_5_messages(session_simulator, mock_anthropic, mock_synapse_client, mock_prompt_builder):
+async def test_context_update_after_5_messages(session_simulator, mock_anthropic, mock_mycelian_client, mock_prompt_builder):
     """Test that context updates after 5 messages."""
     # Set up mock prompt builder with memory_id
     mock_prompt_builder.memory_id = "test-memory-123"
@@ -75,7 +75,7 @@ async def test_context_update_after_5_messages(session_simulator, mock_anthropic
     mock_anthropic.messages.create.return_value = mock_response
     
     # Reset call count before test
-    mock_synapse_client.put_context.reset_mock()
+    mock_mycelian_client.put_context.reset_mock()
     
     # Send 5 messages (should trigger update on 5th)
     for i in range(1, 6):
@@ -84,10 +84,10 @@ async def test_context_update_after_5_messages(session_simulator, mock_anthropic
         # After 5th message, we should have a context update
         if i == 5:
             # Verify context was updated
-            assert mock_synapse_client.put_context.call_count > 0, "Context should be updated after 5 messages"
+            assert mock_mycelian_client.put_context.call_count > 0, "Context should be updated after 5 messages"
             
             # Get the last call to put_context
-            args, _ = mock_synapse_client.put_context.call_args
+            args, _ = mock_mycelian_client.put_context.call_args
             assert args[0] == "test-memory-123"
             context = json.loads(args[1])
             assert "message_count" in context
@@ -96,7 +96,7 @@ async def test_context_update_after_5_messages(session_simulator, mock_anthropic
             assert "history_summary" in context
 
 @pytest.mark.asyncio
-async def test_critical_update_triggers_context_save(session_simulator, mock_anthropic, mock_synapse_client, mock_prompt_builder):
+async def test_critical_update_triggers_context_save(session_simulator, mock_anthropic, mock_mycelian_client, mock_prompt_builder):
     """Test that critical updates trigger immediate context save."""
     # Mock Claude response with tool call
     mock_tool_call = MagicMock()
@@ -116,7 +116,7 @@ async def test_critical_update_triggers_context_save(session_simulator, mock_ant
     await session_simulator.step("Add important note")
     
     # Should call add_entry with correct parameters
-    mock_synapse_client.add_entry.assert_called_once_with(
+    mock_mycelian_client.add_entry.assert_called_once_with(
         "test-memory-123",
         "Test entry",
         "Test summary",
@@ -124,7 +124,7 @@ async def test_critical_update_triggers_context_save(session_simulator, mock_ant
     )
 
 @pytest.mark.asyncio
-async def test_session_end_updates_context(session_simulator, mock_anthropic, mock_synapse_client):
+async def test_session_end_updates_context(session_simulator, mock_anthropic, mock_mycelian_client):
     """Test that session end triggers final context update."""
     # Mock Claude response
     mock_response = MagicMock()
@@ -132,7 +132,7 @@ async def test_session_end_updates_context(session_simulator, mock_anthropic, mo
     mock_anthropic.messages.create.return_value = mock_response
     
     # Reset call count
-    mock_synapse_client.put_context.reset_mock()
+    mock_mycelian_client.put_context.reset_mock()
     
     # Send some messages
     for i in range(3):
@@ -143,10 +143,10 @@ async def test_session_end_updates_context(session_simulator, mock_anthropic, mo
         await session_simulator.close_session()
 
     # Ensure we did *not* attempt to persist context client-side (behaviour changed)
-    assert mock_synapse_client.put_context.call_count == 0
+    assert mock_mycelian_client.put_context.call_count == 0
 
 @pytest.mark.asyncio
-async def test_context_update_error_handling(session_simulator, mock_anthropic, mock_synapse_client, caplog, mock_prompt_builder):
+async def test_context_update_error_handling(session_simulator, mock_anthropic, mock_mycelian_client, caplog, mock_prompt_builder):
     """Test that context update errors are handled gracefully."""
     # Set up mock prompt builder with memory_id
     mock_prompt_builder.memory_id = "test-memory-123"
@@ -158,7 +158,7 @@ async def test_context_update_error_handling(session_simulator, mock_anthropic, 
     
     # Make get_context raise an error
     test_error = Exception("Test error")
-    mock_synapse_client.get_context.side_effect = test_error
+    mock_mycelian_client.get_context.side_effect = test_error
     
     # Clear any existing logs
     caplog.clear()
@@ -172,7 +172,7 @@ async def test_context_update_error_handling(session_simulator, mock_anthropic, 
         pytest.fail(f"Unexpected exception: {e}")
     
     # Verify we tried to get the context
-    mock_synapse_client.get_context.assert_called()
+    mock_mycelian_client.get_context.assert_called()
     
     # Check that we logged the error
     error_logged = any(
@@ -184,28 +184,28 @@ async def test_context_update_error_handling(session_simulator, mock_anthropic, 
     assert error_logged, f"Expected error log not found in records. Logs: {[str(r) for r in caplog.records]}"
 
 @pytest.mark.asyncio
-async def test_get_asset_caching(session_simulator, mock_synapse_client):
-    """get_asset should call SynapseMemoryClient only once per asset and use cache thereafter."""
+async def test_get_asset_caching(session_simulator, mock_mycelian_client):
+    """get_asset should call MycelianMemoryClient only once per asset and use cache thereafter."""
     # Configure mock client
-    mock_synapse_client.get_asset.return_value = "RULES CONTENT"
+    mock_mycelian_client.get_asset.return_value = "RULES CONTENT"
 
     # First call – should invoke underlying client
     await session_simulator._exec_get_asset({"id": "ctx_rules"})
-    mock_synapse_client.get_asset.assert_called_once_with("ctx_rules")
+    mock_mycelian_client.get_asset.assert_called_once_with("ctx_rules")
     assert session_simulator._tool_results["get_asset"] == "RULES CONTENT"
 
     # Reset mock call count for clarity
-    mock_synapse_client.get_asset.reset_mock()
+    mock_mycelian_client.get_asset.reset_mock()
 
     # Second identical call – should use cache (no underlying call)
     await session_simulator._exec_get_asset({"id": "ctx_rules"})
-    mock_synapse_client.get_asset.assert_not_called()
+    mock_mycelian_client.get_asset.assert_not_called()
     assert session_simulator._tool_results["get_asset"] == "RULES CONTENT"
 
 @pytest.mark.asyncio
-async def test_list_assets_pass_through(session_simulator, mock_synapse_client):
-    """list_assets should expose list returned by SynapseMemoryClient."""
-    mock_synapse_client.list_assets.return_value = ["ctx_rules", "ctx_prompt_chat"]
+async def test_list_assets_pass_through(session_simulator, mock_mycelian_client):
+    """list_assets should expose list returned by MycelianMemoryClient."""
+    mock_mycelian_client.list_assets.return_value = ["ctx_rules", "ctx_prompt_chat"]
     await session_simulator._exec_list_assets({})
-    mock_synapse_client.list_assets.assert_called_once()
+    mock_mycelian_client.list_assets.assert_called_once()
     assert session_simulator._tool_results["list_assets"] == ["ctx_rules", "ctx_prompt_chat"]

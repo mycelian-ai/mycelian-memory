@@ -62,8 +62,8 @@ class MycelianMemoryClient:
     _VAULT_REGEX = re.compile(r"Vault created: ([0-9a-fA-F-]{36})")
 
     def _run_cli(self, *args: str) -> str:
-        """Run the `synapse` CLI and return stdout."""
-        cmd = ["synapse", "--service-url", self.base_url, *args]
+        """Run the `mycelianCli` CLI and return stdout."""
+        cmd = ["mycelianCli", "--service-url", self.base_url, *args]
         logging.info("[CLI] %s", " ".join(cmd))
         res = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
@@ -84,7 +84,7 @@ class MycelianMemoryClient:
 
         if res.returncode != 0:
             raise RuntimeError(
-                f"synapse CLI failed (exit {res.returncode}): {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
+                f"mycelianCli CLI failed (exit {res.returncode}): {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
             )
 
         return res.stdout
@@ -165,7 +165,7 @@ class MycelianMemoryClient:
         """Create a new memory and return its ID.
 
         If vault_id is not provided, creates a unique vault for this memory.
-        Primary path uses the `synapse` CLI to avoid accidental schema drift
+        Primary path uses the `mycelianCli` CLI to avoid accidental schema drift
         with the Go client.  If the CLI returns a non-zero exit code (often due
         to the backend returning HTTP 500 while still starting up), we fall
         back to a direct HTTP POST which is faster and less brittle inside the
@@ -405,7 +405,7 @@ class MycelianMemoryClient:
                 return out
             # If stdout empty, run raw subprocess to capture STDERR
             res = subprocess.run(
-                ["synapse", "--service-url", self.base_url, "get-asset", "--id", asset_id],
+                ["mycelianCli", "--service-url", self.base_url, "get-asset", "--id", asset_id],
                 capture_output=True,
                 text=True,
             )

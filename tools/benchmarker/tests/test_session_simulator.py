@@ -41,7 +41,7 @@ class FakeAnthropic:
         self.messages = self._Messages()
 
 
-class FakeSynapse(SynapseMemoryClient := object):  # simple duck type
+class FakeMycelian(MycelianMemoryClient := object):  # simple duck type
     def __init__(self):
         self.added = []
         self.context_puts = []
@@ -64,7 +64,7 @@ class FakeSynapse(SynapseMemoryClient := object):  # simple duck type
 @pytest.mark.asyncio
 async def test_session_simulator_executes_tool_calls():
     fake_ac = FakeAnthropic()
-    fake_sc = FakeSynapse()
+    fake_sc = FakeMycelian()
     spb = PromptAssembler("DMR", fake_sc.user_id, "mem-1", "", [])
     sim = SessionSimulator(fake_ac, fake_sc, spb)
 
