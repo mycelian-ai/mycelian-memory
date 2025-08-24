@@ -114,3 +114,5 @@ coverage.html
 data/
 
 memory-bank/
+.cursor/
+CLAUDE.md
