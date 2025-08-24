@@ -11,8 +11,8 @@ const (
 	// Recoverable errors should be retried with exponential backoff.
 	// Examples: 500 Internal Server Error, network timeouts, connection failures.
 	Recoverable ErrorCategory = iota
-	
-	// Irrecoverable errors should fail immediately without retry.  
+
+	// Irrecoverable errors should fail immediately without retry.
 	// Examples: 401 Unauthorized, 403 Forbidden, 400 Bad Request.
 	Irrecoverable
 )

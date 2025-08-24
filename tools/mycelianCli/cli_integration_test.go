@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
-	"time"
 )
 
 var binPath string
@@ -45,27 +44,11 @@ func TestCreateUserAndMemory(t *testing.T) {
 		serviceURL = "http://localhost:11545"
 	}
 
-	// 1) create user
-	email := fmt.Sprintf("inttest_%d@example.com", time.Now().UnixNano())
-	uid := fmt.Sprintf("u%d", time.Now().UnixNano()%1e8)
-	cmdUser := exec.Command(binPath, "create-user", "--user-id", uid, "--email", email)
-	cmdUser.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
-	outUser, err := cmdUser.CombinedOutput()
-	if err != nil {
-		t.Fatalf("create-user failed: %v\noutput: %s", err, string(outUser))
-	}
-	t.Logf("create-user output: %s", string(outUser))
+	// Note: Using dev mode auth - no user creation needed
 
-	reUser := regexp.MustCompile(`User created: ([a-zA-Z0-9\-]+)`)
-	matches := reUser.FindStringSubmatch(string(outUser))
-	if len(matches) < 2 {
-		t.Fatalf("could not parse user ID from output: %s", string(outUser))
-	}
-	userID := matches[1]
-
-	// 2) create vault
+	// 1) create vault
 	vaultTitle := "it-vault"
-	cmdVault := exec.Command(binPath, "create-vault", "--user-id", userID, "--title", vaultTitle)
+	cmdVault := exec.Command(binPath, "create-vault", "--title", vaultTitle)
 	cmdVault.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
 	outV, err := cmdVault.CombinedOutput()
 	if err != nil {
@@ -80,8 +63,8 @@ func TestCreateUserAndMemory(t *testing.T) {
 	}
 	vaultID := vmatch[1]
 
-	// 3) create memory
-	cmdMem := exec.Command(binPath, "create-memory", "--user-id", userID, "--vault-id", vaultID, "--title", "integration-memory", "--memory-type", "PROJECT")
+	// 2) create memory
+	cmdMem := exec.Command(binPath, "create-memory", "--vault-id", vaultID, "--title", "integration-memory", "--memory-type", "PROJECT")
 	cmdMem.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
 	outMem, err := cmdMem.CombinedOutput()
 	if err != nil {

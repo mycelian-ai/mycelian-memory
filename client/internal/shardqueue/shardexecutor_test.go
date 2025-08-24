@@ -35,7 +35,7 @@ func TestShardExecutor_QueueFull(t *testing.T) {
 	// Block the worker by submitting a job with a context that never completes until we cancel
 	blockCtx, cancel := context.WithCancel(context.Background())
 	var started int32
-	exec.Submit(context.Background(), "same", JobFunc(func(ctx context.Context) error {
+	_ = exec.Submit(context.Background(), "same", JobFunc(func(ctx context.Context) error {
 		atomic.StoreInt32(&started, 1)
 		<-blockCtx.Done()
 		return nil

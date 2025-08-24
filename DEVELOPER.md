@@ -184,7 +184,7 @@ make --version
 
 ```bash
 # Start all services with Postgres backend
-make backend-postgres-up
+make start-dev-mycelian-server
 
 # Verify services are running
 make backend-status
@@ -197,7 +197,7 @@ make backend-logs
 
 ```bash
 # Start all services
-make backend-postgres-up
+make start-dev-mycelian-server
 
 # Verify services
 make backend-status

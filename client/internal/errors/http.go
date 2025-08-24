@@ -5,11 +5,11 @@ import "fmt"
 // ClassifyHTTPError determines whether an HTTP error should be retried.
 // This implements best practices for HTTP error handling:
 // - 4xx client errors (except 429) are irrecoverable
-// - 5xx server errors are recoverable 
+// - 5xx server errors are recoverable
 // - Network-level errors are recoverable
 func ClassifyHTTPError(statusCode int, body string, underlyingErr error) *ClassifiedError {
 	category := getHTTPErrorCategory(statusCode)
-	
+
 	return &ClassifiedError{
 		Category:   category,
 		StatusCode: statusCode,

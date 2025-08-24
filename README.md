@@ -3,7 +3,7 @@
   
   # Mycelian Memory
   
-  Open, minimal memory service for AI agents with a clean REST API, a typed Go SDK, and an MCP server you can point your IDE/LLM at.
+  Mycelian Memory is an open source project for providing simple, reliable and cost-effective long-term memory and context to AI Agents.
   
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian/mycelian-memory?style=social)](https://github.com/mycelian/mycelian-memory/stargazers)
   [![License](https://img.shields.io/github/license/mycelian/mycelian-memory?branch=sameerch-dev)](https://github.com/mycelian/mycelian-memory/blob/sameerch-dev/client/LICENSE)
@@ -15,16 +15,30 @@
 
 ### Why Mycelian
 
-Simple building blocks for agent memory: vaults, memories, entries, and plain‑text contexts. Production‑ready primitives (hard deletes, health checks), plus first‑class developer ergonomics (Go SDK and MCP tools).
+Mycelian aims* to provide AI agents with persistent memory through a simple, log‑structured architecture.
 
-### Features
+When an agent interacts with users, it builds deep contextual understanding, but loses everything when the session ends. Mycelian provides a protocol for agents to directly persist their working context, capturing high‑fidelity information as they process it naturally during conversations.
 
-- **REST API**: CRUD for vaults, memories, entries, and contexts under `/v0/*`.
-- **Go SDK**: Small surface, typed requests/responses, FIFO async where it matters.
-- **MCP server**: Streamable HTTP or stdio; works with Cursor/Claude.
-- **Search pipeline**: Vector index (Weaviate) + embeddings (Ollama).
-- **Health model**: Component probes aggregated under `/v0/health`.
-- **Env‑driven config**: `MEMORY_SERVER_*` makes behavior explicit.
+(*emphasis on aims)
+
+#### What It Does Today
+
+- **Stores agent memory** via append‑only high fidelity entry logs paired with context snapshots (context shards)
+- **Organizes knowledge** through vault‑based scoping
+- **Retrieves context** using hybrid search across memory entries and context shards
+- **Maintains fidelity** by avoiding lossy summarization chains
+- **Runs anywhere** with self‑hostable Go backend and Postgres storage
+
+The architecture is inspired by distributed systems principles — treating memory as an append‑only log that accumulates knowledge over time rather than constantly rewriting state. To learn more about the design, see [our architecture document](docs/designs/001_mycelian_memory_architecture.md).
+
+🚨 🚧 🏗️ *This project is under active development and not yet production‑ready.*
+
+
+### Is Mycleian inspired from Mycelium? - Yes :)
+
+In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
+
+Mycelian's takes inspiration from this natural interconnectedness for AI agents. We aim to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
 
 ---
 
@@ -39,7 +53,7 @@ ollama serve &
 ollama pull nomic-embed-text
 
 # 2) Start the backend stack (Postgres, Weaviate, Memory Service)
-make backend-postgres-up
+make start-dev-mycelian-server
 
 # 3) Wait for healthy and verify
 curl -s http://localhost:11545/v0/health | jq
@@ -91,7 +105,7 @@ Run the MCP server in HTTP mode (good for Cursor) or stdio (good for Claude Desk
 
 ```bash
 # Option A: Docker (HTTP, port 11546)
-make mcp-streamable-up
+make start-mcp-streamable-server
 
 # Option B: Local binary (HTTP, port 11546)
 cd cmd/mycelian-mcp-server
@@ -214,7 +228,7 @@ Common local tasks:
 
 ```bash
 make build
-make backend-postgres-up
+make start-dev-mycelian-server
 ```
 
 ---

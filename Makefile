@@ -1,4 +1,4 @@
-.PHONY: help mcp-streamable-up mcp-streamable-down mcp-streamable-restart
+.PHONY: help start-mcp-streamable-server mcp-streamable-down mcp-streamable-restart
 
 # ==============================================================================
 # Monorepo Convenience Makefile (top-level)
@@ -11,11 +11,11 @@ API_HEALTH_URL := http://localhost:11545/v0/health
 # ------------------------------------------------------------------------------
 # Backend (server) convenience wrappers
 # ------------------------------------------------------------------------------
-.PHONY: backend-postgres-up backend-down backend-status backend-logs backend-clean-postgres
+.PHONY: start-dev-mycelian-server backend-down backend-status backend-logs backend-clean-postgres
 
 
 
-backend-postgres-up:
+start-dev-mycelian-server:
 	$(MAKE) -C server run-postgres
 
 backend-down:
@@ -34,7 +34,7 @@ backend-logs:
 # ------------------------------------------------------------------------------
 # Binary building
 # ------------------------------------------------------------------------------
-.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-mycelian-service-tools build-outbox-worker build-check
+.PHONY: build build-mycelian-cli build-mcp-server build-all clean-bin build-mycelian-service-tools build-outbox-worker build-check quality-check
 
 # Create bin directory
 bin:
@@ -86,6 +86,54 @@ build-check:
 	@cd tools/invariants-checker && go build .
 	@echo "✅ All modules compiled successfully!"
 
+# Quality check - run full quality gate for release-ready code
+quality-check:
+	@echo "Running full quality gate..."
+	@echo "1. Formatting code..."
+	@cd client && go fmt ./...
+	@cd server && go fmt ./...
+	@cd mcp && go fmt ./...
+	@cd tools/mycelianCli && go fmt ./...
+	@cd tools/mycelian-service-tools && go fmt ./...
+	@cd tools/invariants-checker && go fmt ./...
+	@cd cmd/mycelian-mcp-server && go fmt ./...
+	@cd cmd/memory-service && go fmt ./...
+	@cd cmd/outbox-worker && go fmt ./...
+	@echo "2. Running static analysis..."
+	@cd client && go vet ./...
+	@cd server && go vet ./...
+	@cd mcp && go vet ./...
+	@cd tools/mycelianCli && go vet ./...
+	@cd tools/mycelian-service-tools && go vet ./...
+	@cd tools/invariants-checker && go vet ./...
+	@cd cmd/mycelian-mcp-server && go vet ./...
+	@cd cmd/memory-service && go vet ./...
+	@cd cmd/outbox-worker && go vet ./...
+	@echo "3. Running tests with race detector..."
+	@cd client && go test -race ./...
+	@cd server && go test -race ./...
+	@cd mcp && go test -race ./...
+	@cd tools/mycelianCli && go test -race ./...
+	@cd tools/mycelian-service-tools && go test -race ./...
+	@cd tools/invariants-checker && go test -race ./...
+	@echo "4. Cleaning up dependencies..."
+	@go work sync
+	@echo "5. Running comprehensive linter..."
+	@cd client && golangci-lint run
+	@cd server && golangci-lint run
+	@cd mcp && golangci-lint run
+	@cd tools/mycelianCli && golangci-lint run
+	@cd tools/mycelian-service-tools && golangci-lint run
+	@cd tools/invariants-checker && golangci-lint run
+	@echo "6. Scanning for vulnerabilities..."
+	@cd client && govulncheck ./...
+	@cd server && govulncheck ./...
+	@cd mcp && govulncheck ./...
+	@cd tools/mycelianCli && govulncheck ./...
+	@cd tools/mycelian-service-tools && govulncheck ./...
+	@cd tools/invariants-checker && govulncheck ./...
+	@echo "✅ All quality checks passed!"
+
 # Clean built binaries
 clean-bin:
 	rm -rf bin/
@@ -97,15 +145,16 @@ help:
 	@echo "Build Commands:"
 	@echo "  build                  Build all binaries to bin/ directory"
 	@echo "  build-check            Compile all workspace modules (catches compilation errors)"
+	@echo "  quality-check          Run full quality gate (fmt, vet, test, lint, vuln scan)"
 	@echo "  build-mycelian-cli     Build mycelianCli to bin/mycelianCli"
 	@echo "  build-mcp-server       Build MCP server to bin/mycelian-mcp-server"
 	@echo "  clean-bin              Remove all built binaries"
 	@echo ""
 	@echo "Service Commands:"
-	@echo "  mcp-streamable-up      Start (or rebuild) the Synapse MCP server container (streamable HTTP for Cursor)"
+	@echo "  start-mcp-streamable-server      Start (or rebuild) the Synapse MCP server container (streamable HTTP for Cursor)"
 	@echo "  mcp-streamable-down    Stop and remove the Synapse MCP server container"
-	@echo "  mcp-streamable-restart Shortcut for mcp-streamable-down then mcp-streamable-up"
-	@echo "  backend-postgres-up    Start backend stack (Postgres)"
+	@echo "  mcp-streamable-restart Shortcut for mcp-streamable-down then start-mcp-streamable-server"
+	@echo "  start-dev-mycelian-server    Start backend stack (Postgres)"
 	@echo "  backend-down           Stop backend stack containers"
 	@echo "  backend-status         Show backend container status"
 	@echo "  backend-logs           Tail backend container logs"
@@ -113,15 +162,15 @@ help:
 	@echo "Test Commands:"
 	@echo "  client-coverage-check  Run client tests and assert >= 78% coverage"
 	@echo "  protogen               Generate gRPC code from api/proto via buf"
-	@echo "  test-all-postgres      Run server tests, start postgres backend, then client tests (unit+integration)"
+	@echo "  test-full-local-stack  Run server tests, start postgres backend, then client tests (unit+integration)"
 
-mcp-streamable-up:
+start-mcp-streamable-server:
 	docker compose -f $(MCP_COMPOSE_FILE) up -d --build --force-recreate
 
 mcp-streamable-down:
 	docker compose -f $(MCP_COMPOSE_FILE) down
 
-mcp-streamable-restart: mcp-streamable-down mcp-streamable-up 
+mcp-streamable-restart: mcp-streamable-down start-mcp-streamable-server 
 
 .PHONY: client-coverage-check
 client-coverage-check:
@@ -134,7 +183,7 @@ protogen:
 # ------------------------------------------------------------------------------
 # End-to-end developer test pipeline
 # ------------------------------------------------------------------------------
-.PHONY: server-test server-e2e client-test client-test-integration wait-backend-health test-all-postgres
+.PHONY: server-test server-e2e client-test client-test-integration wait-backend-health test-full-local-stack
 
 server-test:
 	$(MAKE) -C server test
@@ -159,16 +208,16 @@ wait-backend-health:
 	done; \
 	echo "Backend is responding."
 
-test-all-postgres:
+test-full-local-stack:
 	@set -euo pipefail; \
 	cleanup() { $(MAKE) backend-down; }; \
 	trap 'cleanup' EXIT INT TERM; \
     $(MAKE) server-test; \
-    $(MAKE) backend-postgres-up; \
+    $(MAKE) start-dev-mycelian-server; \
 	$(MAKE) wait-backend-health; \
 	$(MAKE) server-e2e; \
 	$(MAKE) client-test; \
 	$(MAKE) client-test-integration; \
 	trap - EXIT INT TERM; \
 	cleanup; \
-	echo "ALL POSTGRES TESTS COMPLETED SUCCESSFULLY"
+	echo "ALL LOCAL STACK TESTS COMPLETED SUCCESSFULLY"

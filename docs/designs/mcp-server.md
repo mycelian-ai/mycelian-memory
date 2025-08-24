@@ -180,7 +180,7 @@ go test ./...
 ### Integration Testing
 ```bash
 # Start backend first
-make backend-postgres-up
+make start-dev-mycelian-server
 
 # Run MCP integration tests
 cd mcp

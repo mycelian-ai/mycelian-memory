@@ -57,7 +57,7 @@ func NewRootCmd() *cobra.Command {
 			// Set log level based on debug flag
 			if debug {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
-				os.Setenv("MYCELIAN_DEBUG", "true")
+				_ = os.Setenv("MYCELIAN_DEBUG", "true")
 				log.Debug().Msg("debug logging enabled")
 			} else {
 				zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -91,16 +91,15 @@ func NewRootCmd() *cobra.Command {
 }
 
 func newCreateMemoryCmd() *cobra.Command {
-	var userID, vaultID, title, memoryType, description string
+	var vaultID, title, memoryType, description string
 
 	cmd := &cobra.Command{
 		Use:   "create-memory",
-		Short: "Create a new memory for a user",
+		Short: "Create a new memory",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("title", title).
 				Str("memory_type", memoryType).
@@ -126,7 +125,6 @@ func newCreateMemoryCmd() *cobra.Command {
 			if err != nil {
 				log.Error().
 					Err(err).
-					Str("user_id", userID).
 					Str("vault_id", vaultID).
 					Str("title", title).
 					Str("memory_type", memoryType).
@@ -136,7 +134,6 @@ func newCreateMemoryCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", mem.ID).
 				Str("title", mem.Title).
@@ -150,13 +147,11 @@ func newCreateMemoryCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (required)")
 	cmd.Flags().StringVar(&title, "title", "", "Memory title (required)")
 	cmd.Flags().StringVar(&memoryType, "memory-type", "", "Memory type (required)")
 	cmd.Flags().StringVar(&description, "description", "", "Description (optional)")
 
-	_ = cmd.MarkFlagRequired("user-id")
 	_ = cmd.MarkFlagRequired("vault-id")
 	_ = cmd.MarkFlagRequired("title")
 	_ = cmd.MarkFlagRequired("memory-type")
@@ -165,7 +160,7 @@ func newCreateMemoryCmd() *cobra.Command {
 }
 
 func newCreateEntryCmd() *cobra.Command {
-	var userID, vaultID, memoryID, rawEntry, summary string
+	var vaultID, memoryID, rawEntry, summary string
 
 	cmd := &cobra.Command{
 		Use:   "create-entry",
@@ -174,7 +169,6 @@ func newCreateEntryCmd() *cobra.Command {
 			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Int("raw_entry_len", len(rawEntry)).
@@ -188,7 +182,7 @@ func newCreateEntryCmd() *cobra.Command {
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
-			defer c.Close() // Ensure queues are drained before context is cancelled
+			defer func() { _ = c.Close() }() // Ensure queues are drained before context is cancelled
 
 			start := time.Now()
 			ack, err := c.AddEntry(ctx, vaultID, memoryID, client.AddEntryRequest{
@@ -200,7 +194,6 @@ func newCreateEntryCmd() *cobra.Command {
 			if err != nil {
 				log.Error().
 					Err(err).
-					Str("user_id", userID).
 					Str("vault_id", vaultID).
 					Str("memory_id", memoryID).
 					Dur("elapsed", elapsed).
@@ -209,7 +202,6 @@ func newCreateEntryCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Dur("elapsed", elapsed).
@@ -223,13 +215,11 @@ func newCreateEntryCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (required)")
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&rawEntry, "raw-entry", "", "Raw entry text (required)")
 	cmd.Flags().StringVar(&summary, "summary", "", "Summary (required)")
 
-	_ = cmd.MarkFlagRequired("user-id")
 	_ = cmd.MarkFlagRequired("vault-id")
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("raw-entry")
@@ -239,7 +229,7 @@ func newCreateEntryCmd() *cobra.Command {
 }
 
 func newListEntriesCmd() *cobra.Command {
-	var userID, vaultID, memoryID string
+	var vaultID, memoryID string
 	var limit int
 
 	cmd := &cobra.Command{
@@ -249,7 +239,6 @@ func newListEntriesCmd() *cobra.Command {
 			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Int("limit", limit).
@@ -272,7 +261,6 @@ func newListEntriesCmd() *cobra.Command {
 			if err != nil {
 				log.Error().
 					Err(err).
-					Str("user_id", userID).
 					Str("vault_id", vaultID).
 					Str("memory_id", memoryID).
 					Dur("elapsed", elapsed).
@@ -281,7 +269,6 @@ func newListEntriesCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Dur("elapsed", elapsed).
@@ -299,12 +286,10 @@ func newListEntriesCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (required)")
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().IntVar(&limit, "limit", 25, "Number of entries to return (max 50)")
 
-	_ = cmd.MarkFlagRequired("user-id")
 	_ = cmd.MarkFlagRequired("vault-id")
 	_ = cmd.MarkFlagRequired("memory-id")
 
@@ -345,7 +330,7 @@ func newGetPromptsCmd() *cobra.Command {
 }
 
 func newPutContextCmd() *cobra.Command {
-	var userID, vaultID, memoryID, content string
+	var vaultID, memoryID, content string
 
 	cmd := &cobra.Command{
 		Use:   "put-context",
@@ -354,7 +339,6 @@ func newPutContextCmd() *cobra.Command {
 			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Int("content_len", len(content)).
@@ -367,7 +351,7 @@ func newPutContextCmd() *cobra.Command {
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
 			defer cancel()
-			defer c.Close() // Ensure queues are drained before process exits
+			defer func() { _ = c.Close() }() // Ensure queues are drained before process exits
 
 			start := time.Now()
 			ack, err := c.PutContext(ctx, vaultID, memoryID, content)
@@ -376,7 +360,6 @@ func newPutContextCmd() *cobra.Command {
 			if err != nil {
 				log.Error().
 					Err(err).
-					Str("user_id", userID).
 					Str("vault_id", vaultID).
 					Str("memory_id", memoryID).
 					Dur("elapsed", elapsed).
@@ -385,7 +368,6 @@ func newPutContextCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Str("status", ack.Status).
@@ -398,12 +380,10 @@ func newPutContextCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (required)")
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&content, "content", "", "Context content (required)")
 
-	_ = cmd.MarkFlagRequired("user-id")
 	_ = cmd.MarkFlagRequired("vault-id")
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("content")
@@ -412,7 +392,7 @@ func newPutContextCmd() *cobra.Command {
 }
 
 func newGetContextCmd() *cobra.Command {
-	var userID, vaultID, memoryID string
+	var vaultID, memoryID string
 
 	cmd := &cobra.Command{
 		Use:   "get-context",
@@ -421,7 +401,6 @@ func newGetContextCmd() *cobra.Command {
 			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Str("service_url", serviceURL).
@@ -441,7 +420,6 @@ func newGetContextCmd() *cobra.Command {
 			if err != nil {
 				if err == client.ErrNotFound {
 					log.Debug().
-						Str("user_id", userID).
 						Str("vault_id", vaultID).
 						Str("memory_id", memoryID).
 						Dur("elapsed", elapsed).
@@ -451,7 +429,6 @@ func newGetContextCmd() *cobra.Command {
 				}
 				log.Error().
 					Err(err).
-					Str("user_id", userID).
 					Str("vault_id", vaultID).
 					Str("memory_id", memoryID).
 					Dur("elapsed", elapsed).
@@ -460,7 +437,6 @@ func newGetContextCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Dur("elapsed", elapsed).
@@ -471,10 +447,9 @@ func newGetContextCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (required)")
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	_ = cmd.MarkFlagRequired("vault-id")
 	_ = cmd.MarkFlagRequired("memory-id")
 
@@ -482,7 +457,7 @@ func newGetContextCmd() *cobra.Command {
 }
 
 func newSearchCmd() *cobra.Command {
-	var userID, memoryID, query string
+	var memoryID, query string
 	var topK int
 
 	cmd := &cobra.Command{
@@ -501,7 +476,6 @@ func newSearchCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("memory_id", memoryID).
 				Str("query", query).
 				Int("top_k", topK).
@@ -525,7 +499,6 @@ func newSearchCmd() *cobra.Command {
 
 			if err != nil {
 				log.Error().Err(err).
-					Str("user_id", userID).
 					Str("memory_id", memoryID).
 					Dur("elapsed", elapsed).
 					Msg("search failed")
@@ -533,7 +506,6 @@ func newSearchCmd() *cobra.Command {
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("memory_id", memoryID).
 				Dur("elapsed", elapsed).
 				Int("count", resp.Count).
@@ -546,11 +518,10 @@ func newSearchCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&query, "query", "", "Search query (required)")
 	cmd.Flags().IntVar(&topK, "top-k", defaultTopK, "Number of results to return (1-100)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("query")
 
@@ -650,7 +621,7 @@ func newGetToolsSchemaCmd() *cobra.Command {
 }
 
 func newAwaitConsistencyCmd() *cobra.Command {
-	var userID, memoryID string
+	var memoryID string
 
 	cmd := &cobra.Command{
 		Use:   "await-consistency",
@@ -659,7 +630,6 @@ func newAwaitConsistencyCmd() *cobra.Command {
 			// Client-side validation removed; rely on server-side validation
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("memory_id", memoryID).
 				Str("service_url", serviceURL).
 				Msg("awaiting consistency")
@@ -674,14 +644,12 @@ func newAwaitConsistencyCmd() *cobra.Command {
 			start := time.Now()
 			if err := c.AwaitConsistency(ctx, memoryID); err != nil {
 				log.Error().Err(err).
-					Str("user_id", userID).
 					Str("memory_id", memoryID).
 					Msg("await-consistency failed")
 				return err
 			}
 
 			log.Debug().
-				Str("user_id", userID).
 				Str("memory_id", memoryID).
 				Dur("elapsed", time.Since(start)).
 				Msg("await-consistency completed")
@@ -690,9 +658,8 @@ func newAwaitConsistencyCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	_ = cmd.MarkFlagRequired("memory-id")
 
 	return cmd
@@ -754,7 +721,7 @@ func newGetAssetCmd() *cobra.Command {
 // ------------------ Vault Commands -------------------
 
 func newCreateVaultCmd() *cobra.Command {
-	var userID, title, description string
+	var title, description string
 
 	cmd := &cobra.Command{
 		Use:   "create-vault",
@@ -778,17 +745,16 @@ func newCreateVaultCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&title, "title", "", "Vault title (required)")
 	cmd.Flags().StringVar(&description, "description", "", "Description (optional)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	_ = cmd.MarkFlagRequired("title")
 
 	return cmd
 }
 
 func newListVaultsCmd() *cobra.Command {
-	var userID string
+
 	cmd := &cobra.Command{
 		Use:   "list-vaults",
 		Short: "List all vaults for a user",
@@ -813,13 +779,12 @@ func newListVaultsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	return cmd
 }
 
 func newGetVaultCmd() *cobra.Command {
-	var userID, title string
+	var title string
 	cmd := &cobra.Command{
 		Use:   "get-vault",
 		Short: "Retrieve a vault by title",
@@ -842,15 +807,15 @@ func newGetVaultCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
+
 	cmd.Flags().StringVar(&title, "title", "", "Vault title (required)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	_ = cmd.MarkFlagRequired("title")
 	return cmd
 }
 
 func newDeleteVaultCmd() *cobra.Command {
-	var userID, vaultID string
+	var vaultID string
 
 	cmd := &cobra.Command{
 		Use:   "delete-vault",
@@ -873,9 +838,8 @@ func newDeleteVaultCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (required)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	_ = cmd.MarkFlagRequired("vault-id")
 	return cmd
 }
@@ -883,7 +847,7 @@ func newDeleteVaultCmd() *cobra.Command {
 // ------------------ Memory Listing Command -------------------
 
 func newListMemoriesCmd() *cobra.Command {
-	var userID, vaultID, vaultTitle string
+	var vaultID, vaultTitle string
 
 	cmd := &cobra.Command{
 		Use:   "list-memories",
@@ -909,7 +873,11 @@ func newListMemoriesCmd() *cobra.Command {
 
 			var mems []client.Memory
 			if vaultID != "" {
+				var err error
 				mems, err = c.ListMemories(ctx, vaultID)
+				if err != nil {
+					return err
+				}
 			} else {
 				// Get vault by title to obtain vault ID
 				vault, err := c.GetVaultByTitle(ctx, vaultTitle)
@@ -917,9 +885,9 @@ func newListMemoriesCmd() *cobra.Command {
 					return fmt.Errorf("failed to get vault by title '%s': %w", vaultTitle, err)
 				}
 				mems, err = c.ListMemories(ctx, vault.VaultID)
-			}
-			if err != nil {
-				return err
+				if err != nil {
+					return err
+				}
 			}
 
 			for _, m := range mems {
@@ -930,10 +898,9 @@ func newListMemoriesCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userID, "user-id", "", "User ID (required)")
 	cmd.Flags().StringVar(&vaultID, "vault-id", "", "Vault ID (mutually exclusive with --vault-title)")
 	cmd.Flags().StringVar(&vaultTitle, "vault-title", "", "Vault title (mutually exclusive with --vault-id)")
-	_ = cmd.MarkFlagRequired("user-id")
+
 	return cmd
 }
 

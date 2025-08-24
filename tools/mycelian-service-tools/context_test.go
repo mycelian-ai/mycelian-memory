@@ -14,7 +14,7 @@ func TestRunContextPut_Smoke(t *testing.T) {
 		if r.Method != http.MethodPut {
 			t.Fatalf("expected PUT, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, "/v0/users/u1/vaults/v1/memories/m1/contexts") {
+		if !strings.HasPrefix(r.URL.Path, "/v0/vaults/v1/memories/m1/contexts") {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body struct {
@@ -33,7 +33,7 @@ func TestRunContextPut_Smoke(t *testing.T) {
 	defer srv.Close()
 
 	var sb strings.Builder
-	if err := runContextPut(srv.URL, "u1", "m1", `{"foo":"bar"}`, &sb); err != nil {
+	if err := runContextPut(srv.URL, "m1", `{"foo":"bar"}`, &sb); err != nil {
 		t.Fatalf("runContextPut: %v", err)
 	}
 	if !strings.Contains(sb.String(), "foo") {
@@ -48,7 +48,7 @@ func TestRunContextGet_Smoke(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, "/v0/users/u1/vaults/v1/memories/m1/contexts") {
+		if !strings.HasPrefix(r.URL.Path, "/v0/vaults/v1/memories/m1/contexts") {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -58,7 +58,7 @@ func TestRunContextGet_Smoke(t *testing.T) {
 	defer srv.Close()
 
 	var sb strings.Builder
-	if err := runContextGet(srv.URL, "u1", "m1", &sb); err != nil {
+	if err := runContextGet(srv.URL, "m1", &sb); err != nil {
 		t.Fatalf("runContextGet: %v", err)
 	}
 	if !strings.Contains(sb.String(), "foo") {

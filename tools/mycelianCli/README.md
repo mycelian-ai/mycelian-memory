@@ -10,8 +10,8 @@ mycelianCli [command] [flags]
 
 ## Commands
 
-- `create-user` - Create a new user
-- `create-memory` - Create a new memory for a user  
+- `create-vault` - Create a new vault
+- `create-memory` - Create a new memory in a vault  
 - `create-entry` - Create a new entry for a memory
 - `list-entries` - List entries for a memory
 - `get-prompts` - Get default prompt templates
@@ -40,7 +40,7 @@ mycelianCli -d [command]
 
 When debug mode is enabled, the CLI will output structured JSON logs showing:
 
-1. **Request parameters**: user_id, memory_id, service_url, content_len, etc.
+1. **Request parameters**: vault_id, memory_id, service_url, content_len, etc.
 2. **Timing information**: elapsed time for operations
 3. **HTTP details**: method, URL, status codes, request/response dumps
 4. **Operation results**: counts, status, verification attempts, content types
@@ -49,23 +49,23 @@ When debug mode is enabled, the CLI will output structured JSON logs showing:
 
 #### Entry Operations
 ```bash
-mycelianCli --debug create-entry --user-id user-123 --memory-id mem-456 --raw-entry "test" --summary "test summary"
+mycelianCli --debug create-entry --vault-id vault-123 --memory-id mem-456 --raw-entry "test" --summary "test summary"
 ```
 
 #### Context Operations
 ```bash
-mycelianCli --debug put-context --user-id user-123 --memory-id mem-456 --content "active context data"
-mycelianCli --debug get-context --user-id user-123 --memory-id mem-456
+mycelianCli --debug put-context --vault-id vault-123 --memory-id mem-456 --content "active context data"
+mycelianCli --debug get-context --vault-id vault-123 --memory-id mem-456
 ```
 
-#### User Operations
+#### Vault Operations
 ```bash
-mycelianCli --debug create-user --email "user@example.com" --display-name "John Doe" --time-zone "UTC"
+mycelianCli --debug create-vault --title "My Project Vault" --description "Project notes and context"
 ```
 
 #### Memory Operations
 ```bash
-mycelianCli --debug create-memory --user-id user-123 --title "My Project" --memory-type "PROJECT" --description "Project notes"
+mycelianCli --debug create-memory --vault-id vault-123 --title "My Project" --memory-type "PROJECT" --description "Project notes"
 ```
 
 Will output structured JSON logs like:

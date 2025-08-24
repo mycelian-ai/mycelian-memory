@@ -36,7 +36,7 @@ func CreateMemory(ctx context.Context, httpClient *http.Client, baseURL, vaultID
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("create memory: status %d", resp.StatusCode)
@@ -64,7 +64,7 @@ func ListMemories(ctx context.Context, httpClient *http.Client, baseURL, vaultID
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("list memories: status %d", resp.StatusCode)
@@ -92,7 +92,7 @@ func GetMemory(ctx context.Context, httpClient *http.Client, baseURL, vaultID, m
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get memory: status %d", resp.StatusCode)
@@ -120,7 +120,7 @@ func DeleteMemory(ctx context.Context, httpClient *http.Client, baseURL, vaultID
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("delete memory: status %d", resp.StatusCode)
 	}

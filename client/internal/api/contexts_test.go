@@ -9,12 +9,6 @@ import (
 
 // mockExec provided by mock_executor_provider_test.go
 
-type errorExec struct{}
-
-func (e *errorExec) Submit(ctx context.Context, shard string, job interface{ Run(context.Context) error }) error {
-	return context.Canceled
-}
-
 func TestPutContext_EnqueuesAndCallsHTTP(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

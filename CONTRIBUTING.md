@@ -6,6 +6,195 @@ Welcome! This project embraces AI-assisted development with guardrails to keep q
 
 This is early-stage software under active development. APIs will change, docs will evolve, and the focus is on core functionality. Architecture feedback and real-world use-cases are as valuable as code.
 
+## Getting Started
+
+### Fork and Clone
+
+1. **Fork the repository** on GitHub
+2. **Clone your fork**:
+   ```bash
+   git clone https://github.com/yourusername/mycelian-memory.git
+   cd mycelian-memory
+   ```
+3. **Add upstream remote**:
+   ```bash
+   git remote add upstream https://github.com/mycelian/mycelian-memory.git
+   ```
+
+### Understanding the Project Structure
+
+Before diving in, review our [monorepo documentation](docs/monorepo.md) to understand how the project is organized.
+
+**Key components:**
+- **Go modules**: Server, Client SDK, MCP server, and CLI tools
+- **Python benchmarker**: Performance testing and evaluation tools
+- **Docker stack**: Local development environment with Postgres and Weaviate
+
+### Prerequisites and Dependencies
+
+#### Required Software
+
+**Go 1.24.6+**
+```bash
+# macOS
+brew install go
+
+# Ubuntu/Debian
+wget https://go.dev/dl/go1.24.6.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.24.6.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+
+# Verify installation
+go version
+```
+
+**Docker Desktop**
+- [Download Docker Desktop](https://www.docker.com/products/docker-desktop)
+- Ensure Docker Compose is included (comes with Desktop)
+
+**Ollama with embedding model**
+```bash
+# macOS
+brew install ollama
+
+# Ubuntu/Debian
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Start Ollama and pull embedding model
+ollama serve &
+ollama pull nomic-embed-text
+```
+
+#### Optional Dependencies
+
+**Python 3.11+** *(optional, for benchmarker and performance testing)*
+```bash
+# macOS
+brew install python@3.11
+
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3.11 python3.11-pip python3.11-venv
+
+# Verify installation
+python3 --version
+```
+
+> **Python Environment Management**: We recommend using `pyenv` to manage Python versions and `venv` for project isolation. If you're working on multiple Python projects, consider installing `pyenv` first (`brew install pyenv` or `curl https://pyenv.run | bash`), then `pyenv install 3.11.9` and `pyenv local 3.11.9` in this project. Our `./setup-env.sh` script will create a local `venv` regardless of how you installed Python, keeping dependencies isolated from your system Python.
+
+**Make** *(required for build automation)*
+```bash
+# macOS (usually pre-installed, but if needed)
+xcode-select --install
+# or
+brew install make
+
+# Ubuntu/Debian (usually pre-installed, but if needed)
+sudo apt install build-essential
+```
+
+#### Optional Development Tools
+
+**jq** *(optional, helpful for JSON processing in examples and debugging)*
+```bash
+# macOS
+brew install jq
+
+# Ubuntu/Debian
+sudo apt install jq
+```
+
+### Initial Setup and Verification
+
+1. **Verify everything compiles**:
+   ```bash
+   make build-check
+   ```
+   
+   **Optional**: Run full quality gate (formatting, linting, tests, vulnerability scan):
+   ```bash
+   make quality-check
+   ```
+
+2. **Set up Python virtual environment** *(optional, for benchmarker and performance testing)*:
+   ```bash
+   # This creates a venv, installs Python dependencies, and builds CLI tools
+   source ./setup-env.sh
+   ```
+   
+   **For future sessions**, activate the environment:
+   ```bash
+   source venv/bin/activate
+   ```
+
+3. **Run full test suite** to verify everything works:
+   ```bash
+   make test-full-local-stack
+   ```
+
+This command will:
+- Run server unit tests
+- Start the backend stack (Postgres, Weaviate, Memory Service)
+- Wait for services to be healthy
+- Run integration and e2e tests
+- Clean up automatically
+
+If all tests pass, you're ready to contribute!
+
+## Branch and PR Workflow
+
+### Creating Feature Branches
+
+**Important**: Never develop features directly on the `main` branch. Always create feature branches from an up-to-date main.
+
+```bash
+# Keep your fork up to date
+git fetch upstream
+git checkout main
+git pull --rebase upstream main
+
+# Create a feature branch
+git checkout -b feature/your-feature-name
+# or
+git checkout -b fix/issue-description
+# or  
+git checkout -b docs/update-name
+```
+
+### Submitting Pull Requests
+
+1. **Push your branch** to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+2. **Create a PR** from your fork to the main repository
+
+3. **Link to issues** if applicable using "Fixes #123" or "Closes #456"
+
+**Note**: We're building reliable CI automation - for now, ensure your changes pass local tests before submitting.
+
+## Issue and Discussion Workflow
+
+### When to Use Issues vs Discussions
+
+**Use GitHub Issues for:**
+- Bug reports with reproducible steps
+- Feature requests with clear requirements
+- Documentation improvements
+
+**Use GitHub Discussions for:**
+- Architecture questions and design conversations
+- General questions about usage or implementation
+- Brainstorming new features or approaches
+
+### Linking PRs to Issues
+
+When submitting a PR, reference related issues:
+- `Fixes #123` - automatically closes the issue when PR merges
+- `Addresses #456` - links to the issue without auto-closing
+- `Related to #789` - general reference
+
 ## AI-Assisted Development Philosophy
 
 AI-generated code is welcome, but it must pass human review and follow our four-layer quality method:
@@ -36,25 +225,11 @@ AI-generated code is welcome, but it must pass human review and follow our four-
 
 ## Development Workflow
 
-### Initial Setup
-
-```bash
-# Fork and clone the repository
-git clone https://github.com/yourusername/mycelian-memory.git
-cd mycelian-memory
-
-# Optional: bootstrap local environment
-./setup-env.sh
-
-# Verify everything compiles
-make build-check
-```
-
 ### Simple Development Loop
 
 ```bash
 # Start everything and run tests
-make test-all-postgres
+make test-full-local-stack
 
 # That's it! This command:
 # - Runs server unit tests
@@ -67,7 +242,7 @@ make test-all-postgres
 **For iterative development:**
 ```bash
 # 1. Start backend once
-make backend-postgres-up
+make start-dev-mycelian-server
 
 # 2. Write tests, implement, repeat
 make server-test
@@ -99,7 +274,7 @@ make client-test-integration
 **MCP server development:**
 ```bash
 # Start MCP server for Cursor integration
-make mcp-streamable-up
+make start-mcp-streamable-server
 
 # Restart after changes
 make mcp-streamable-restart
@@ -166,9 +341,7 @@ Critical review is required:
 - [ ] For major changes: design documentation submitted and approved
 - [ ] Tests written and passing (unit + integration as applicable)
 - [ ] Race detector clean: `go test -race ./...` (from `server/` and relevant modules)
-- [ ] Formatting and static analysis: `go fmt ./... && go vet ./... && golangci-lint run`
-- [ ] Vulnerability scan: `govulncheck ./...`
-- [ ] Coverage target (~90%) checked locally
+- [ ] Quality gate: `make quality-check` (or manually: `go fmt ./... && go vet ./... && go test -race ./... && go mod tidy && golangci-lint run && govulncheck ./...`)
 - [ ] Invariant tests passing: `go test ./tools/invariants-checker/...`
 - [ ] Failing tests are fixed, not disabled
 - [ ] Implementation aligns with relevant ADRs/specs
@@ -240,7 +413,7 @@ go test ./tools/invariants-checker/...  # no violations
 - **Architecture docs**: `docs/designs/` (client-sdk, mcp-server, etc.)
 
 ## Security
-Report vulnerabilities via `SECURITY.md` in this repository. When running locally, prefer Docker Compose targets (e.g., `make -C server run-postgres`) instead of launching ad-hoc host binaries to avoid duplicate endpoints and environment drift.
+Please refer to `SECURITY.md`.
 
 ## Conventional Commits
 Use conventional commit messages:
@@ -254,5 +427,3 @@ By contributing, you agree that your contributions will be licensed under the sa
 ---
 
 Remember: keep changes small, test-first, and optimize for clarity and reliability.
-
-

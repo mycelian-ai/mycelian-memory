@@ -14,9 +14,9 @@ import (
 
 // runContextPut uploads a JSON context to the Memory API.
 // ctxJSON must be a raw JSON string representing an object.
-func runContextPut(api, user, memory, ctxJSON string, out io.Writer) error {
-	if user == "" || memory == "" {
-		return fmt.Errorf("--user and --memory required")
+func runContextPut(api, memory, ctxJSON string, out io.Writer) error {
+	if memory == "" {
+		return fmt.Errorf("--memory required")
 	}
 	if ctxJSON == "" {
 		return fmt.Errorf("--json payload required")
@@ -35,7 +35,7 @@ func runContextPut(api, user, memory, ctxJSON string, out io.Writer) error {
 	if vaultFlag == "" {
 		return fmt.Errorf("--vault required (set with -v)")
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/contexts", api, user, vaultFlag, memory)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", api, vaultFlag, memory)
 	resp, err := httpPutJSON(url, bodyBytes)
 	if err != nil {
 		return err
@@ -49,18 +49,19 @@ func runContextPut(api, user, memory, ctxJSON string, out io.Writer) error {
 }
 
 // runContextGet fetches the latest context snapshot.
-func runContextGet(api, user, memory string, out io.Writer) error {
-	if user == "" || memory == "" {
-		return fmt.Errorf("--user and --memory required")
+func runContextGet(api, memory string, out io.Writer) error {
+	if memory == "" {
+		return fmt.Errorf("--memory required")
 	}
 	if vaultFlag == "" {
 		return fmt.Errorf("--vault required (set with -v)")
 	}
-	url := fmt.Sprintf("%s/api/users/%s/vaults/%s/memories/%s/contexts", api, user, vaultFlag, memory)
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", api, vaultFlag, memory)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
@@ -80,6 +81,7 @@ func httpPutJSON(url string, payload []byte) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
 	return httpClient.Do(req)
 }
 
@@ -96,10 +98,9 @@ func init() {
 		Short: "Upload a context JSON snapshot",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonStr, _ := cmd.Flags().GetString("json")
-			return runContextPut(apiFlag, userFlag, memoryFlag, jsonStr, os.Stdout)
+			return runContextPut(apiFlag, memoryFlag, jsonStr, os.Stdout)
 		},
 	}
-	putCmd.Flags().StringVarP(&userFlag, "user", "u", "", "User ID (required)")
 	putCmd.Flags().StringVarP(&memoryFlag, "memory", "m", "", "Memory ID (required)")
 	putCmd.Flags().StringP("json", "j", "", "Context JSON payload (required)")
 	_ = putCmd.MarkFlagRequired("json")
@@ -109,10 +110,9 @@ func init() {
 		Use:   "get",
 		Short: "Fetch the latest context snapshot",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runContextGet(apiFlag, userFlag, memoryFlag, os.Stdout)
+			return runContextGet(apiFlag, memoryFlag, os.Stdout)
 		},
 	}
-	getCmd.Flags().StringVarP(&userFlag, "user", "u", "", "User ID (required)")
 	getCmd.Flags().StringVarP(&memoryFlag, "memory", "m", "", "Memory ID (required)")
 
 	contextCmd.AddCommand(putCmd, getCmd)

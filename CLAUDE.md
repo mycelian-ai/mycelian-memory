@@ -35,12 +35,12 @@ go fmt ./... && go vet ./... && go test -race ./... && go mod tidy && go build .
 ### Service Management
 ```bash
 # Postgres backend (local development)
-make backend-postgres-up     # Start Postgres + Weaviate stack
+make start-dev-mycelian-server     # Start Postgres + Weaviate stack
 make backend-down           # Stop all services
 make backend-status         # Show service status
 
 # MCP Server (for Claude integration)
-make mcp-streamable-up      # Start MCP server on streamable HTTP
+make start-mcp-streamable-server      # Start MCP server on streamable HTTP
 ```
 
 ## Architecture Overview
@@ -151,7 +151,7 @@ curl http://localhost:8082/v1/.well-known/ready
 ### Database Management
 ```bash
 # Start Postgres backend (includes schema initialization)
-make backend-postgres-up
+make start-dev-mycelian-server
 
 # Postgres inspection
 psql postgresql://user:password@localhost:5432/mycelian_memory
