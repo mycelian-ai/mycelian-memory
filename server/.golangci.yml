@@ -1,0 +1,9 @@
+# .golangci.yml  ── GolangCI-Lint v2 minimal config
+version: "2"
+
+run:
+  tests: true
+
+# Note: v2 schema expects linter configs under `linters.settings`.
+# We no longer need errcheck exclusions for tests (code fixed),
+# so `linters-settings` and `issues.exclude-rules` were removed.
