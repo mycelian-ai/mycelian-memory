@@ -46,12 +46,6 @@ func (hc *SearchIndexHealthChecker) Start(ctx context.Context, interval time.Dur
 				ok = false
 				hc.log.Error().Stack().Str("checker", hc.Name()).Err(err).Msg("search index health check failed")
 			}
-		} else {
-			// Fallback: issue a cheap no-op by calling DeleteVault with empty inputs should be no-op
-			if err := hc.index.DeleteVault(checkCtx, "", ""); err != nil {
-				ok = false
-				hc.log.Error().Stack().Str("checker", hc.Name()).Err(err).Msg("search index health check failed")
-			}
 		}
 		if ok {
 			hc.healthy.Store(1)

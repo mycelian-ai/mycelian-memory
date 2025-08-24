@@ -40,11 +40,13 @@ func Run() error {
 	if cfg.EmbedProvider == "ollama" || cfg.EmbedProvider == "" {
 		emb = ollama.New(cfg.EmbedModel)
 	}
+	// Critical dependency check - fail fast if embedder is missing
+	if emb == nil {
+		log.Fatal().Str("provider", cfg.EmbedProvider).Msg("critical dependency missing: embedder not configured")
+	}
 	// Validate embedder readiness at startup
-	if emb != nil {
-		if vec, err := emb.Embed(context.Background(), "worker-startup-check"); err != nil || len(vec) == 0 {
-			return fmt.Errorf("embedder not ready: provider=%s model=%s err=%v len=%d", cfg.EmbedProvider, cfg.EmbedModel, err, len(vec))
-		}
+	if vec, err := emb.Embed(context.Background(), "worker-startup-check"); err != nil || len(vec) == 0 {
+		return fmt.Errorf("embedder not ready: provider=%s model=%s err=%v len=%d", cfg.EmbedProvider, cfg.EmbedModel, err, len(vec))
 	}
 
 	// Ensure schema exists in dev/e2e; safe to call repeatedly.

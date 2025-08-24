@@ -210,12 +210,9 @@ func (w *Worker) markFailed(ctx context.Context, tx *sql.Tx, id int64, _ error) 
 	return err
 }
 
-// embed wraps the embedder to keep callers simple and guards nil embedder usage.
+// embed wraps the embedder to keep callers simple.
+// Embedder is guaranteed to be non-nil after startup validation.
 func (w *Worker) embed(text string, ctx context.Context) ([]float32, error) {
-	if w.embedder == nil {
-		// Allow operation without vectors (indexer may fill later); return empty vector
-		return nil, nil
-	}
 	return w.embedder.Embed(ctx, text)
 }
 
