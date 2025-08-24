@@ -22,7 +22,7 @@ The framework organizes information in immutable timelines that preserve memory 
 
 The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [the architecture document](docs/designs/001_mycelian_memory_architecture.md). 
 
-### Architecture (high level)
+### Architecture (high-level design)
 
 ```mermaid
 flowchart TD
