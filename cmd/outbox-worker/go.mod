@@ -52,6 +52,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/mycelian/mycelian-memory/devmode => ../../devmode
+replace github.com/mycelian/mycelian-memory/pkg/devauth => ../../pkg/devauth
 
 replace github.com/mycelian/mycelian-memory/server => ../../server

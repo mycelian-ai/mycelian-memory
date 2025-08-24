@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/mycelian/mycelian-memory/devmode"
+	"github.com/mycelian/mycelian-memory/pkg/devauth"
 )
 
 // MockAuthorizer provides a simple authorizer for local development
@@ -18,7 +18,7 @@ func NewMockAuthorizer() *MockAuthorizer {
 
 // Authorize validates the shared dev API key and checks permissions in one call
 func (m *MockAuthorizer) Authorize(ctx context.Context, apiKey, operation, resource string) (*ActorInfo, error) {
-	if apiKey != devmode.APIKey {
+	if apiKey != devauth.APIKey {
 		return nil, errors.New("invalid API key for local development")
 	}
 

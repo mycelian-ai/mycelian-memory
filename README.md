@@ -3,7 +3,7 @@
   
   # Mycelian Memory
   
-  Mycelian Memory is an open source framework that aims to provide simple, reliable and cost-effective long-term memory and context to AI Agents.
+  Mycelian Memory is an open source framework that aims to provide simple, reliable, and cost-effective long-term memory and context to AI Agents.
   
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian/mycelian-memory?style=social)](https://github.com/mycelian/mycelian-memory/stargazers)
   [![License](https://img.shields.io/github/license/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/blob/main/LICENSE)
@@ -34,17 +34,17 @@ The architecture is inspired by distributed systems principles, treating memory 
 
 🚨 🚧 🏗️ *This project is under active development and not yet production‑ready.*
 
-### Is Mycelian inspired from Mycelium? - Yes :)
+### Is Mycelian inspired by Mycelium? - Yes :)
 
 In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
 
-Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
+Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim is to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
 
 ---
 
 ### Quickstart (Docker)
 
-Prereqs (please refer to [CONTRIBUTING.md](CONTRIBUTING.md)): 
+Prerequisites (please refer to [CONTRIBUTING.md](CONTRIBUTING.md)): 
 1. Docker Desktop 
 2. Ollama
 3. Make & jq
@@ -68,7 +68,7 @@ The stack exposes the API on `http://localhost:11545`.
 
 ### Quickstart (MCP Integration)
 
-#### For tools that support Streamable MCP Server (Cursor)
+#### For tools that support streamable MCP Servers (e.g. Cursor)
 
 ```bash
 # Start the MCP server
@@ -99,7 +99,8 @@ make start-mcp-streamable-server
   }
 }
 ```
-#### For tools that require stdio mode (Claude Desktop)
+
+#### For tools that require stdio mode (e.g. Claude Desktop)
 
 ```bash
 # Build the MCP server binary

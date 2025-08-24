@@ -14,7 +14,7 @@ import (
 	"github.com/mycelian/mycelian-memory/client/internal/errors"
 	"github.com/mycelian/mycelian-memory/client/internal/shardqueue"
 	promptsinternal "github.com/mycelian/mycelian-memory/client/prompts"
-	"github.com/mycelian/mycelian-memory/devmode"
+	"github.com/mycelian/mycelian-memory/pkg/devauth"
 	"github.com/rs/zerolog/log"
 )
 
@@ -103,7 +103,7 @@ func New(baseURL, apiKey string, opts ...Option) (*Client, error) {
 // Convenience constructor for local development; not for production use.
 func NewWithDevMode(baseURL string, opts ...Option) (*Client, error) {
 	// Use the shared dev API key that MockAuthorizer recognizes
-	return New(baseURL, devmode.APIKey, opts...)
+	return New(baseURL, devauth.APIKey, opts...)
 }
 
 // wrapTransportWithAPIKey wraps the HTTP client's transport so every request

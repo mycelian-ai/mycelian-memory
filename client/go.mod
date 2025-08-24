@@ -2,9 +2,9 @@ module github.com/mycelian/mycelian-memory/client
 
 go 1.24.6
 
-require github.com/mycelian/mycelian-memory/devmode v0.0.0
+require github.com/mycelian/mycelian-memory/pkg/devauth v0.0.0
 
-replace github.com/mycelian/mycelian-memory/devmode => ../devmode
+replace github.com/mycelian/mycelian-memory/pkg/devauth => ../pkg/devauth
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	client "github.com/mycelian/mycelian-memory/client"
-	"github.com/mycelian/mycelian-memory/devmode"
+	"github.com/mycelian/mycelian-memory/pkg/devauth"
 )
 
 func TestClient_MemoryCRUD(t *testing.T) {
@@ -27,7 +27,7 @@ func TestClient_MemoryCRUD(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// Check Authorization header
-		if r.Header.Get("Authorization") != "Bearer "+devmode.APIKey {
+		if r.Header.Get("Authorization") != "Bearer "+devauth.APIKey {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
