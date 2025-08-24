@@ -341,7 +341,7 @@ Critical review is required:
 - [ ] For major changes: design documentation submitted and approved
 - [ ] Tests written and passing (unit + integration as applicable)
 - [ ] Race detector clean: `go test -race ./...` (from `server/` and relevant modules)
-- [ ] Quality gate: `make quality-check` (or manually: `go fmt ./... && go vet ./... && go test -race ./... && go mod tidy && golangci-lint run && govulncheck ./...`)
+- [ ] Quality gate: `make quality-check` 
 - [ ] Invariant tests passing: `go test ./tools/invariants-checker/...`
 - [ ] Failing tests are fixed, not disabled
 - [ ] Implementation aligns with relevant ADRs/specs
