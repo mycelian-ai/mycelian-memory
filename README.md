@@ -3,7 +3,7 @@
   
   # Mycelian Memory
   
-  Mycelian Memory is an open source project for providing simple, reliable and cost-effective long-term memory and context to AI Agents.
+  Mycelian Memory is an open source framework that aims to provide simple, reliable and cost-effective long-term memory and context to AI Agents.
   
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian/mycelian-memory?style=social)](https://github.com/mycelian/mycelian-memory/stargazers)
   [![License](https://img.shields.io/github/license/mycelian/mycelian-memory?branch=sameerch-dev)](https://github.com/mycelian/mycelian-memory/blob/sameerch-dev/client/LICENSE)
@@ -15,36 +15,40 @@
 
 ### Why Mycelian
 
-Mycelian aims* to provide AI agents with persistent memory through a simple, log‑structured architecture.
+Mycelian aims to provide AI agents with persistent memory through a simple, reliable, log‑structured architecture.
 
-When an agent interacts with users, it builds deep contextual understanding, but loses everything when the session ends. Mycelian provides a protocol for agents to directly persist their working context, capturing high‑fidelity information as they process it naturally during conversations.
+When an agent interacts with users, it builds deep contextual understanding within a session, but forgets everything when the session ends. Mycelian provides a framework for agents to directly persist their working context and memories, capturing high‑fidelity information as they process it during conversations.
 
-(*emphasis on aims)
+The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections. 
+
+The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [our architecture document](docs/designs/001_mycelian_memory_architecture.md). 
 
 #### What It Does Today
 
 - **Stores agent memory** via append‑only high fidelity entry logs paired with context snapshots (context shards)
 - **Organizes knowledge** through vault‑based scoping
 - **Retrieves context** using hybrid search across memory entries and context shards
-- **Maintains fidelity** by avoiding lossy summarization chains
-- **Runs anywhere** with self‑hostable Go backend and Postgres storage
+- **Maintains fidelity** by avoiding lossy summarization chains and graph-based memory complexity
+- **Runs locally but designed to run anywhere** with self‑hostable Go backend and pluggable storage/vector database support.
+- **Tested for memory recall** using the MemGPT/MSC-Self-Instruct benchmark dataset (see `tools/benchmarker/`)
 
-The architecture is inspired by distributed systems principles — treating memory as an append‑only log that accumulates knowledge over time rather than constantly rewriting state. To learn more about the design, see [our architecture document](docs/designs/001_mycelian_memory_architecture.md).
 
 🚨 🚧 🏗️ *This project is under active development and not yet production‑ready.*
 
-
-### Is Mycleian inspired from Mycelium? - Yes :)
+### Is Mycelian inspired from Mycelium? - Yes :)
 
 In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
 
-Mycelian's takes inspiration from this natural interconnectedness for AI agents. We aim to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
+Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
 
 ---
 
 ### Quickstart (Docker)
 
-Prereqs: Docker Desktop. For embeddings, run Ollama locally and pull the model used by default.
+Prereqs (please refer to [CONTRIBUTING.md](CONTRIBUTING.md)): 
+1. Docker Desktop 
+2. Ollama
+3. Make & jq
 
 ```bash
 # 1) Start Ollama (separate terminal)
@@ -63,60 +67,68 @@ The stack exposes the API on `http://localhost:11545`.
 
 ---
 
-### Quickstart (Go SDK)
+### Quickstart (MCP Integration)
 
-```go
-package main
+#### For tools that support Streamable MCP Server (Cursor)
 
-import (
-    "context"
-    "fmt"
-    "github.com/mycelian/mycelian-memory/client"
-)
+```bash
+# Start the MCP server
+make start-mcp-streamable-server
+```
 
-func main() {
-    // Dev-only helper automatically uses the local development API key.
-    c, err := client.NewWithDevMode("http://localhost:11545")
-    if err != nil { panic(err) }
-    defer c.Close()
+**Add to Cursor MCP config** (`~/.cursor/mcp.json`):
 
-    ctx := context.Background()
+```json
+{
+  "mcpServers": {
+    "mycelian-memory-streamable": {
+      "url": "http://localhost:11546/mcp",
+      "alwaysAllow": [
+        "add_entry",
+        "list_entries", 
+        "create_vault",
+        "list_vaults",
+        "list_memories",
+        "get_memory",
+        "create_memory_in_vault",
+        "put_context",
+        "get_context",
+        "search_memories",
+        "await_consistency"
+      ]
+    }
+  }
+}
+```
+#### For tools that require stdio mode (Claude Desktop)
 
-    v, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: "notes"})
-    if err != nil { panic(err) }
-    m, err := c.CreateMemory(ctx, v.VaultID, client.CreateMemoryRequest{Title: "demo", MemoryType: "NOTES"})
-    if err != nil { panic(err) }
+```bash
+# Build the MCP server binary
+make build-mcp-server
+```
 
-    // Optional: attach context text and add an entry
-    _, _ = c.PutContext(ctx, v.VaultID, m.ID, "projectBrief:...\nactiveContext:...\n")
-    _, _ = c.AddEntry(ctx, v.VaultID, m.ID, client.AddEntryRequest{RawEntry: "hello", Summary: "greeting"})
+**Add to Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
-    // Read back
-    list, _ := c.ListEntries(ctx, v.VaultID, m.ID, nil)
-    fmt.Println("entries:", list.Count)
+```json
+{
+  "mcpServers": {
+    "mycelian-memory": {
+      "command": "/path/to/mycelian-memory/bin/mycelian-mcp-server",
+      "env": {
+        "MEMORY_SERVICE_URL": "http://localhost:11545"
+      }
+    }
+  }
 }
 ```
 
----
+#### Usage in both IDEs:
+- Create vaults and memories for your projects
+- Store context, code snippets, and project knowledge  
+- Search across your stored memories during development
+- Maintain persistent context between coding sessions
 
-### Quickstart (MCP server)
-
-Run the MCP server in HTTP mode (good for Cursor) or stdio (good for Claude Desktop). The server forwards all operations through the Go SDK.
-
-```bash
-# Option A: Docker (HTTP, port 11546)
-make start-mcp-streamable-server
-
-# Option B: Local binary (HTTP, port 11546)
-cd cmd/mycelian-mcp-server
-go build -o mycelian-mcp-server .
-MCP_HTTP=true MEMORY_SERVICE_URL=http://localhost:11545 ./mycelian-mcp-server
-
-# Sanity check (expect 200)
-curl -m 2 -s -o /dev/null -w "%{http_code}\n" http://localhost:11546/mcp
-```
-
-In Cursor, add a custom MCP server pointing to `http://localhost:11546/mcp`.
+The MCP server provides tools for vault management, memory operations, context storage, and search.
 
 ---
 
@@ -125,33 +137,37 @@ In Cursor, add a custom MCP server pointing to `http://localhost:11546/mcp`.
 Base URL: `http://localhost:11545/v0`
 
 ```bash
-# Health
+# Set dev mode API key for local development
+export API_KEY="LOCAL_DEV_MODE_NOT_FOR_PRODUCTION"
+export MCP_PORT="11546"
+
+# Health (no auth required)
 curl -s http://localhost:11545/v0/health
 
-# Create a vault (Authorization required; use a Bearer token)
+# Create a vault
 curl -s -X POST http://localhost:11545/v0/vaults \
-  -H "Authorization: Bearer <your_api_key>" \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"title":"notes"}'
 
 # Create a memory inside a vault
 curl -s -X POST http://localhost:11545/v0/vaults/<vaultId>/memories \
-  -H "Authorization: Bearer <your_api_key>" \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"title":"demo","memoryType":"NOTES"}'
 
 # Put and get context (plain text)
 curl -s -X PUT http://localhost:11545/v0/vaults/<vaultId>/memories/<memoryId>/contexts \
-  -H "Authorization: Bearer <your_api_key>" \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: text/plain; charset=utf-8" \
   --data-binary @context.txt
 
 curl -s http://localhost:11545/v0/vaults/<vaultId>/memories/<memoryId>/contexts \
-  -H "Authorization: Bearer <your_api_key>" -H "Accept: text/plain"
+  -H "Authorization: Bearer $API_KEY" -H "Accept: text/plain"
 
 # Search (requires index + embeddings to be healthy)
 curl -s -X POST http://localhost:11545/v0/search \
-  -H "Authorization: Bearer <your_api_key>" \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"query":"hello", "limit":10}'
 ```
@@ -193,48 +209,45 @@ tools/                    # CLI and service tools
 docs/                     # ADRs, designs, API reference
 ```
 
+For detailed information about the monorepo structure, versioning, and development workflow, see [docs/monorepo.md](docs/monorepo.md).
+
 ---
 
 ### Architecture (high level)
 
 ```mermaid
-flowchart LR
-  A[IDE/LLM] -->|MCP| B[Mycelian MCP server]
-  B -->|Go SDK| C[Memory Service HTTP]
-  C --> D[(Postgres)]
-  C --> E[Vector Index\n(Weaviate)]
-  C --> F[Embeddings\n(Ollama)]
+flowchart TD
+    Agent[AI Agent] <--> MCP["`**MCP Server**
+    _[Mycelian Client]_`"]
+    MCP <--> Service[Memory Service]
+    Service <--> Postgres[(Postgres)]
+    Vector[(Vector DB)] --> Service
+    Postgres <--> Worker[Outbox<br/>Worker]
+    Worker --> Vector
+    
+    %% Add label to Postgres
+    Postgres -.- Tables["`**Key Tables:**
+    vaults
+    memories
+    entries
+    context
+    tx_outbox`"]
+    
+    classDef primary fill:#dbeafe,stroke:#1e40af,stroke-width:3px,color:#000
+    classDef storage fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#000
+    classDef async fill:#e9d5ff,stroke:#7c3aed,stroke-width:3px,color:#000
+    classDef note fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#000
+    
+    class Agent,MCP,Service primary
+    class Postgres,Vector storage
+    class Worker async
+    class Tables note
 ```
 
----
-
-### Troubleshooting
-
-- Health stays "unhealthy": ensure Postgres, Weaviate, and Ollama are up; check `docker compose` logs. The service waits for healthy deps before serving.
-- Search errors: verify Weaviate is reachable (port `8082->8080`) and that Ollama is running with the `nomic-embed-text` model pulled.
-- Auth 401: in dev, prefer the SDK’s `NewWithDevMode` to set the Authorization header for you.
 
 ---
 
 ### Contributing
 
-Requirements: Go 1.24.6+. Before opening a PR, run:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow, and contribution guidelines.
 
-```bash
-go fmt ./... && go vet ./... && go test -race ./... && go tool golangci-lint run
-```
-
-Common local tasks:
-
-```bash
-make build
-make start-dev-mycelian-server
-```
-
----
-
-### License
-
-See `LICENSE`.
-
-Need to create a simple README file
