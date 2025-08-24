@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Mycelian"
+abstract: "An open source project by Sameer Choudhary."
+authors:
+  - family-names: "Choudhary"
+    given-names: "Sameer"
+repository-code: "https://github.com/mycelian-ai/mycelian-memory"
+url: "https://github.com/mycelian-ai/mycelian-memory"
+license: Apache-2.0
+version: "0.0.1"
+date-released: "2025-08-22"
+preferred-citation:
+  type: generic
+  title: "Mycelian Memory Architecture"
+  authors:
+    - family-names: "Choudhary"
+      given-names: "Sameer"
+  url: "https://github.com/mycelian-ai/mycelian-memory/blob/sameerch-dev/docs/designs/001_mycelian_memory_architecture.md"
+  year: 2025

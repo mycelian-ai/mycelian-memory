@@ -1,0 +1,103 @@
+package api
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/mycelian/mycelian-memory/client/internal/job"
+	"github.com/mycelian/mycelian-memory/client/internal/types"
+)
+
+// Use shared types, validation, and interfaces from types package
+
+// Use the shared ErrNotFound from types to ensure equality works across boundaries.
+
+// PutContext stores a plain-text context document via the sharded executor.
+// This ensures FIFO ordering per memory and provides offline resilience.
+// CRITICAL: This MUST preserve the async executor pattern!
+func PutContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID string, doc string) (*types.EnqueueAck, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	putJob := job.New(func(jobCtx context.Context) error {
+		url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", baseURL, vaultID, memID)
+		httpReq, err := http.NewRequestWithContext(jobCtx, http.MethodPut, url, bytes.NewBufferString(doc))
+		if err != nil {
+			return err
+		}
+		httpReq.Header.Set("Content-Type", "text/plain; charset=utf-8")
+		resp, err := httpClient.Do(httpReq)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusCreated {
+			return fmt.Errorf("put context: status %d", resp.StatusCode)
+		}
+		return nil
+	})
+	if err := exec.Submit(ctx, memID, putJob); err != nil {
+		return nil, err
+	}
+	return &types.EnqueueAck{MemoryID: memID, Status: "enqueued"}, nil
+}
+
+// GetLatestContext fetches the latest context as plain text.
+func GetLatestContext(ctx context.Context, httpClient *http.Client, baseURL, vaultID, memID string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", baseURL, vaultID, memID)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("Accept", "text/plain")
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", types.ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("get context text: status %d", resp.StatusCode)
+	}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// DeleteContext removes a context snapshot by contextId synchronously.
+// It first awaits consistency to ensure all pending writes complete, then performs the HTTP DELETE.
+func DeleteContext(ctx context.Context, exec types.Executor, httpClient *http.Client, baseURL, vaultID, memID, contextID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Ensure all pending writes for this memory complete before deletion
+	if err := awaitConsistency(ctx, exec, memID); err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts/%s", baseURL, vaultID, memID, contextID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("delete context: status %d", resp.StatusCode)
+	}
+	return nil
+}

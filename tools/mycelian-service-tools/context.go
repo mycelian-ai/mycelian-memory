@@ -1,0 +1,121 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+
+	"github.com/spf13/cobra"
+)
+
+// runContextPut uploads a JSON context to the Memory API.
+// ctxJSON must be a raw JSON string representing an object.
+func runContextPut(api, memory, ctxJSON string, out io.Writer) error {
+	if memory == "" {
+		return fmt.Errorf("--memory required")
+	}
+	if ctxJSON == "" {
+		return fmt.Errorf("--json payload required")
+	}
+
+	// Validate that ctxJSON is a valid JSON object
+	var tmp map[string]interface{}
+	if err := json.Unmarshal([]byte(ctxJSON), &tmp); err != nil {
+		return fmt.Errorf("context must be a JSON object: %w", err)
+	}
+
+	// Build request body { "context": {..} }
+	bodyMap := map[string]interface{}{"context": tmp}
+	bodyBytes, _ := json.Marshal(bodyMap)
+
+	if vaultFlag == "" {
+		return fmt.Errorf("--vault required (set with -v)")
+	}
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", api, vaultFlag, memory)
+	resp, err := httpPutJSON(url, bodyBytes)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+	_, _ = io.Copy(out, resp.Body)
+	return nil
+}
+
+// runContextGet fetches the latest context snapshot.
+func runContextGet(api, memory string, out io.Writer) error {
+	if memory == "" {
+		return fmt.Errorf("--memory required")
+	}
+	if vaultFlag == "" {
+		return fmt.Errorf("--vault required (set with -v)")
+	}
+	url := fmt.Sprintf("%s/v0/vaults/%s/memories/%s/contexts", api, vaultFlag, memory)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+	_, _ = io.Copy(out, resp.Body)
+	return nil
+}
+
+// httpPutJSON is a helper to send PUT with application/json.
+func httpPutJSON(url string, payload []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPut, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer LOCAL_DEV_MODE_NOT_FOR_PRODUCTION")
+	return httpClient.Do(req)
+}
+
+func init() {
+	// Parent command
+	contextCmd := &cobra.Command{
+		Use:   "context",
+		Short: "Manage memory context snapshots",
+	}
+
+	// put subcommand
+	putCmd := &cobra.Command{
+		Use:   "put",
+		Short: "Upload a context JSON snapshot",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			jsonStr, _ := cmd.Flags().GetString("json")
+			return runContextPut(apiFlag, memoryFlag, jsonStr, os.Stdout)
+		},
+	}
+	putCmd.Flags().StringVarP(&memoryFlag, "memory", "m", "", "Memory ID (required)")
+	putCmd.Flags().StringP("json", "j", "", "Context JSON payload (required)")
+	_ = putCmd.MarkFlagRequired("json")
+
+	// get subcommand
+	getCmd := &cobra.Command{
+		Use:   "get",
+		Short: "Fetch the latest context snapshot",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runContextGet(apiFlag, memoryFlag, os.Stdout)
+		},
+	}
+	getCmd.Flags().StringVarP(&memoryFlag, "memory", "m", "", "Memory ID (required)")
+
+	contextCmd.AddCommand(putCmd, getCmd)
+
+	rootCmd.AddCommand(contextCmd)
+}

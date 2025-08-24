@@ -1,0 +1,59 @@
+# Git files
+.git
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+memory-service
+memory-service-*
+indexer-prototype
+indexer-prototype-*
+*.exe
+
+# Logs
+*.log
+
+# Documentation that's not needed in container
+*.md
+docs/
+memory-bank/
+
+# Test files
+*_test.go
+testdata/
+dev_env_e2e_tests/
+
+# Development tools
+Makefile
+.golangci.yml
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+
+# CI/CD
+.github/
+
+# Issues and development files
+issues/
+
+# Scripts (not needed in container)
+scripts/
+
+# Memory bank (development context)
+memory-bank/ 
