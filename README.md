@@ -6,11 +6,10 @@
   Mycelian Memory is an open source framework that aims to provide simple, reliable and cost-effective long-term memory and context to AI Agents.
   
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian/mycelian-memory?style=social)](https://github.com/mycelian/mycelian-memory/stargazers)
-  [![License](https://img.shields.io/github/license/mycelian/mycelian-memory?branch=sameerch-dev)](https://github.com/mycelian/mycelian-memory/blob/sameerch-dev/client/LICENSE)
-  [![Go Version](https://img.shields.io/github/go-mod/go-version/mycelian/mycelian-memory?branch=sameerch-dev)](https://github.com/mycelian/mycelian-memory/tree/sameerch-dev)
-  [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
-  [![GitHub Issues](https://img.shields.io/github/issues/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/issues)
-  [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/pulls)
+  [![License](https://img.shields.io/github/license/mycelian/mycelian-memory)](https://github.com/mycelian/mycelian-memory/blob/main/LICENSE)
+  [![Go Version](https://img.shields.io/github/go-mod/go-version/mycelian/mycelian-memory?branch=main)](https://github.com/mycelian/mycelian-memory/tree/sameerch-dev)
+  [![Discord](https://img.shields.io/discord/1396722077792469104?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
+  
 </div>
 
 ### Why Mycelian
@@ -251,3 +250,5 @@ flowchart TD
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow, and contribution guidelines.
 
+### License
+Apache 2.0 — see the [LICENSE](LICENSE) file for details.
