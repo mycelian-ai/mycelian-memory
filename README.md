@@ -76,9 +76,13 @@ Mycelian takes inspiration from this natural interconnectedness for AI agents. T
 
 🚨 🚧 🏗️ **This project is under active development and not yet production‑ready.**
 
-🤖 **AI-Assisted Development**: This codebase was created using AI development tools including **Cursor** (with o3, GPT-4o, Claude Sonnet 3.5, and Claude Opus models). Part of the motivation for building this project is to learn how to build production-level code using modern AI tools while exploring what techniques yield the best results.
+🤖 **AI-Assisted Development**: I (@sam33rch) have created this codebase using AI development tools, specifically **Cursor**, **Claude Code**, and **Kiro**. Part of the motivation is learning to build production-level code with AI while exploring what techniques work best.
 
-📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but not perfect - I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
+As of 08-24-2024, the project is ~5 weeks of active development. I worked on problem disambiguation, architecture, specs, designs and provided oversight to the models for producing functional and good quality code. I did one quick pass to get it ready for this early open source release to gather developer feedback. The next step is to perform a thorough code review to improve the code quality.
+
+ Majority of the code was written by o3 and gpt5-high models, followed by Claude Sonnet 4. 
+
+📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but far from perfect, I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
 
 You'll find instructions throughout the codebase documenting what AI techniques have worked well, and we'll continue updating these insights as the project evolves.
 
