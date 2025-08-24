@@ -12,7 +12,8 @@
   
 </div>
 
-### Why Mycelian
+
+## Why Mycelian
 
 Mycelian aims to provide AI agents with persistent memory through a simple, reliable, log‑structured architecture.
 
@@ -21,6 +22,38 @@ When an agent interacts with users, it builds deep contextual understanding with
 The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections. 
 
 The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [our architecture document](docs/designs/001_mycelian_memory_architecture.md). 
+
+### Architecture (high level)
+
+```mermaid
+flowchart TD
+    Agent[AI Agent] <--> MCP["`**MCP Server**
+    _[Mycelian Client]_`"]
+    MCP <--> Service[Memory Service]
+    Service <--> Postgres[(Postgres)]
+    Vector[(Vector DB)] --> Service
+    Postgres <--> Worker[Outbox<br/>Worker]
+    Worker --> Vector
+    
+    %% Add label to Postgres
+    Postgres -.- Tables["`**Key Tables:**
+    vaults
+    memories
+    entries
+    context
+    tx_outbox`"]
+    
+    classDef primary fill:#dbeafe,stroke:#1e40af,stroke-width:3px,color:#000
+    classDef storage fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#000
+    classDef async fill:#e9d5ff,stroke:#7c3aed,stroke-width:3px,color:#000
+    classDef note fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#000
+    
+    class Agent,MCP,Service primary
+    class Postgres,Vector storage
+    class Worker async
+    class Tables note
+```
+
 
 #### What It Does Today
 
@@ -31,9 +64,6 @@ The architecture is inspired by distributed systems principles, treating memory 
 - **Runs locally but designed to run anywhere** with self‑hostable Go backend and pluggable storage/vector database support.
 - **Tested for memory recall** using the MemGPT/MSC-Self-Instruct benchmark dataset (see `tools/benchmarker/`)
 
-
-🚨 🚧 🏗️ *This project is under active development and not yet production‑ready.*
-
 ### Is Mycelian inspired by Mycelium? - Yes :)
 
 In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
@@ -42,7 +72,21 @@ Mycelian takes inspiration from this natural interconnectedness for AI agents. T
 
 ---
 
-### Quickstart (Docker)
+## Disclaimer
+
+🚨 🚧 🏗️ **This project is under active development and not yet production‑ready.**
+
+🤖 **AI-Assisted Development**: This codebase was created using AI development tools including **Cursor** (with o3, GPT-4o, Claude Sonnet 3.5, and Claude Opus models). Part of the motivation for building this project is to learn how to build production-level code using modern AI tools while exploring what techniques yield the best results.
+
+📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but not perfect - I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
+
+You'll find instructions throughout the codebase documenting what AI techniques have worked well, and we'll continue updating these insights as the project evolves.
+
+---
+
+## Quickstart
+
+### Server Setup
 
 Prerequisites (please refer to [CONTRIBUTING.md](CONTRIBUTING.md)): 
 1. Docker Desktop 
@@ -66,7 +110,7 @@ The stack exposes the API on `http://localhost:11545`.
 
 ---
 
-### Quickstart (MCP Integration)
+### MCP Server Configuration
 
 #### For tools that support streamable MCP Servers (e.g. Cursor)
 
@@ -121,18 +165,11 @@ make build-mcp-server
   }
 }
 ```
-
-#### Usage in both IDEs:
-- Create vaults and memories for your projects
-- Store context, code snippets, and project knowledge  
-- Search across your stored memories during development
-- Maintain persistent context between coding sessions
-
-The MCP server provides tools for vault management, memory operations, context storage, and search.
+ 
 
 ---
 
-### API overview
+## API overview
 
 Base URL: `http://localhost:11545/v0`
 
@@ -176,7 +213,7 @@ Auth: development mode accepts a single dev API key. Use the Go SDK helper `clie
 
 ---
 
-### Configuration (environment)
+## Configuration (environment)
 
 All server configuration uses the `MEMORY_SERVER_` prefix. Useful vars:
 
@@ -196,7 +233,7 @@ See `server/internal/config/config.go` for defaults and descriptions. Docker com
 
 ---
 
-### Repository layout
+## Repository layout
 
 ```text
 cmd/
@@ -213,43 +250,11 @@ For detailed information about the monorepo structure, versioning, and developme
 
 ---
 
-### Architecture (high level)
-
-```mermaid
-flowchart TD
-    Agent[AI Agent] <--> MCP["`**MCP Server**
-    _[Mycelian Client]_`"]
-    MCP <--> Service[Memory Service]
-    Service <--> Postgres[(Postgres)]
-    Vector[(Vector DB)] --> Service
-    Postgres <--> Worker[Outbox<br/>Worker]
-    Worker --> Vector
-    
-    %% Add label to Postgres
-    Postgres -.- Tables["`**Key Tables:**
-    vaults
-    memories
-    entries
-    context
-    tx_outbox`"]
-    
-    classDef primary fill:#dbeafe,stroke:#1e40af,stroke-width:3px,color:#000
-    classDef storage fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#000
-    classDef async fill:#e9d5ff,stroke:#7c3aed,stroke-width:3px,color:#000
-    classDef note fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#000
-    
-    class Agent,MCP,Service primary
-    class Postgres,Vector storage
-    class Worker async
-    class Tables note
-```
-
-
----
-
-### Contributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow, and contribution guidelines.
 
-### License
+---
+
+## License
 Apache 2.0 — see the [LICENSE](LICENSE) file for details.
