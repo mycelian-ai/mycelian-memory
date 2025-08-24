@@ -26,7 +26,6 @@ benchmark.log
 # vendor/
 
 # Go workspace file
-go.work
 go.work.sum
 
 # Environment variables

@@ -1,0 +1,21 @@
+go 1.24.6
+
+use ./devmode
+
+use ./client
+
+use ./server
+
+use ./tools/mycelianCli
+
+use ./mcp
+
+use ./cmd/mycelian-mcp-server
+
+use ./cmd/memory-service
+
+use ./cmd/outbox-worker
+
+use ./tools/mycelian-service-tools
+
+use ./tools/invariants-checker
