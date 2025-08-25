@@ -83,7 +83,7 @@ As of 08-24-2024, I've been actively developing this project for ~5 weeks. I wor
 
 📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but far from perfect, I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
 
-You'll find instructions throughout the codebase documenting what AI techniques have worked well, and we'll continue updating these insights as the project evolves.
+You'll find detailed AI development methodologies and techniques that have worked well documented in [docs/coding-stds/ai-coding-best-practices.md](docs/coding-stds/ai-coding-best-practices.md), and I'll continue updating these insights as the project evolves.
 
 ---
 
