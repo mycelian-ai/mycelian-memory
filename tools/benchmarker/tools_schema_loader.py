@@ -20,8 +20,8 @@ def _find_mycelian_cli_binary() -> Path | None:
     # Try deterministic location first, then fallbacks
     candidates = [
         repo_root / "bin/mycelianCli",                # Deterministic build path (preferred)
-        repo_root / "bin/synapse",                    # Legacy name
-        repo_root / "clients/go/bin/synapse",         # Legacy location
+        repo_root / "bin/synapse",                    # Legacy name (deprecated)
+        repo_root / "clients/go/bin/synapse",         # Legacy location (deprecated)
         repo_root / "tools/mycelianCli/mycelianCli",  # Direct build in tools
         Path("mycelianCli"),                          # In PATH
     ]

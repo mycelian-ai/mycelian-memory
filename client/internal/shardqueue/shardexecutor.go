@@ -1,4 +1,4 @@
-// Copyright 2025 The Synapse Authors.
+// Copyright 2025 The Mycelian Authors.
 //
 // Package shardqueue provides a lightweight sharded work‑queue that guarantees
 // FIFO order *per key* while allowing parallelism across shards.

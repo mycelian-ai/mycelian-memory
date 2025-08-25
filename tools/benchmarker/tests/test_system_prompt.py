@@ -1,10 +1,9 @@
-from benchmarks.python.system_prompt_builder import PromptAssembler
+from system_prompt_builder import PromptAssembler
 
 
 def test_system_prompt_contains_sections():
     builder = PromptAssembler(
         benchmark_name="DMR",
-        user_id="user-123",
         memory_id="mem-456",
         context_doc="Sample context",
         recent_entries=[
@@ -15,7 +14,6 @@ def test_system_prompt_contains_sections():
     )
     prompt = builder.build()
     assert "DMR" in prompt
-    assert "User ID: user-123" in prompt
     assert "Memory ID: mem-456" in prompt
     assert "Sample context" in prompt
     # Asset list present

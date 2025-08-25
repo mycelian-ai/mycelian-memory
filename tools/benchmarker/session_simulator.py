@@ -23,18 +23,18 @@ class ContextData(TypedDict, total=False):
     last_updated_by: str
 
 from system_prompt_builder import PromptAssembler
-from synapse_client import MycelianMemoryClient
+from mycelian_client import MycelianMemoryClient
 
 # Marker the harness sends as last user turn in a session.
 END_SESSION_TOKEN = "control:test_harness SESSION_END"
 
 logger = logging.getLogger(__name__)
 
-# Default to a 15-second interval between requests (~12 RPM). This is usually
-# fast enough for local tests while remaining under Anthropic’s rate limits.
+# Default to a 1-second interval between requests (~60 RPM). This is usually
+# fast enough for local tests while remaining under most API rate limits.
 # Override via the SESSION_SIMULATOR_RATE_LIMIT_INTERVAL env var if you need a
 # different pace.
-_RATE_LIMIT_INTERVAL = float(os.getenv("SESSION_SIMULATOR_RATE_LIMIT_INTERVAL", "15.0"))
+_RATE_LIMIT_INTERVAL = float(os.getenv("SESSION_SIMULATOR_RATE_LIMIT_INTERVAL", "1.0"))
 _last_call_ts: float = 0.0
 
 async def _respect_rate_limit():
@@ -58,7 +58,7 @@ class SessionSimulator:
     def __init__(
         self,
         anthropic_client,
-        synapse_client: MycelianMemoryClient,
+        mycelian_client: MycelianMemoryClient,
         system_builder: PromptAssembler,
         *,
         model_name: str = "claude-3-haiku-20240307",
@@ -74,7 +74,7 @@ class SessionSimulator:
             self._ac = anthropic.Anthropic(api_key=anthropic_client)
         else:
             self._ac = anthropic_client
-        self._sc = synapse_client
+        self._sc = mycelian_client
         self._system_builder = system_builder
 
         # Allow caller to override the Anthropic model for cost/perf testing
@@ -433,7 +433,11 @@ class SessionSimulator:
                 else:
                     result_payload["status"] = "OK"
 
-                if tc.get("name") == "create_memory":
+                if tc.get("name") == "create_vault":
+                    result_payload["vault_id"] = self._tool_results.get("create_vault", "")
+                elif tc.get("name") == "create_memory_in_vault":
+                    result_payload["memory_id"] = self._tool_results.get("create_memory_in_vault", "")
+                elif tc.get("name") == "create_memory":
                     result_payload["memory_id"] = self._mem_aliases.get(tc.get("arguments").get("title"), "")
                 elif tc.get("name") == "get_context":
                     result_payload["context"] = self._tool_results.get("get_context", "")
@@ -441,6 +445,8 @@ class SessionSimulator:
                     result_payload["entries"] = self._tool_results.get("list_entries", [])
                 elif tc.get("name") == "search_memories":
                     result_payload.update(self._tool_results.get("search_memories", {}))
+                elif tc.get("name") == "get_tools_schema":
+                    result_payload["tools"] = self._tool_results.get("get_tools_schema", [])
 
                 self._history.append({
                     "role": "user",
@@ -540,6 +546,10 @@ class SessionSimulator:
                     await self._exec_list_entries(args)
                 elif name == "search_memories":
                     await self._exec_search_memories(args)
+                elif name == "create_vault":
+                    await self._exec_create_vault(args)
+                elif name == "create_memory_in_vault":
+                    await self._exec_create_memory_in_vault(args)
                 elif name == "create_memory":
                     await self._exec_create_memory(args)
                 elif name == "get_context":
@@ -550,10 +560,11 @@ class SessionSimulator:
                     await self._exec_get_memory(args)
                 elif name == "await_consistency":
                     await self._exec_await_consistency(args)
-                elif name == "list_assets":
-                    await self._exec_list_assets(args)
-                elif name == "get_asset":
-                    await self._exec_get_asset(args)
+                # Deprecated asset tools removed from advertised schema
+                elif name == "get_tools_schema":
+                    await self._exec_get_tools_schema(args)
+                elif name == "get_default_prompts":
+                    await self._exec_get_default_prompts(args)
                 # Ignore unknown tool names to stay forward-compatible.
             except Exception as e:
                 logger.error("Error in tool call %s: %s", name, str(e), exc_info=True)
@@ -684,6 +695,30 @@ class SessionSimulator:
         res = self._sc.search_memories(memory_id, query=query, top_k=top_k)
         self._tool_results["search_memories"] = res
 
+    async def _exec_create_vault(self, args: Dict[str, Any]) -> None:
+        """Handle create_vault tool call and return vault_id."""
+        title = args["title"]
+        description = args.get("description", "")
+        vault_id = self._sc.create_vault(title, description=description)
+        self._tool_results["create_vault"] = vault_id
+        logger.debug("Created vault %s with title '%s'", vault_id, title)
+
+    async def _exec_create_memory_in_vault(self, args: Dict[str, Any]) -> None:
+        """Handle create_memory_in_vault tool call and return memory_id."""
+        vault_id = args["vault_id"]
+        title = args["title"]
+        memory_type = args.get("memory_type", "NOTES")
+        description = args.get("description", "")
+        
+        # Use the MCP client's create_memory_in_vault method
+        memory_id = self._sc.create_memory_in_vault(vault_id, title, memory_type, description)
+        self._tool_results["create_memory_in_vault"] = memory_id
+        
+        # Store mapping for future reference
+        self._mem_aliases[title] = memory_id
+        setattr(self._system_builder, "memory_id", memory_id)
+        logger.debug("Created memory %s in vault %s with title '%s'", memory_id, vault_id, title)
+
     async def _exec_create_memory(self, args: Dict[str, Any]) -> None:
         """Handle create_memory tool call and update internal memory_id."""
         title = args["title"]
@@ -745,37 +780,27 @@ class SessionSimulator:
             # Fallback: short sleep in case of client error
             await asyncio.sleep(0.5)
 
-    # ------------------------------------------------------------------
-    # Asset tool helpers
-    # ------------------------------------------------------------------
-    async def _exec_list_assets(self, args: Dict[str, Any]) -> None:
-        """Return list of available asset IDs (read-only)."""
-        ids = self._sc.list_assets()
-        self._tool_results["list_assets"] = ids
+    # Asset tools removed in favor of get_default_prompts(memory_type)
 
-    async def _exec_get_asset(self, args: Dict[str, Any]) -> None:
-        """Fetch static asset text, respecting session cache to avoid spam."""
-        asset_id = args.get("id") or args.get("asset_id")  # tolerate either arg name
-        if not asset_id:
-            raise ValueError("get_asset requires 'id' argument")
+    async def _exec_get_default_prompts(self, args: Dict[str, Any]) -> None:
+        """Fetch default prompts via MCP tool (proxied through CLI)."""
+        mem_type = args.get("memory_type") or "chat"
+        # Use the CLI helper we added on the client to fetch prompts JSON
+        data = self._sc.get_prompts(mem_type)
+        # Mark required assets as satisfied since this bundle includes rules and templates
+        self._boot_seen_ctx_rules = True
+        self._boot_assets_downloaded.update({"ctx_rules", "ctx_prompt_chat", "entry_prompt_chat", "summary_prompt_chat"})
+        self._tool_results["get_default_prompts"] = data
 
-        if asset_id in self._asset_cache:
-            logger.debug("Returning cached asset %s", asset_id)
-            self._tool_results["get_asset"] = self._asset_cache[asset_id]
-            return
-
-        txt = self._sc.get_asset(asset_id)
-        if not txt:
-            raise RuntimeError(f"get_asset failed or returned empty for id={asset_id}")
-        # Cache and expose via tool_results
-        self._asset_cache[asset_id] = txt
-        self._tool_results["get_asset"] = txt
-
-        # Track required asset downloads for bootstrap gate
-        if asset_id == "ctx_rules":
-            self._boot_seen_ctx_rules = True
-
-        self._boot_assets_downloaded.add(asset_id)
+    async def _exec_get_tools_schema(self, args: Dict[str, Any]) -> None:
+        """Fetch live MCP tools schema via CLI."""
+        try:
+            schema = self._sc.get_tools_schema()
+            self._tool_results["get_tools_schema"] = schema
+            logger.debug("Retrieved tools schema with %d tools", len(schema) if isinstance(schema, list) else 0)
+        except Exception as e:
+            logger.error("Failed to fetch tools schema: %s", e)
+            raise RuntimeError(f"get_tools_schema failed: {e}")
 
     # ------------------------------------------------------------------
     # Legacy helper methods kept for unit-test compatibility
@@ -834,7 +859,7 @@ class SessionSimulator:
             logger.warning("Assistant called put_context before loading ctx_rules. Requesting explanation …")
             try:
                 explanation = await self.step(
-                    "You must load @context_summary_rules.md via get_asset(\"ctx_rules\") before put_context. Why did you skip?"
+                    "You must call get_default_prompts(memory_type='chat') to load rules/templates before put_context. Why did you skip?"
                 )
                 logger.error("Assistant ctx_rules bootstrap violation explanation: %s", explanation)
             except Exception as e:

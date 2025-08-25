@@ -260,10 +260,10 @@ case err != nil:
 ### Observability
 
 **Prometheus Metrics**:
-- `synapse_shardqueue_submissions_total{shard}` - Jobs enqueued
-- `synapse_shardqueue_queue_full_total{shard}` - Back-pressure events  
-- `synapse_shardqueue_run_duration_seconds{shard}` - Execution latency
-- `synapse_shardqueue_queue_depth{shard}` - Current queue size
+- `mycelian_shardqueue_submissions_total{shard}` - Jobs enqueued
+- `mycelian_shardqueue_queue_full_total{shard}` - Back-pressure events  
+- `mycelian_shardqueue_run_duration_seconds{shard}` - Execution latency
+- `mycelian_shardqueue_queue_depth{shard}` - Current queue size
 
 **Structured Logging**:
 - Enqueue errors with memory ID context

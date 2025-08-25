@@ -20,19 +20,10 @@ class MycelianMemoryClient:
     See CODING_STANDARDS.md for interface policy.
     """
 
-    def __init__(self, base_url: str, user_id: str | None = None):
-        """Create client.
-
-        If *user_id* is None, tries to use the default 'local_user' first.
-        If local_user doesn't exist, creates a fresh user via CLI.
-        """
+    def __init__(self, base_url: str):
+        """Create client for dev mode (no user management)."""
         self.base_url = base_url.rstrip("/")
         self.mycelian_cli_binary = self._find_mycelian_cli_binary()
-        
-        if user_id:
-            self.user_id = user_id
-        else:
-            self.user_id = self._get_or_create_user()
 
     def _find_mycelian_cli_binary(self) -> str:
         """Auto-detect mycelianCli binary, prefer local repo version."""
@@ -52,39 +43,8 @@ class MycelianMemoryClient:
     # Regex patterns for parsing CLI output
     _VAULT_REGEX = re.compile(r"Vault created: ([a-f0-9\-]+)")
     _MEM_REGEX = re.compile(r"Memory created: ([a-f0-9\-]+)")
-    _USER_REGEX = re.compile(r"User created: ([a-zA-Z0-9_\-]+)")
 
-    def _get_or_create_user(self) -> str:
-        """Try to use local_user first, create fresh user if needed."""
-        # First try to use the existing local_user
-        try:
-            # Check if local_user exists by trying to get user info
-            self._run_cli("get-user", "--user-id", "local_user")
-            logger.info("Using existing local_user for benchmark")
-            return "local_user"
-        except Exception as e:
-            # Create a fresh user (local_user doesn't exist or is inaccessible)
-            logger.info("local_user not found (%s), creating fresh user for benchmark", str(e).split('\n')[0])
-            return self._create_fresh_user()
 
-    def _create_fresh_user(self) -> str:
-        """Create a fresh benchmark user via CLI."""
-        # Generate shorter user_id to fit 20-char limit: bench_XXXXXXXX (16 chars)
-        timestamp_short = str(int(time.time()))[-8:]  # Last 8 digits of timestamp
-        user_id = f"bench_{timestamp_short}"
-        email = f"{user_id}@benchmark.local"
-        
-        out = self._run_cli(
-            "create-user",
-            "--user-id", user_id,
-            "--email", email,
-            "--display-name", "Benchmark User"
-        )
-        
-        m = self._USER_REGEX.search(out)
-        if not m:
-            raise RuntimeError(f"Failed to parse user ID from CLI output:\n{out}")
-        return m.group(1)
 
     def _run_cli(self, *args: str) -> str:
         """Run mycelianCli command and return stdout."""
@@ -92,9 +52,9 @@ class MycelianMemoryClient:
         logger.info("[CLI DEBUG] Full command: %s", cmd)
         logger.info("[CLI DEBUG] Command string: %s", " ".join(cmd))
         
-        # Set working directory to clients/go where prompt files are located
+        # Set working directory to client where prompt files are located
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        cli_working_dir = os.path.join(script_dir, "..", "..", "clients", "go")
+        cli_working_dir = os.path.join(script_dir, "..", "..", "client")
         cli_working_dir = os.path.normpath(cli_working_dir)
         
         try:
@@ -136,7 +96,6 @@ class MycelianMemoryClient:
         
         out = self._run_cli(
             "create-vault",
-            "--user-id", self.user_id,
             "--title", title,
             "--description", description,
         )
@@ -145,12 +104,66 @@ class MycelianMemoryClient:
             raise RuntimeError(f"Failed to parse vault ID from CLI output:\n{out}")
         return m.group(1)
 
+    def list_vaults(self) -> List[Dict[str, str]]:
+        """List vaults via CLI; returns list of {id,title} dicts.
+
+        Parses the mycelianCli plain-text output where each line is:
+        "<uuid>\t<title>" and a trailing "Total: N" line.
+        """
+        out = self._run_cli("list-vaults").strip()
+        vaults: List[Dict[str, str]] = []
+        if not out:
+            return vaults
+        for line in out.splitlines():
+            line = line.strip()
+            if not line or line.lower().startswith("total"):
+                continue
+            # Expect: "<uuid>    <title>"
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            vaults.append({"id": parts[0], "title": parts[1]})
+        return vaults
+
+    def find_vault_by_title(self, title: str) -> Optional[str]:
+        """Return vault_id for the first vault whose title matches exactly."""
+        for v in self.list_vaults():
+            if v.get("title") == title:
+                return v.get("id")
+        return None
+
+    def get_or_create_vault(self, title: str, description: str = "") -> str:
+        """Return existing vault_id by title or create a new one if absent."""
+        existing = self.find_vault_by_title(title)
+        if existing:
+            logger.info("Using existing vault %s (%s)", existing, title)
+            return existing
+        return self.create_vault(title, description)
+
     def _is_valid_vault_title(self, title: str) -> bool:
         """Check if vault title meets constraints: 1-50 chars, ASCII letters/digits/hyphens only."""
         if not title or len(title) > 50:
             return False
         # Match the regex from server validation: ^[A-Za-z0-9\-]+$
         return re.match(r'^[A-Za-z0-9\-]+$', title) is not None
+
+    def create_memory_in_vault(self, vault_id: str, title: str, memory_type: str = "NOTES", description: str = "") -> str:
+        """Create memory in a specific vault via MCP tool call."""
+        # This method should use the MCP client, but for now we'll use CLI as fallback
+        # Store vault_id for future add_entry calls
+        self._last_vault_id = vault_id
+            
+        out = self._run_cli(
+            "create-memory",
+            "--vault-id", vault_id,
+            "--title", title,
+            "--memory-type", memory_type,
+            "--description", description,
+        )
+        m = self._MEM_REGEX.search(out)
+        if not m:
+            raise RuntimeError(f"Failed to parse memory ID from CLI output:\n{out}")
+        return m.group(1)
 
     def create_memory(self, title: str, memory_type: str = "conversation", description: str = "", vault_id: str | None = None) -> str:
         """Create memory via CLI."""
@@ -165,7 +178,6 @@ class MycelianMemoryClient:
             
         out = self._run_cli(
             "create-memory",
-            "--user-id", self.user_id,
             "--vault-id", vault_id,
             "--title", title,
             "--memory-type", memory_type,
@@ -179,10 +191,9 @@ class MycelianMemoryClient:
     def get_context(self, memory_id: str) -> str:
         """Return latest context document using CLI."""
         # Need vault_id for get-context command
-        vault_id = self._last_vault_id or self._get_or_create_default_vault()
+        vault_id = getattr(self, '_last_vault_id', None) or self._get_or_create_default_vault()
         out = self._run_cli(
             "get-context",
-            "--user-id", self.user_id,
             "--vault-id", vault_id,
             "--memory-id", memory_id,
         ).strip()
@@ -206,10 +217,9 @@ class MycelianMemoryClient:
     def list_entries(self, memory_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Return recent entries using CLI."""
         # Need vault_id for list-entries command
-        vault_id = self._last_vault_id or self._get_or_create_default_vault()
+        vault_id = getattr(self, '_last_vault_id', None) or self._get_or_create_default_vault()
         out = self._run_cli(
             "list-entries",
-            "--user-id", self.user_id,
             "--vault-id", vault_id,
             "--memory-id", memory_id,
             "--limit", str(limit),
@@ -233,10 +243,9 @@ class MycelianMemoryClient:
     def put_context(self, memory_id: str, context: str) -> None:
         """Update context document using CLI."""
         # Need vault_id for put-context command
-        vault_id = self._last_vault_id or self._get_or_create_default_vault()
+        vault_id = getattr(self, '_last_vault_id', None) or self._get_or_create_default_vault()
         self._run_cli(
             "put-context",
-            "--user-id", self.user_id,
             "--vault-id", vault_id,
             "--memory-id", memory_id,
             "--content", context,
@@ -256,7 +265,6 @@ class MycelianMemoryClient:
             
         out = self._run_cli(
             "create-entry",
-            "--user-id", self.user_id,
             "--vault-id", vault_id,
             "--memory-id", memory_id,
             "--raw-entry", raw_entry,
@@ -269,7 +277,6 @@ class MycelianMemoryClient:
         """Search memories using CLI."""
         out = self._run_cli(
             "search",
-            "--user-id", self.user_id,
             "--memory-id", memory_id,
             "--query", query,
             "--top-k", str(top_k),
@@ -281,72 +288,60 @@ class MycelianMemoryClient:
             logger.warning("Failed to parse search JSON from CLI output")
             return {"entries": []}
 
-    def get_asset(self, asset_id: str) -> str:
-        """Get asset content using CLI."""
-        # Special handling for get-asset which writes to stderr instead of stdout
-        cmd = [self.mycelian_cli_binary, "--service-url", self.base_url, "get-asset", "--id", asset_id]
-        logger.debug("[CLI] %s", " ".join(cmd))
-        
-        # Set working directory to clients/go where prompt files are located
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        cli_working_dir = os.path.join(script_dir, "..", "..", "clients", "go")
-        cli_working_dir = os.path.normpath(cli_working_dir)
-        
-        try:
-            result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
-                timeout=30,
-                check=True,
-                cwd=cli_working_dir
-            )
-            # For get-asset, content is written to stderr, not stdout
-            content = result.stderr.strip() if result.stderr.strip() else result.stdout.strip()
-            logger.info("get_asset(%s) returned %d chars", asset_id, len(content))
-            return content
-        except subprocess.CalledProcessError as e:
-            logger.warning("[CLI STDERR] %s", e.stderr)
-            raise RuntimeError(
-                f"mycelianCli failed (exit {e.returncode}): {' '.join(cmd)}\n"
-                f"STDOUT:\n{e.stdout}\n"
-                f"STDERR:\n{e.stderr}"
-            ) from e
-
-    def list_assets(self) -> List[str]:
-        """Return list of available asset IDs via CLI."""
-        try:
-            out = self._run_cli("list-assets").strip()
-            if not out:
-                return []
-            # Assume newline-separated output
-            return [line.strip() for line in out.split('\n') if line.strip()]
-        except Exception:
-            # Return empty list if command fails
-            return []
+    # Deprecated asset helpers removed: get_asset, list_assets
 
     def await_consistency(self, memory_id: str) -> None:
         """Block until previous writes for the memory are consistent using CLI."""
         try:
             self._run_cli(
                 "await-consistency",
-                "--user-id", self.user_id,
                 "--memory-id", memory_id,
             )
         except Exception:
             # Small delay as fallback
             time.sleep(0.5)
 
-    def get_user(self, user_id: str | None = None) -> Dict[str, Any]:
-        """Get user details using CLI."""
-        target_user = user_id or self.user_id
-        out = self._run_cli(
-            "get-user",
-            "--user-id", target_user,
-        ).strip()
+    def get_prompts(self, memory_type: str = "chat") -> Dict[str, Any]:
+        """Fetch default prompt templates for a memory type via CLI.
 
+        Returns a dict:
+          {
+            "version": str,
+            "context_summary_rules": str,
+            "templates": {
+               "context_prompt": str,
+               "entry_capture_prompt": str,
+               "summary_prompt": str,
+            }
+          }
+        """
+        out = self._run_cli("get-prompts", "--memory-type", memory_type).strip()
         try:
-            return json.loads(out) if out else {}
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse user JSON from CLI output")
-            return {}
+            data = json.loads(out) if out else {}
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse get-prompts JSON: %s", e)
+            raise RuntimeError(f"Invalid JSON from get-prompts: {e}")
+
+        # Basic shape validation
+        if not isinstance(data, dict):
+            raise RuntimeError("get-prompts returned non-object payload")
+        if "version" not in data or "context_summary_rules" not in data or "templates" not in data:
+            raise RuntimeError("get-prompts payload missing required fields")
+        if not isinstance(data["templates"], dict):
+            raise RuntimeError("get-prompts 'templates' is not an object")
+        return data
+
+    def get_tools_schema(self) -> List[Dict[str, Any]]:
+        """Fetch live MCP tools schema via CLI."""
+        out = self._run_cli("get-tools-schema").strip()
+        try:
+            schema = json.loads(out)
+            if isinstance(schema, list):
+                return schema
+            else:
+                logger.warning("get-tools-schema returned non-list: %s", type(schema))
+                return []
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse tools schema JSON: %s", e)
+            raise RuntimeError(f"Invalid JSON from get-tools-schema: {e}")
+
