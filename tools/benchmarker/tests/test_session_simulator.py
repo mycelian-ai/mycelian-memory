@@ -1,7 +1,7 @@
 import pytest
 
-from benchmarks.python.session_simulator import SessionSimulator, END_SESSION_TOKEN
-from benchmarks.python.system_prompt_builder import PromptAssembler
+from session_simulator import SessionSimulator, END_SESSION_TOKEN
+from system_prompt_builder import PromptAssembler
 
 
 class FakeAnthropicMessageBlock:

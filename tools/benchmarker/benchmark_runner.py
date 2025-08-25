@@ -287,7 +287,7 @@ class BenchmarkRunner:
             Path(output).parent.mkdir(parents=True, exist_ok=True)
             with open(output, "w", encoding="utf-8") as f:
                 json.dump({
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(datetime.UTC).isoformat(),
                     "results": all_results,
                 }, f, indent=2)
         # Persist tracker if requested

@@ -1,4 +1,4 @@
-from benchmarks.python.system_prompt_builder import PromptAssembler
+from system_prompt_builder import PromptAssembler
 
 
 def test_system_prompt_contains_sections():

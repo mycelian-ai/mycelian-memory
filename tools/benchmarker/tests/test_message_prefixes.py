@@ -1,8 +1,8 @@
 import pytest
 
-from benchmarks.python.session_simulator import SessionSimulator
-from benchmarks.python.system_prompt_builder import PromptAssembler
-from benchmarks.python.mycelian_client import MycelianMemoryClient
+from session_simulator import SessionSimulator
+from system_prompt_builder import PromptAssembler
+from mycelian_client import MycelianMemoryClient
 
 # ---------------------------------------------------------------------------
 # Fake Anthropic client that always emits an add_entry tool call for any

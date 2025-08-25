@@ -69,6 +69,7 @@ clients/go/venv/
 # Python cache directories and files
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 *.so
 
