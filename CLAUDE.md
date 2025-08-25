@@ -225,4 +225,4 @@ Implementing multi-tenant memory organization:
 - Check existing patterns in similar files
 - Test commands are in Makefile
 - Development uses Docker for dependencies
-- **Git commits**: Use user's git config, not Claude as committer
+- **Git commits**: Use user's git config only - no AI agent as committer or co-author
