@@ -11,6 +11,7 @@ import sys
 from datetime import datetime
 
 import anthropic
+from model_provider import new_model_client
 
 # Direct local imports for tool execution
 from mycelian_client import MycelianMemoryClient
@@ -153,34 +154,26 @@ class BenchmarkEvaluator:
 class BenchmarkRunner:
     def __init__(
         self,
-        anthropic_key: str,
+        ac_client,
         mycelian_url: str,
-        user_id: str | None = None,
         *,
         model_name: str = "claude-3-haiku-20240307",
         verbose: bool = False,
     ): 
-        """Create a new benchmark runner.
-
-        If *user_id* is omitted, the runner will create **a fresh Mycelian user**
-        for the run via the CLI helper in :pyclass:`MycelianMemoryClient`. This
-        prevents duplicate-email errors when the benchmark is executed
-        repeatedly (each run generates a new random email address).
-        """
+        """Create a new benchmark runner for dev mode (no user management)."""
 
         # Use asynchronous Anthropic client for non-blocking IO.
-        self._ac = anthropic.AsyncAnthropic(api_key=anthropic_key)
-        self._mc = MycelianMemoryClient(mycelian_url, user_id)
+        self._ac = ac_client
+        self._mc = MycelianMemoryClient(mycelian_url)
         self._model_name = model_name
         self._builder = ConversationIngestor(self._ac, self._mc, model_name=self._model_name)
         self._evaluator = BenchmarkEvaluator(self._ac, self._mc, model_name=self._model_name, verbose=verbose)
 
-    async def ingest_only(self, max_conversations: int | None, tracker_file: str, max_messages: int | None = None):
+    async def ingest_only(self, max_conversations: int | None, tracker_file: str, max_messages: int | None = None, *, vault_title: str = "benchmarker"):
         """Ingest conversations and write tracker; skip evaluation."""
-        # Create a unique vault for this benchmark run
-        vault_title = self._mc.generate_unique_vault_title("MSC-bench")
-        vault_id = self._mc.create_vault(vault_title, "Auto-created vault for MSC benchmark run")
-        logger.info("Created benchmark vault %s (%s) for %d conversations", vault_id, vault_title, max_conversations or 0)
+        # Use a persistent benchmarker vault (get-or-create)
+        vault_id = self._mc.get_or_create_vault(vault_title, "Persistent vault for benchmarker runs")
+        logger.info("Using benchmark vault %s (%s) for %d conversations", vault_id, vault_title, max_conversations or 0)
         
         conversations = load_msc_dataset(max_conv=max_conversations)
         tracker_records: list[dict[str, str]] = []
@@ -194,7 +187,6 @@ class BenchmarkRunner:
             tracker_records.append({
                 "conversation_id": conv.conversation_id,
                 "memory_id": mem_id,
-                "user_id": self._mc.user_id,
                 "vault_id": vault_id,
             })
         Path(tracker_file).parent.mkdir(parents=True, exist_ok=True)
@@ -206,12 +198,7 @@ class BenchmarkRunner:
         """Evaluate existing ingested conversations using tracker file."""
         with open(tracker_file, "r", encoding="utf-8") as f:
             tracker_records = json.load(f)
-        # If tracker records include a user_id, re-use it so we don't create a fresh user
-        if tracker_records and "user_id" in tracker_records[0]:
-            tracked_uid = tracker_records[0]["user_id"]
-            if tracked_uid and getattr(self._mc, "user_id", None) != tracked_uid:
-                logger.info("Reusing existing benchmark user %s from tracker", tracked_uid)
-                self._mc.user_id = tracked_uid
+        # User management removed - dev mode only
         # Build lookup map for tracker
         map_mem = {r["conversation_id"]: r for r in tracker_records}
         # Load full dataset to fetch questions
@@ -254,12 +241,11 @@ class BenchmarkRunner:
         accuracy = sum(r["is_correct"] for r in all_results) / len(all_results) if all_results else 0.0
         logger.info("Accuracy %.1f%% over %d questions", accuracy * 100, len(all_results))
 
-    async def run_msc(self, max_conversations: int | None = 1, output: str | None = None, tracker_file: str | None = None):
+    async def run_msc(self, max_conversations: int | None = 1, output: str | None = None, tracker_file: str | None = None, *, vault_title: str = "benchmarker"):
         """Ingest and evaluate the MemGPT MSC-Self-Instruct benchmark."""
-        # Create a unique vault for this benchmark run
-        vault_title = self._mc.generate_unique_vault_title("MSC-bench")
-        vault_id = self._mc.create_vault(vault_title, "Auto-created vault for MSC benchmark run")
-        logger.info("Created benchmark vault %s (%s) for %d conversations", vault_id, vault_title, max_conversations or 0)
+        # Use a persistent benchmarker vault (get-or-create)
+        vault_id = self._mc.get_or_create_vault(vault_title, "Persistent vault for benchmarker runs")
+        logger.info("Using benchmark vault %s (%s) for %d conversations", vault_id, vault_title, max_conversations or 0)
         
         conversations = load_msc_dataset(max_conv=max_conversations)
         all_results: List[Dict[str, Any]] = []
@@ -273,7 +259,6 @@ class BenchmarkRunner:
             tracker_records.append({
                 "conversation_id": conv.conversation_id,
                 "memory_id": memory_id,
-                "user_id": self._mc.user_id,
                 "vault_id": vault_id,
             })
 
@@ -325,48 +310,27 @@ async def _cli_run_validate_tools(args):
     # ------------------------------------------------------------------
     # 1. Set up clients
     # ------------------------------------------------------------------
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    provider = (getattr(args, "provider", None) or os.getenv("BENCHMARK_PROVIDER", "anthropic")).lower()
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    aws_region = getattr(args, "aws_region", None) or os.getenv("AWS_REGION")
 
-    # ------------------------------------------------------------------
-    # Support local/offline runs by falling back to a lightweight fake client
-    # if no Anthropic key is present. The fake client merely echoes a DONE
-    # after simulating tool calls so the validation can complete.
-    # ------------------------------------------------------------------
+    if provider == "anthropic" and not anthropic_key:
+        raise SystemExit("ANTHROPIC_API_KEY must be set for provider=anthropic")
+    ac = new_model_client(provider, anthropic_key, aws_region)
 
-    if api_key:
-        ac = anthropic.AsyncAnthropic(api_key=api_key)
-    else:
-        class _FakeBlock:
-            def __init__(self, text):
-                self.type = "text"
-                self.text = text
-
-        class _FakeMessages:
-            async def create(self, **kwargs):
-                # Immediately respond with DONE so the loop exits.
-                return type("Resp", (), {"content": [_FakeBlock("DONE")]})()
-
-        class FakeAnthropic:
-            def __init__(self):
-                self.messages = _FakeMessages()
-
-        ac = FakeAnthropic()
-        print("[validate-tools] Running with FakeAnthropic (offline mode)")
-
-    sc = MycelianMemoryClient(base_url=args.synapse_url)
+    sc = MycelianMemoryClient(base_url=args.mycelian_url)
 
     # ------------------------------------------------------------------
     # 2. Build initial system prompt (no memory yet – will be created by LLM)
     # ------------------------------------------------------------------
     spb = PromptAssembler(
         benchmark_name="validate-tools",
-        user_id=sc.user_id,
         memory_id="",  # blank – LLM will create memory via create_memory
         context_doc="",
         recent_entries=[],
     )
 
-    sim = SessionSimulator(ac, sc, spb)
+    sim = SessionSimulator(ac, sc, spb, model_name=args.model_name)
 
     # ------------------------------------------------------------------
     # 3. Seed conversation instructing the model to call every tool
@@ -374,13 +338,13 @@ async def _cli_run_validate_tools(args):
     CONTROL_PREFIX = "control:test_harness"
     seed = (
         f"{CONTROL_PREFIX} VALIDATE_TOOLS "
-        "You are running an integration self-check. For each Mycelian tool, "
-        "issue exactly one call in a sensible order: create_memory, "
-        "add_entry, list_entries, put_context, get_context, search_memories, "
-        "await_consistency, get_user, get_memory. "
-        "IMPORTANT: Use valid test data - titles must contain only letters/digits/hyphens (no spaces), "
-        "memory_type must be 'conversation' (not 'chat'). Example: title='test-memory', memory_type='conversation'. "
-        "After using all tools, reply with 'DONE'."
+        "You are running an integration self-check for the Mycelian tools. "
+        "First, call get_tools_schema to fetch the live tools schema. "
+        "Then, call get_default_prompts with memory_type='chat' and use the returned context_summary_rules and templates. "
+        "Next, exercise the key tools in a logical sequence: create storage, add content, verify consistency, and retrieve data. "
+        "Use real UUIDs returned by each tool call - never use placeholder strings. "
+        "When calling add_entry, include the role parameter with either 'speaker_1' or 'speaker_2'. "
+        "After successfully exercising the tools, reply with 'DONE'."
     )
 
     print("Sending validation prompt to Claude …")
@@ -408,17 +372,22 @@ async def _cli_run_validate_tools(args):
 async def _cli_main():
     logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO, datefmt="%H:%M:%S")
     parser = argparse.ArgumentParser(description="Run Mycelian MSC benchmark")
-    parser.add_argument("--synapse-url", required=True, help="Base URL of the Mycelian service, e.g. http://localhost:8000")
+    parser.add_argument("--mycelian-url", required=True, help="Base URL of the Mycelian service, e.g. http://localhost:11545")
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
     subparsers.add_parser("both")
     subparsers.add_parser("ingest")
     subparsers.add_parser("eval")
     subparsers.add_parser("validate-tools")
-    parser.add_argument("--anthropic-key", help="Anthropic API key. If omitted, read from ANTHROPIC_API_KEY env var")
+    # Provider-specific configuration is taken from environment variables.
+    # For provider=anthropic: require ANTHROPIC_API_KEY.
+    # For provider=bedrock: require standard AWS credentials and AWS_REGION.
+    parser.add_argument("--provider", default=os.getenv("BENCHMARK_PROVIDER", "anthropic"), choices=["anthropic", "bedrock"], help="Model provider to use (anthropic or bedrock)")
+    parser.add_argument("--aws-region", default=os.getenv("AWS_REGION"), help="AWS region for Bedrock (e.g., us-east-1)")
     parser.add_argument("--model-name", default="claude-3-haiku-20240307", help="Anthropic Claude model to use for simulation (default: claude-3-haiku-20240307)")
-    parser.add_argument("--user-id", help="Existing Mycelian user ID to reuse; if omitted, a fresh user is created")
+
     parser.add_argument("--conversations", type=int, default=1, help="Number of MSC conversations to process (default: 1)")
+    parser.add_argument("--vault-title", default=os.getenv("BENCH_VAULT_TITLE", "benchmarker"), help="Fixed title of the persistent benchmarker vault (default: 'benchmarker')")
     parser.add_argument("--output", help="Optional path to write results JSON")
     parser.add_argument("--questions", type=int, help="Limit number of test questions per conversation during evaluation")
     parser.add_argument("--max-messages", type=int, help="Truncate each session to N messages (test mode)")
@@ -435,26 +404,17 @@ async def _cli_main():
     else:
         args = parser.parse_args()
 
-    anthropic_key = args.anthropic_key or os.getenv("ANTHROPIC_API_KEY")
-    if not anthropic_key and args.mode != "validate-tools":
-        parser.error("Anthropic API key must be provided via --anthropic-key or ANTHROPIC_API_KEY env var")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    if args.provider == "anthropic" and not anthropic_key:
+        parser.error("ANTHROPIC_API_KEY must be set for provider=anthropic")
 
-    # Decide user ID: reuse from tracker if in eval mode and not explicitly given
-    user_id: str | None = args.user_id
-    if args.mode == "eval" and not user_id and args.tracker_file and Path(args.tracker_file).exists():
-        try:
-            with open(args.tracker_file, "r", encoding="utf-8") as _tf:
-                _records = json.load(_tf)
-                if _records and "user_id" in _records[0]:
-                    user_id = _records[0]["user_id"]
-                    logging.info("Reusing benchmark user %s from tracker", user_id)
-        except Exception as e:
-            logging.warning("Failed to read user_id from tracker: %s", e)
+    # User management removed - dev mode only
+
+    ac_client = new_model_client(args.provider, anthropic_key, args.aws_region)
 
     runner = BenchmarkRunner(
-        anthropic_key,
-        args.synapse_url,
-        user_id=user_id,
+        ac_client,
+        args.mycelian_url,
         model_name=args.model_name or "claude-3-haiku-20240307",
         verbose=args.verbose,
     )
@@ -465,7 +425,6 @@ async def _cli_main():
         mem_id = runner._mc.create_memory(title="prompt-validation", memory_type="conversation")  # Uses auto-vault creation
         sys_builder = PromptAssembler(
             benchmark_name="MSC",
-            user_id=runner._mc.user_id,
             memory_id=mem_id,
             context_doc="",
             recent_entries=[],
@@ -486,11 +445,11 @@ async def _cli_main():
         return
 
     if args.mode == "both":
-        await runner.run_msc(max_conversations=args.conversations, output=args.output, tracker_file=args.tracker_file)
+        await runner.run_msc(max_conversations=args.conversations, output=args.output, tracker_file=args.tracker_file, vault_title=args.vault_title)
     elif args.mode == "ingest":
         if not args.tracker_file:
             parser.error("--tracker-file is required in ingest mode")
-        await runner.ingest_only(max_conversations=args.conversations, tracker_file=args.tracker_file, max_messages=args.max_messages)
+        await runner.ingest_only(max_conversations=args.conversations, tracker_file=args.tracker_file, max_messages=args.max_messages, vault_title=args.vault_title)
     elif args.mode == "eval":
         if not args.tracker_file:
             parser.error("--tracker-file is required in eval mode")

@@ -1,156 +1,161 @@
-# Mycelian Memory Client Benchmarks
+# Mycelian Memory Benchmarker
 
-This directory contains benchmarks and tests for the Mycelian Memory Client, focusing on testing the integration with Claude and the Mycelian memory system.
+**What it does**: Tests the Mycelian memory system by simulating conversations with Claude, ingesting MSC dataset conversations, and evaluating memory recall performance.
 
-## Overview
+## TLDR - Quick Commands
 
-The benchmark suite includes:
-
-- **SessionSimulator**: Simulates conversations with Claude, handling context management and tool calls.
-- **MSC Dataset Loader**: Loads and processes the MSC (Multi-Session Chat) dataset for testing.
-- **System Prompt Builder**: Constructs system prompts for the Claude model.
-- **Test Suite**: Comprehensive tests for all components.
-- **Note-Taker Semantics**: See [docs/design/msc_dataset_note_taker.md](../../docs/design/msc_dataset_note_taker.md) for the canonical mapping between dataset speaker labels and Mycelian roles, and for the ingestion rules followed by the benchmark *note-taker* agent.
-
-## Key Features
-
-### Context Management
-
-The `SessionSimulator` includes an advanced context management system that:
-
-- Updates context every 5 messages
-- Handles critical updates after important tool calls
-- Ensures context is saved at the end of each session
-- Maintains conversation history and state
-
-For detailed documentation, see [docs/context_management.md](docs/context_management.md).
-
-## Quick Setup
-
-### Environment Setup (Recommended)
-
-Use the provided setup script to automatically configure your environment:
-
+### Setup
 ```bash
-# Run this from the PROJECT ROOT (/path/to/mycelian-memory/)
+# From project root
 source setup-env.sh
+cd tools/benchmarker/
 ```
 
-This script will:
-- Create and activate a workspace-wide Python virtual environment in the project root
-- Install all dependencies from `requirements.txt`
-- Build the latest `mycelianCli` CLI binary
-- Configure `PATH` to prioritize the local mycelianCli binary
-- Keep you in the project root with access to all tools
+### Run Benchmarks (Anthropic)
+Provider setup (Anthropic):
+- Set environment variable `ANTHROPIC_API_KEY` to your Claude API key.
+- Default provider is `anthropic`; default model is `claude-3-haiku-20240307`.
 
-### Prerequisites
-
-- Python 3.8+
-- Go 1.19+ (for building the mycelianCli CLI)
-- Anthropic API key in `ANTHROPIC_API_KEY` environment variable
-- Mycelian Memory Service running (e.g., `http://localhost:8080`)
-
-### User Management
-
-The benchmark client automatically tries to use the default `local_user` created by the backend. If `local_user` is not available, it falls back to creating a fresh benchmark user via the CLI. This provides better performance while maintaining test isolation when needed.
-
-## Running Tests
-
-**Note**: Always run the environment setup first from the project root:
 ```bash
-# From PROJECT ROOT (/path/to/mycelian-memory/)
-source setup-env.sh
+# Validate tools (Anthropic)
+python benchmark_runner.py --mycelian-url http://localhost:11545 validate-tools
 ```
 
-### Running All Tests
-
 ```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
-pytest tests/
+# Ingest MSC dataset conversations
+python benchmark_runner.py --mycelian-url http://localhost:11545 --conversations 5 --tracker-file tracker.json --vault-title benchmarker ingest
+
+# Evaluate memory recall
+python benchmark_runner.py --mycelian-url http://localhost:11545 --tracker-file tracker.json eval
+
+# Both phases
+python benchmark_runner.py --mycelian-url http://localhost:11545 --conversations 5 --tracker-file tracker.json --vault-title benchmarker both
 ```
 
-### Running Specific Tests
+### Run Benchmarks (AWS Bedrock)
+Provider setup (Bedrock):
+- Configure AWS credentials with an IAM user/role that has Bedrock InvokeModel access.
+  - `aws configure` (or environment variables) for Access Key, Secret, and default region.
+  - Ensure Bedrock model access is granted in the target region (e.g., `us-west-2`) for the model you select.
+- Use `--provider bedrock --aws-region <region>` and a valid Bedrock model ID (e.g., `anthropic.claude-3-5-haiku-20241022-v1:0`).
 
 ```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
-
-# Run context management tests
-pytest tests/test_session_simulator_context.py -v
-
-# Run helper method tests
-pytest tests/test_session_simulator_helpers.py -v
-
-# Run integration tests
-pytest tests/test_session_simulator.py -v
-```
-
-## Running Benchmarks
-
-**Note**: All benchmark commands run from the `tools/benchmarker/` directory after setup.
-
-### Quick Tool Validation
-
-```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
-
-# List available Mycelian CLI commands (fast)
-mycelianCli --help
-
-# Get MCP tools schema
-mycelianCli get-tools-schema
-
-# Run integration test (slow - tests all tools end-to-end)
-python benchmark_runner.py --synapse-url http://localhost:8080 validate-tools
-```
-
-### Full Benchmark Suite
-
-#### Ingest Phase (Load MSC dataset)
-```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
-
+# Validate tools (Bedrock)
 python benchmark_runner.py \
-  --synapse-url http://localhost:8080 \
-  --conversations 1 \
+  --provider bedrock \
+  --aws-region us-west-2 \
+  --model-name anthropic.claude-3-5-haiku-20241022-v1:0 \
+  --mycelian-url http://localhost:11545 \
+  validate-tools
+
+# Ingest (Bedrock)
+python benchmark_runner.py \
+  --provider bedrock \
+  --aws-region us-west-2 \
+  --model-name anthropic.claude-3-5-haiku-20241022-v1:0 \
+  --mycelian-url http://localhost:11545 \
+  --conversations 5 \
   --tracker-file tracker.json \
-  --model-name claude-3-5-sonnet-20241022 \
+  --vault-title benchmarker \
   ingest
-```
 
-#### Evaluation Phase (Test recall)
-```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
-
+# Evaluate (Bedrock)
 python benchmark_runner.py \
-  --synapse-url http://localhost:8080 \
+  --provider bedrock \
+  --aws-region us-west-2 \
+  --model-name anthropic.claude-3-5-haiku-20241022-v1:0 \
+  --mycelian-url http://localhost:11545 \
   --tracker-file tracker.json \
-  --model-name claude-3-5-sonnet-20241022 \
   eval
-```
 
-#### Both Phases
-```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
-
+# Both (Bedrock)
 python benchmark_runner.py \
-  --synapse-url http://localhost:8080 \
-  --conversations 1 \
+  --provider bedrock \
+  --aws-region us-west-2 \
+  --model-name anthropic.claude-3-5-haiku-20241022-v1:0 \
+  --mycelian-url http://localhost:11545 \
+  --conversations 5 \
   --tracker-file tracker.json \
-  --model-name claude-3-5-sonnet-20241022 \
+  --vault-title benchmarker \
   both
 ```
 
-### Prompt Validation
+Notes:
+- Anthropic: export `ANTHROPIC_API_KEY`.
+- Bedrock: ensure AWS credentials are configured and Bedrock model access is granted in the specified region.
+- The runner reuses a persistent vault (`--vault-title`, default `benchmarker`) and creates a new memory per run inside that vault.
 
+## How It Works
+
+### Components
+- **SessionSimulator**: Drives conversations with Claude, handles MCP tool calls and context management
+- **MycelianMemoryClient**: CLI-based client that interfaces with the memory service
+- **MSC Dataset Loader**: Processes Multi-Session Chat dataset for realistic conversation testing
+- **BenchmarkRunner**: Orchestrates ingestion and evaluation phases
+
+### Architecture
+1. **Ingestion Phase**: 
+   - Loads MSC dataset conversations
+   - Claude acts as a "note-taker" agent, persisting each message via `add_entry` tool calls
+   - Updates context documents via `put_context` at session end
+   - Tracks conversation metadata for evaluation
+
+2. **Evaluation Phase**:
+   - Asks Claude questions about previously ingested conversations
+   - Tests memory recall using `search_memories` and `get_context` tools
+   - Measures accuracy of retrieved information
+
+3. **Context Management**:
+   - Updates context every 5 messages or after critical tool calls
+   - Maintains conversation history and state
+   - Ensures context persistence at session end
+
+### Model Providers
+- **Anthropic API**: Direct integration with Claude models
+- **AWS Bedrock**: Claude models via Bedrock runtime (requires AWS credentials)
+
+### Bootstrap & Prompts
+- The model first calls `get_tools_schema`, then `get_default_prompts` with `memory_type='chat'` to load:
+  - `context_summary_rules`
+  - `templates.context_prompt`, `templates.entry_capture_prompt`, `templates.summary_prompt`
+- Static `get_asset` calls are no longer required.
+
+### Vault & Memory Policy
+- Persistent vault (title via `--vault-title`, default `benchmarker`) is reused across runs.
+- A new memory is created per run inside that vault; the model must use the provided `vault_id`/`memory_id` (it must not create vaults/memories).
+
+### Rate Limiting
+- Default: 1 second between requests (~60 RPM)
+- Configurable via `SESSION_SIMULATOR_RATE_LIMIT_INTERVAL` environment variable
+- Includes exponential backoff for rate limit (429) and overload (529) errors
+
+## Prerequisites
+- Python 3.8+
+- Go 1.19+ (for mycelianCli binary)
+- Mycelian Memory Service running (default: `http://localhost:11545`)
+- API credentials:
+  - Anthropic: `ANTHROPIC_API_KEY` environment variable
+  - Bedrock: AWS credentials configured
+
+## Dev Mode
+The benchmarker operates in **dev mode** - no user management required. It connects directly to the memory service using a hardcoded development API key.
+
+## Testing
 ```bash
-# From tools/benchmarker/ directory
-cd tools/benchmarker/  # if not already there
+# Run all tests
+pytest tests/
 
-python benchmark_runner.py --validate-prompts --synapse-url http://localhost:8080
+# Specific test suites
+pytest tests/test_session_simulator.py -v
+pytest tests/test_session_simulator_context.py -v
 ```
+
+## Configuration
+- `--conversations N`: Limit ingestion to N conversations
+- `--questions N`: Limit evaluation questions per conversation  
+- `--max-messages N`: Truncate sessions to N messages
+- `--model-name`: Specify Claude model (e.g., `claude-3-5-sonnet-20241022`)
+- `--provider`: Choose `anthropic` or `bedrock`
+- `--aws-region`: AWS region for Bedrock (e.g., `us-west-2`)
+
+For detailed design documentation, see [docs/design/msc_dataset_note_taker.md](../../docs/design/msc_dataset_note_taker.md).

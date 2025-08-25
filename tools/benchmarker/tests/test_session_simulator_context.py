@@ -184,28 +184,22 @@ async def test_context_update_error_handling(session_simulator, mock_anthropic, 
     assert error_logged, f"Expected error log not found in records. Logs: {[str(r) for r in caplog.records]}"
 
 @pytest.mark.asyncio
-async def test_get_asset_caching(session_simulator, mock_mycelian_client):
-    """get_asset should call MycelianMemoryClient only once per asset and use cache thereafter."""
-    # Configure mock client
-    mock_mycelian_client.get_asset.return_value = "RULES CONTENT"
-
-    # First call – should invoke underlying client
-    await session_simulator._exec_get_asset({"id": "ctx_rules"})
-    mock_mycelian_client.get_asset.assert_called_once_with("ctx_rules")
-    assert session_simulator._tool_results["get_asset"] == "RULES CONTENT"
-
-    # Reset mock call count for clarity
-    mock_mycelian_client.get_asset.reset_mock()
-
-    # Second identical call – should use cache (no underlying call)
-    await session_simulator._exec_get_asset({"id": "ctx_rules"})
-    mock_mycelian_client.get_asset.assert_not_called()
-    assert session_simulator._tool_results["get_asset"] == "RULES CONTENT"
-
-@pytest.mark.asyncio
-async def test_list_assets_pass_through(session_simulator, mock_mycelian_client):
-    """list_assets should expose list returned by MycelianMemoryClient."""
-    mock_mycelian_client.list_assets.return_value = ["ctx_rules", "ctx_prompt_chat"]
-    await session_simulator._exec_list_assets({})
-    mock_mycelian_client.list_assets.assert_called_once()
-    assert session_simulator._tool_results["list_assets"] == ["ctx_rules", "ctx_prompt_chat"]
+async def test_get_default_prompts_bootstrap_marks_assets(session_simulator, mock_mycelian_client):
+    """get_default_prompts should mark required assets as satisfied."""
+    mock_mycelian_client.get_prompts.return_value = {
+        "version": "v1",
+        "context_summary_rules": "RULES",
+        "templates": {
+            "context_prompt": "CTX",
+            "entry_capture_prompt": "ENTRY",
+            "summary_prompt": "SUMMARY",
+        },
+    }
+    await session_simulator._exec_get_default_prompts({"memory_type": "chat"})
+    assert session_simulator._boot_seen_ctx_rules is True
+    assert {
+        "ctx_rules",
+        "ctx_prompt_chat",
+        "entry_prompt_chat",
+        "summary_prompt_chat",
+    }.issubset(session_simulator._boot_assets_downloaded)

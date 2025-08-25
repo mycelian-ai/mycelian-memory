@@ -45,7 +45,6 @@ class FakeMycelian(MycelianMemoryClient := object):  # simple duck type
     def __init__(self):
         self.added = []
         self.context_puts = []
-        self.user_id = "user-1"
 
     def add_entry(self, memory_id, raw_entry, summary, *, role=None, tags=None):
         self.added.append((memory_id, raw_entry, summary))
@@ -65,7 +64,7 @@ class FakeMycelian(MycelianMemoryClient := object):  # simple duck type
 async def test_session_simulator_executes_tool_calls():
     fake_ac = FakeAnthropic()
     fake_sc = FakeMycelian()
-    spb = PromptAssembler("DMR", fake_sc.user_id, "mem-1", "", [])
+    spb = PromptAssembler("DMR", "mem-1", "", [])
     sim = SessionSimulator(fake_ac, fake_sc, spb)
 
     await sim.step("hello there")

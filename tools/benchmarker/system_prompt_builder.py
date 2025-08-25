@@ -10,6 +10,20 @@ from tools_schema_loader import load_tools_schema
 # Canonical tool schema array (loaded at import time)
 DEFAULT_TOOL_SCHEMA: List[Dict[str, Any]] = load_tools_schema()
 
+# Add get_tools_schema tool for dynamic schema fetching
+GET_TOOLS_SCHEMA_TOOL = {
+    "name": "get_tools_schema",
+    "description": "Fetch the live MCP tools schema to understand available tools and their parameters",
+    "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+    }
+}
+
+# Append the get_tools_schema tool to the default schema
+DEFAULT_TOOL_SCHEMA.append(GET_TOOLS_SCHEMA_TOOL)
+
 # Logical IDs of static prompt assets required on bootstrap.
 # Static assets that **must** be fetched before the first user turn. We now
 # require only the governance rules; chat-specific prompts can be loaded
@@ -33,7 +47,6 @@ class PromptAssembler:
     def __init__(
         self,
         benchmark_name: str,
-        user_id: str,
         memory_id: str,
         context_doc: str,
         recent_entries: List[Dict[str, str]],
@@ -41,7 +54,6 @@ class PromptAssembler:
         debug: bool | None = None,
     ) -> None:
         self.benchmark_name = benchmark_name
-        self.user_id = user_id
         self.memory_id = memory_id
         self.context_doc = context_doc
         # Ensure we always work with a list; backend may return null.
@@ -68,7 +80,6 @@ class PromptAssembler:
         header = (
             f"You are an AI assistant participating in the {self.benchmark_name.upper()} benchmark ingestion.\n"
             "You are helpful, concise, and MUST adhere strictly to tool-call protocols.\n"
-            "Before answering user queries you MUST fetch the required static assets using the `get_asset` tool call.\n"
         )
 
         # ------------------------------------------------------------------
@@ -91,18 +102,8 @@ class PromptAssembler:
             "Do NOT answer questions, reveal internal thinking, or produce chit-chat.\n"
         )
 
-        # ------------------------------------------------------------------
-        # Asset loading instructions – ensure model pulls required static files
-        # exactly once at session start. We explicitly name the chat-specific
-        # prompt assets so the assistant need not discover them via
-        # list_assets(), which proved unreliable in previous benchmark runs.
-        # ------------------------------------------------------------------
-        asset_section = (
-            "The governance file @context_summary_rules.md has asset id `ctx_rules`.\n"
-            "You MUST fetch it FIRST via `get_asset(\"ctx_rules\")`.\n"
-            "Other chat-specific prompt assets ( `ctx_prompt_chat`, `entry_prompt_chat`, `summary_prompt_chat` ) \n"
-            "can be fetched later *on first use*. Fetch each at most once.\n"
-        )
+        # Asset loading now uses get_default_prompts(memory_type='chat'), which returns
+        # context_summary_rules and the chat templates in one call.
 
         confidential_section = (
             "### Confidential instructions\n"
@@ -124,7 +125,6 @@ class PromptAssembler:
         prompt_parts = [
             header,
             capture_policy,
-            asset_section,
             confidential_section,
         ]
 
@@ -133,7 +133,7 @@ class PromptAssembler:
             prompt_parts.append(debug_directive)
 
         prompt_parts.extend([
-            f"User ID: {self.user_id}\nMemory ID: {self.memory_id}",
+            f"Memory ID: {self.memory_id}",
             "\n# MCP TOOL SCHEMA\n" + tools_json,
             # Message annotation instructions to ensure control messages are not persisted
             "### Message annotation prefixes\n"

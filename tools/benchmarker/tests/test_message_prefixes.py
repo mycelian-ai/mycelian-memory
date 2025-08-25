@@ -48,7 +48,6 @@ class _FakeAnthropic:
 class _FakeMycelian(MycelianMemoryClient := object):  # simple duck-type
     def __init__(self):
         self.added = []
-        self.user_id = "user-1"
 
     def add_entry(self, memory_id, raw_entry, summary, *, role=None, tags=None):
         self.added.append((memory_id, raw_entry, summary))
@@ -68,7 +67,7 @@ class _FakeMycelian(MycelianMemoryClient := object):  # simple duck-type
 async def test_message_annotation_prefix_handling():
     fake_ac = _FakeAnthropic()
     fake_sc = _FakeMycelian()
-    spb = PromptAssembler("MSC", fake_sc.user_id, "mem-1", "", [])
+    spb = PromptAssembler("MSC", "mem-1", "", [])
     sim = SessionSimulator(fake_ac, fake_sc, spb)
 
     # 1. Control message – should NOT trigger add_entry
