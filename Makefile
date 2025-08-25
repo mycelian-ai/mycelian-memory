@@ -2,7 +2,7 @@
 
 # ==============================================================================
 # Monorepo Convenience Makefile (top-level)
-# Provides shortcuts for running the Synapse MCP server via Docker Compose.
+# Provides shortcuts for running the Mycelian MCP server via Docker Compose.
 # ==============================================================================
 
 MCP_COMPOSE_FILE := deployments/docker/docker-compose.streamable.yml
@@ -143,7 +143,7 @@ clean-bin:
 
 # Update help output
 help:
-	@echo "Synapse Monorepo Makefile — available commands:"
+	@echo "Mycelian Monorepo Makefile — available commands:"
 	@echo ""
 	@echo "Build Commands:"
 	@echo "  build                  Build all binaries to bin/ directory"
@@ -155,8 +155,8 @@ help:
 	@echo "  clean-bin              Remove all built binaries"
 	@echo ""
 	@echo "Service Commands:"
-	@echo "  start-mcp-streamable-server      Start (or rebuild) the Synapse MCP server container (streamable HTTP for Cursor)"
-	@echo "  mcp-streamable-down    Stop and remove the Synapse MCP server container"
+	@echo "  start-mcp-streamable-server      Start (or rebuild) the Mycelian MCP server container (streamable HTTP for Cursor)"
+	@echo "  mcp-streamable-down    Stop and remove the Mycelian MCP server container"
 	@echo "  mcp-streamable-restart Shortcut for mcp-streamable-down then start-mcp-streamable-server"
 	@echo "  start-dev-mycelian-server    Start backend stack (Postgres)"
 	@echo "  backend-down           Stop backend stack containers"

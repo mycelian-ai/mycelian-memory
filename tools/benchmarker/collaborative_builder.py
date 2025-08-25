@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 import anthropic
 
 from models import BenchmarkConversation, ConversationMessage
-from synapse_client import MycelianMemoryClient
+from mycelian_client import MycelianMemoryClient
 from system_prompt_builder import PromptAssembler
 from session_simulator import SessionSimulator
 # Message annotation prefixes (see docs/design/msc_dataset_note_taker.md)
@@ -23,24 +23,25 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 SESSION_BOOTSTRAP_PROMPT = (
     f"{CONTROL_PREFIX} SESSION_BOOTSTRAP\n\n"
-    "### Startup sequence (MUST follow in order)\n"
-    "1. Fetch static assets – call get_asset() once for each id **in this order**:\n"
-    "   • ctx_rules\n"
-    "   • ctx_prompt_chat\n"
-    "   • entry_prompt_chat\n"
-    "   • summary_prompt_chat\n"
-    "2. get_context() – retrieve stored document.\n"
-    "3. list_entries(limit = 10) – merge recent facts.\n\n"
-    "### Harness command semantics\n"
-    "• Any message whose first token starts with `control:` is a harness command.\n"
-    "  It MUST NOT be persisted with add_entry; treat it as out-of-band instruction.\n\n"
-    "### Session termination sentinel\n"
-    "When you receive the message `control:test_harness SESSION_END` you MUST:\n"
-    "  1. Persist any remaining raw dialogue messages via add_entry (follow entry_capture rules).\n"
-    "  2. Call await_consistency() to ensure all previous writes are durable.\n"
-    "  3. Issue exactly **one** put_context() call containing the updated context, formatted per ctx_prompt_chat (≤ 5000 chars).\n"
-    "After completing these steps, reply with `control:note_taker_assistant OK`.\n\n"
-    "These instructions apply only to this benchmark; they override more generic prompt guidance."
+    "You are starting a benchmark ingestion session. First, call get_tools_schema to fetch the live tools schema and understand the API. "
+    "Then, call get_default_prompts with memory_type='chat' and use the returned context_summary_rules and templates for this session. "
+    "Next, follow the required startup sequence:\n\n"
+    "### Required startup sequence\n"
+    "1. get_context() – retrieve any existing context document\n"
+    "2. list_entries(limit = 10) – review recent entries for continuity\n\n"
+    "### Vault and memory usage (STRICT)\n"
+    "• The runner has already created and provided a vault_id and a memory_id for this session.\n"
+    "• Do NOT call create_vault, create_memory, or create_memory_in_vault. Always use the provided IDs.\n\n"
+    "### Message handling rules\n"
+    "• Messages starting with `control:` are harness commands - NEVER persist with add_entry\n"
+    "• Only persist messages prefixed with `benchmark_conversation:speaker_1` or `benchmark_conversation:speaker_2`\n\n"
+    "### Session termination\n"
+    "When you receive `control:test_harness SESSION_END`:\n"
+    "  1. Persist any remaining dialogue messages via add_entry (follow entry_capture rules)\n"
+    "  2. Call await_consistency() to ensure durability\n"
+    "  3. Issue exactly one put_context() call with updated context (≤ 5000 chars, formatted per ctx_prompt_chat)\n"
+    "  4. Reply with `control:note_taker_assistant OK`\n\n"
+    "Use real UUIDs from tool responses - never use placeholder strings like 'default'."
 )
 
 
@@ -95,7 +96,6 @@ class ConversationIngestor:
             context_doc = self._mc.get_context(memory_id)
             sys_builder = PromptAssembler(
                 benchmark_name=benchmark_name,
-                user_id=self._mc.user_id,
                 memory_id=memory_id,
                 context_doc=context_doc,
                 recent_entries=[],

@@ -1,8 +1,8 @@
 import pytest
 
-from benchmarks.python.session_simulator import SessionSimulator
-from benchmarks.python.system_prompt_builder import PromptAssembler
-from benchmarks.python.synapse_client import SynapseMemoryClient
+from session_simulator import SessionSimulator
+from system_prompt_builder import PromptAssembler
+from mycelian_client import MycelianMemoryClient
 
 # ---------------------------------------------------------------------------
 # Fake Anthropic client that always emits an add_entry tool call for any
@@ -45,10 +45,9 @@ class _FakeAnthropic:
         self.messages = self._Messages()
 
 
-class _FakeSynapse(SynapseMemoryClient := object):  # simple duck-type
+class _FakeMycelian(MycelianMemoryClient := object):  # simple duck-type
     def __init__(self):
         self.added = []
-        self.user_id = "user-1"
 
     def add_entry(self, memory_id, raw_entry, summary, *, role=None, tags=None):
         self.added.append((memory_id, raw_entry, summary))
@@ -67,8 +66,8 @@ class _FakeSynapse(SynapseMemoryClient := object):  # simple duck-type
 @pytest.mark.asyncio
 async def test_message_annotation_prefix_handling():
     fake_ac = _FakeAnthropic()
-    fake_sc = _FakeSynapse()
-    spb = PromptAssembler("MSC", fake_sc.user_id, "mem-1", "", [])
+    fake_sc = _FakeMycelian()
+    spb = PromptAssembler("MSC", "mem-1", "", [])
     sim = SessionSimulator(fake_ac, fake_sc, spb)
 
     # 1. Control message – should NOT trigger add_entry

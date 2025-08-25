@@ -1,7 +1,7 @@
 import pytest
 
-from benchmarks.python.session_simulator import SessionSimulator, END_SESSION_TOKEN
-from benchmarks.python.system_prompt_builder import PromptAssembler
+from session_simulator import SessionSimulator, END_SESSION_TOKEN
+from system_prompt_builder import PromptAssembler
 
 
 class FakeAnthropicMessageBlock:
@@ -41,11 +41,10 @@ class FakeAnthropic:
         self.messages = self._Messages()
 
 
-class FakeSynapse(SynapseMemoryClient := object):  # simple duck type
+class FakeMycelian(MycelianMemoryClient := object):  # simple duck type
     def __init__(self):
         self.added = []
         self.context_puts = []
-        self.user_id = "user-1"
 
     def add_entry(self, memory_id, raw_entry, summary, *, role=None, tags=None):
         self.added.append((memory_id, raw_entry, summary))
@@ -64,8 +63,8 @@ class FakeSynapse(SynapseMemoryClient := object):  # simple duck type
 @pytest.mark.asyncio
 async def test_session_simulator_executes_tool_calls():
     fake_ac = FakeAnthropic()
-    fake_sc = FakeSynapse()
-    spb = PromptAssembler("DMR", fake_sc.user_id, "mem-1", "", [])
+    fake_sc = FakeMycelian()
+    spb = PromptAssembler("DMR", "mem-1", "", [])
     sim = SessionSimulator(fake_ac, fake_sc, spb)
 
     await sim.step("hello there")

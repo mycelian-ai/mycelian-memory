@@ -19,8 +19,8 @@ COPY . .
 # Build the MCP server binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mycelian-mcp-server ./cmd/mycelian-mcp-server
 
-# Build the Synapse CLI binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o synapse ./cmd/synapse
+# Build the Mycelian CLI binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mycelianCli ./cmd/mycelianCli
 
 # Final stage
 FROM alpine:latest
@@ -29,20 +29,20 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 
 # Create a non-root user
-RUN addgroup -g 1001 -S synapse && \
-    adduser -u 1001 -S synapse -G synapse
+RUN addgroup -g 1001 -S mycelian && \
+    adduser -u 1001 -S mycelian -G mycelian
 
 WORKDIR /app
 
 # Copy binaries from builder stage
 COPY --from=builder /app/mycelian-mcp-server .
-COPY --from=builder /app/synapse .
+COPY --from=builder /app/mycelianCli .
 
 # Change ownership to non-root user
-RUN chown synapse:synapse mycelian-mcp-server
+RUN chown mycelian:mycelian mycelian-mcp-server
 
 # Switch to non-root user
-USER synapse
+USER mycelian
 
 # Expose port (if needed for future HTTP transport)
 EXPOSE 8081

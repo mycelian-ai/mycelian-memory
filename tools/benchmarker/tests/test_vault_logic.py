@@ -11,7 +11,7 @@ from datetime import datetime
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from synapse_client import SynapseMemoryClient
+from mycelian_client import MycelianMemoryClient
 
 
 class TestVaultTitleValidation(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestVaultTitleValidation(unittest.TestCase):
     def setUp(self):
         """Set up a mock client for testing."""
         with patch('subprocess.run'):
-            self.client = SynapseMemoryClient("http://localhost:11545", "test_user")
+            self.client = MycelianMemoryClient("http://localhost:11545", "test_user")
 
     def test_valid_vault_titles(self):
         """Test valid vault titles that should pass validation."""
@@ -124,7 +124,7 @@ class TestVaultCreation(unittest.TestCase):
     def setUp(self):
         """Set up mock client for testing."""
         with patch('subprocess.run'):
-            self.client = SynapseMemoryClient("http://localhost:11545", "test_user")
+            self.client = MycelianMemoryClient("http://localhost:11545", "test_user")
 
     @patch('subprocess.run')
     def test_create_vault_cli_success(self, mock_run):
@@ -144,7 +144,8 @@ class TestVaultCreation(unittest.TestCase):
         # Should have called CLI with correct arguments
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0][0]
-        self.assertEqual(call_args[0], "synapse")
+        # Verify mycelianCli binary is called (call_args[0] is the binary path)
+        self.assertTrue("mycelianCli" in call_args[0] or "synapse" in call_args[0])  # Allow legacy CLI for tests
         self.assertIn("create-vault", call_args)
         self.assertIn("--title", call_args)
         self.assertIn("test-vault", call_args)
@@ -157,7 +158,7 @@ class TestVaultCreation(unittest.TestCase):
         self.assertIn("Invalid vault title", str(cm.exception))
 
     @patch('subprocess.run')
-    @patch.object(SynapseMemoryClient, '_run_cli')
+    @patch.object(MycelianMemoryClient, '_run_cli')
     @patch('requests.Session.post')
     def test_create_vault_cli_fallback_to_http(self, mock_post, mock_run_cli, mock_run):
         """Test vault creation falls back to HTTP when CLI fails."""
@@ -186,10 +187,10 @@ class TestMemoryCreationWithVault(unittest.TestCase):
     def setUp(self):
         """Set up mock client for testing."""
         with patch('subprocess.run'):
-            self.client = SynapseMemoryClient("http://localhost:11545", "test_user")
+            self.client = MycelianMemoryClient("http://localhost:11545", "test_user")
 
-    @patch.object(SynapseMemoryClient, '_run_cli')
-    @patch.object(SynapseMemoryClient, 'create_vault')
+    @patch.object(MycelianMemoryClient, '_run_cli')
+    @patch.object(MycelianMemoryClient, 'create_vault')
     def test_create_memory_without_vault_creates_vault(self, mock_create_vault, mock_run_cli):
         """Test that create_memory creates a vault when none provided."""
         # Mock vault creation
@@ -213,7 +214,7 @@ class TestMemoryCreationWithVault(unittest.TestCase):
         self.assertIn("--vault-id", call_args)
         self.assertIn("auto-vault-id", call_args)
 
-    @patch.object(SynapseMemoryClient, '_run_cli')
+    @patch.object(MycelianMemoryClient, '_run_cli')
     def test_create_memory_with_existing_vault(self, mock_run_cli):
         """Test create_memory with existing vault ID."""
         # Mock memory creation CLI

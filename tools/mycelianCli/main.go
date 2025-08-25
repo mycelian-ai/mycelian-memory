@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -84,8 +83,6 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newSearchCmd())
 	rootCmd.AddCommand(newGetToolsSchemaCmd())
 	rootCmd.AddCommand(newAwaitConsistencyCmd())
-	rootCmd.AddCommand(newListAssetsCmd())
-	rootCmd.AddCommand(newGetAssetCmd())
 
 	return rootCmd
 }
@@ -662,59 +659,6 @@ func newAwaitConsistencyCmd() *cobra.Command {
 
 	_ = cmd.MarkFlagRequired("memory-id")
 
-	return cmd
-}
-
-// ----------------------------- Assets ------------------------------
-
-func assetIDMap() map[string]string {
-	return map[string]string{
-		"ctx_rules":           "prompts/system/context_summary_rules.md",
-		"ctx_prompt_chat":     "prompts/default/chat/context_prompt.md",
-		"entry_prompt_chat":   "prompts/default/chat/entry_capture_prompt.md",
-		"summary_prompt_chat": "prompts/default/chat/summary_prompt.md",
-	}
-}
-
-func newListAssetsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "list-assets",
-		Short: "List logical IDs of static assets available via get-asset",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ids := make([]string, 0, len(assetIDMap()))
-			for id := range assetIDMap() {
-				ids = append(ids, id)
-			}
-			sort.Strings(ids)
-			enc := json.NewEncoder(cmd.OutOrStdout())
-			enc.SetIndent("", "  ")
-			return enc.Encode(map[string]any{"assets": ids})
-		},
-	}
-	return cmd
-}
-
-func newGetAssetCmd() *cobra.Command {
-	var id string
-	cmd := &cobra.Command{
-		Use:   "get-asset",
-		Short: "Print the raw text content of a static prompt or rule asset",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			mp := assetIDMap()
-			path, ok := mp[id]
-			if !ok {
-				return fmt.Errorf("unknown asset id: %s", id)
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			cmd.Println(string(data))
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&id, "id", "", "Logical asset ID (required)")
-	_ = cmd.MarkFlagRequired("id")
 	return cmd
 }
 

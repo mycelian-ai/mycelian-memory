@@ -4,7 +4,7 @@ This document describes how context is managed in the `SessionSimulator` class, 
 
 ## Overview
 
-The `SessionSimulator` maintains a context that is updated periodically during a conversation. This context is stored in the Synapse memory system and can be used to maintain state across multiple turns of conversation.
+The `SessionSimulator` maintains a context that is updated periodically during a conversation. This context is stored in the Mycelian memory system and can be used to maintain state across multiple turns of conversation.
 
 ## When Context is Updated
 
@@ -52,7 +52,7 @@ The `SessionSimulator` maintains a message counter that increments with each use
 
 The following tools interact with the context system:
 
-- `mcp_synapse-memory_add_entry`: Adds an entry to the memory and triggers a context update.
+- `mcp_mycelian-memory-streamable_add_entry`: Adds an entry to the memory and triggers a context update.
 - `put_context`: Directly updates the context with provided content.
 
 ## Best Practices
@@ -65,7 +65,7 @@ The following tools interact with the context system:
 
 ```python
 # Create a session
-simulator = SessionSimulator(api_key, synapse_client, system_prompt_builder)
+simulator = SessionSimulator(api_key, mycelian_client, system_prompt_builder)
 
 # Send messages (context updates happen automatically)
 await simulator.step("Hello, how are you?")

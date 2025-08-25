@@ -18,52 +18,23 @@ class MycelianMemoryClient:
     See CODING_STANDARDS.md for interface policy.
     """
 
-    def __init__(self, base_url: str, user_id: str | None = None):
-        """Create client.
-
-        If *user_id* is None, tries to use the default 'local_user' first.
-        If local_user doesn't exist, falls back to creating a fresh user via CLI.
-        """
+    def __init__(self, base_url: str):
+        """Create client for dev mode (no user management)."""
         self.base_url = base_url.rstrip("/")
 
-        if user_id:
-            self.user_id = user_id
-        else:
-            self.user_id = self._get_or_create_user()
 
 
 
-    def _get_or_create_user(self) -> str:
-        """Try to use local_user first, fallback to creating fresh user."""
-        # First try to use the default local_user
-        if self._check_local_user_exists():
-            logger.info("Using existing local_user for benchmark")
-            return "local_user"
-        
-        # Fallback to creating a fresh user
-        logger.warning("local_user not found, creating fresh benchmark user - this may indicate the backend is not properly initialized")
-        return self._create_user_via_cli()
-
-    def _check_local_user_exists(self) -> bool:
-        """Check if local_user exists by attempting to fetch it via API."""
-        try:
-            url = f"{self.base_url}/api/users/local_user"
-            response = self._session.get(url, timeout=10)
-            return response.status_code == 200
-        except Exception as e:
-            logger.debug("Failed to check for local_user: %s", e)
-            return False
 
     # ------------------------------------------------------------------
     # CLI helpers
     # ------------------------------------------------------------------
-    _USER_REGEX = re.compile(r"User created: ([0-9a-fA-F-]{36})")
     _MEM_REGEX = re.compile(r"Memory created: ([0-9a-fA-F-]{36})")
     _VAULT_REGEX = re.compile(r"Vault created: ([0-9a-fA-F-]{36})")
 
     def _run_cli(self, *args: str) -> str:
-        """Run the `synapse` CLI and return stdout."""
-        cmd = ["synapse", "--service-url", self.base_url, *args]
+        """Run the `mycelianCli` CLI and return stdout."""
+        cmd = ["mycelianCli", "--service-url", self.base_url, *args]
         logging.info("[CLI] %s", " ".join(cmd))
         res = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
@@ -84,27 +55,12 @@ class MycelianMemoryClient:
 
         if res.returncode != 0:
             raise RuntimeError(
-                f"synapse CLI failed (exit {res.returncode}): {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
+                f"mycelianCli CLI failed (exit {res.returncode}): {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
             )
 
         return res.stdout
 
-    def _create_user_via_cli(self) -> str:
-        user_id = str(uuid.uuid4())
-        email = f"benchmark-{uuid.uuid4().hex[:8]}@example.com"
-        out = self._run_cli(
-            "create-user",
-            "--user-id",
-            user_id,
-            "--email",
-            email,
-            "--display-name",
-            "Benchmark User",
-        )
-        m = self._USER_REGEX.search(out)
-        if not m:
-            raise RuntimeError(f"Failed to parse user ID from CLI output:\n{out}")
-        return m.group(1)
+
 
     # ---------------------------------------------------------------------
     # Vault lifecycle  
@@ -121,8 +77,6 @@ class MycelianMemoryClient:
         
         out = self._run_cli(
             "create-vault",
-            "--user-id",
-            self.user_id,
             "--title", 
             title,
             "--description",
@@ -165,7 +119,7 @@ class MycelianMemoryClient:
         """Create a new memory and return its ID.
 
         If vault_id is not provided, creates a unique vault for this memory.
-        Primary path uses the `synapse` CLI to avoid accidental schema drift
+        Primary path uses the `mycelianCli` CLI to avoid accidental schema drift
         with the Go client.  If the CLI returns a non-zero exit code (often due
         to the backend returning HTTP 500 while still starting up), we fall
         back to a direct HTTP POST which is faster and less brittle inside the
@@ -178,8 +132,6 @@ class MycelianMemoryClient:
             logger.info("Created unique vault %s (%s) for memory %s", vault_id, vault_title, title)
         out = self._run_cli(
             "create-memory",
-            "--user-id",
-            self.user_id,
             "--vault-id",
             vault_id,
             "--title",
@@ -203,8 +155,6 @@ class MycelianMemoryClient:
         try:
             out = self._run_cli(
                 "get-context",
-                "--user-id",
-                self.user_id,
                 "--memory-id",
                 memory_id,
             ).strip()
@@ -230,22 +180,12 @@ class MycelianMemoryClient:
             return out
 
         except Exception as cli_err:
-            logger.debug("[get_context] CLI failed (%s); falling back to HTTP", cli_err)
+            logger.debug("[get_context] CLI failed (%s); HTTP fallback disabled (no users)", cli_err)
+            return ""
 
         # ------------------------------------------------------------------
-        # HTTP fallback – existing implementation
-        url = f"{self.base_url}/api/users/{self.user_id}/memories/{memory_id}/contexts"
-        resp = self._session.get(url, timeout=30)
-        if resp.status_code in (404, 500):
-            return ""
-        resp.raise_for_status()
-        data = resp.json() or {}
-        if "context" in data:
-            ctx_obj = data["context"]
-            if isinstance(ctx_obj, dict) and "activeContext" in ctx_obj:
-                return ctx_obj["activeContext"]
-            return json.dumps(ctx_obj)
-        return data.get("content", "")
+        # HTTP fallback disabled - user management removed
+        # ------------------------------------------------------------------
 
     # ------------------------------------------------------------------
     # Public read helper matching tool name exactly
@@ -256,8 +196,6 @@ class MycelianMemoryClient:
         try:
             out = self._run_cli(
                 "list-entries",
-                "--user-id",
-                self.user_id,
                 "--memory-id",
                 memory_id,
                 "--limit",
@@ -269,18 +207,8 @@ class MycelianMemoryClient:
             data = json.loads(out)
             return data.get("entries") or []
         except Exception as cli_err:
-            logger.debug("[list_entries] CLI failed (%s); falling back to HTTP", cli_err)
-
-        resp = self._session.get(
-            f"{self.base_url}/api/users/{self.user_id}/memories/{memory_id}/entries",
-            params={"limit": limit},
-            timeout=30,
-        )
-        if resp.status_code == 404:
+            logger.debug("[list_entries] CLI failed (%s); HTTP fallback disabled (no users)", cli_err)
             return []
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("entries") or []
 
     # Backwards-compatibility alias (deprecated)
     def list_recent_entries(self, memory_id: str, limit: int = 10):  # pragma: no cover
@@ -306,19 +234,9 @@ class MycelianMemoryClient:
         clean_tags = dict(tags) if tags else {}
         clean_tags.pop("role", None)
 
-        payload = {
-            "rawEntry": raw_entry,
-            "summary": summary,
-            # Preserve role both as top-level per tool schema and inside tags for backend compatibility.
-            "role": role,
-            "tags": {**clean_tags, "role": role},
-        }
-        resp = self._session.post(
-            f"{self.base_url}/api/users/{self.user_id}/memories/{memory_id}/entries",
-            json=payload,
-            timeout=30,
-        )
-        resp.raise_for_status()
+        # HTTP endpoint disabled - user management removed
+        # Use CLI-only approach
+        raise RuntimeError("add_entry only supports CLI mode - HTTP fallback disabled")
 
     def delete_memory(self, memory_id: str):
         """Delete a memory.  Best-effort; ignores 404s."""
@@ -326,28 +244,18 @@ class MycelianMemoryClient:
             # Prefer CLI for symmetry with create_memory.
             self._run_cli(
                 "delete-memory",
-                "--user-id",
-                self.user_id,
                 "--memory-id",
                 memory_id,
             )
             return
         except RuntimeError as cli_err:
-            logging.info("[delete_memory] CLI fell back to HTTP: %s", cli_err)
-        # Fallback HTTP
-        resp = self._session.delete(
-            f"{self.base_url}/api/users/{self.user_id}/memories/{memory_id}",
-            timeout=30,
-        )
-        if resp.status_code not in (200, 204, 404):
-            resp.raise_for_status()
+            logging.info("[delete_memory] CLI failed, HTTP fallback disabled (no users): %s", cli_err)
+            # HTTP fallback disabled - user management removed
 
     def put_context(self, memory_id: str, content: str):
         # Use new CLI subcommand.
         self._run_cli(
             "put-context",
-            "--user-id",
-            self.user_id,
             "--memory-id",
             memory_id,
             "--content",
@@ -358,22 +266,9 @@ class MycelianMemoryClient:
     # Search
     # ------------------------------------------------------------------
     def search_memories(self, memory_id: str, query: str, top_k: int = 5) -> Dict[str, Any]:
-        """Hybrid search within a memory (server-side user scoping).
-        Uses new unified /api/search endpoint matching Go SDK.
-        """
-        payload = {
-            "userId": self.user_id,
-            "memoryId": memory_id,
-            "query": query,
-            "topK": top_k,
-        }
-        resp = self._session.post(
-            f"{self.base_url}/api/search",
-            json=payload,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        """Hybrid search within a memory. HTTP fallback disabled - use CLI only."""
+        # HTTP endpoint disabled - user management removed
+        raise RuntimeError("search_memories HTTP fallback disabled - use CLI-only client")
 
     # ------------------------------------------------------------------
     # Asset helper operations (static prompt assets)
@@ -405,7 +300,7 @@ class MycelianMemoryClient:
                 return out
             # If stdout empty, run raw subprocess to capture STDERR
             res = subprocess.run(
-                ["synapse", "--service-url", self.base_url, "get-asset", "--id", asset_id],
+                ["mycelianCli", "--service-url", self.base_url, "get-asset", "--id", asset_id],
                 capture_output=True,
                 text=True,
             )
@@ -431,7 +326,7 @@ class MycelianMemoryClient:
     def await_consistency(self, memory_id: str) -> None:
         """Block until previous writes for the memory are consistent using CLI; fallback to short sleep."""
         try:
-            self._run_cli("await-consistency", "--user-id", self.user_id, "--memory-id", memory_id)
+            self._run_cli("await-consistency", "--memory-id", memory_id)
             return
         except Exception as cli_err:
             logger.debug("[await_consistency] CLI failed: %s; falling back to sleep", cli_err)

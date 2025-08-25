@@ -191,20 +191,20 @@ Transient back-pressure: shard queue full when `Submit` attempted enqueue.
 
 ### Prometheus Metrics
 
-All metrics use namespace `synapse` and subsystem `shardqueue`:
+All metrics use namespace `mycelian` and subsystem `shardqueue`:
 
 ```go
 // Job submissions successfully enqueued
-synapse_shardqueue_submissions_total{shard="0"}
+mycelian_shardqueue_submissions_total{shard="0"}
 
 // Enqueue timeouts due to full queues
-synapse_shardqueue_queue_full_total{shard="0"}
+mycelian_shardqueue_queue_full_total{shard="0"}
 
 // Job execution duration histogram
-synapse_shardqueue_run_duration_seconds{shard="0"}
+mycelian_shardqueue_run_duration_seconds{shard="0"}
 
 // Current queue depth per shard
-synapse_shardqueue_queue_depth{shard="0"}
+mycelian_shardqueue_queue_depth{shard="0"}
 ```
 
 ### Logging

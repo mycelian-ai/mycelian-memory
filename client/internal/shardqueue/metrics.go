@@ -12,7 +12,7 @@ import (
 var (
 	submissionsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "synapse",
+			Namespace: "mycelian",
 			Subsystem: "shardqueue",
 			Name:      "submissions_total",
 			Help:      "Jobs successfully accepted for execution.",
@@ -22,7 +22,7 @@ var (
 
 	queueFullTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "synapse",
+			Namespace: "mycelian",
 			Subsystem: "shardqueue",
 			Name:      "queue_full_total",
 			Help:      "Enqueue attempts that timed out (per‑shard queue full).",
@@ -32,7 +32,7 @@ var (
 
 	runDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "synapse",
+			Namespace: "mycelian",
 			Subsystem: "shardqueue",
 			Name:      "run_duration_seconds",
 			Help:      "Job execution latency.",
@@ -43,7 +43,7 @@ var (
 
 	queueDepth = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: "synapse",
+			Namespace: "mycelian",
 			Subsystem: "shardqueue",
 			Name:      "queue_depth",
 			Help:      "Current depth of each shard queue.",

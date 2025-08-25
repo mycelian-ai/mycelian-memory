@@ -18,51 +18,13 @@ class MycelianMemoryClient:
     See CODING_STANDARDS.md for interface policy.
     """
 
-    def __init__(self, base_url: str, user_id: str | None = None):
-        """Create client.
-
-        If *user_id* is None, tries to use the default 'local_user' first.
-        If local_user doesn't exist, creates a fresh user via CLI.
-        """
+    def __init__(self, base_url: str):
+        """Create client for dev mode (no user management)."""
         self.base_url = base_url.rstrip("/")
-        
-        if user_id:
-            self.user_id = user_id
-        else:
-            self.user_id = self._get_or_create_user()
 
     # Regex patterns for parsing CLI output
     _VAULT_REGEX = re.compile(r"Vault created: ([a-f0-9\-]+)")
     _MEM_REGEX = re.compile(r"Memory created: ([a-f0-9\-]+)")
-    _USER_REGEX = re.compile(r"User created: ([a-zA-Z0-9_\-]+)")
-
-    def _get_or_create_user(self) -> str:
-        """Try to use local_user first, create fresh user if needed."""
-        # First try to use the existing local_user
-        try:
-            logger.info("Using existing local_user for benchmark")
-            return "local_user"
-        except Exception:
-            # Create a fresh user
-            logger.info("Creating fresh user for benchmark")
-            return self._create_fresh_user()
-
-    def _create_fresh_user(self) -> str:
-        """Create a fresh benchmark user via CLI."""
-        user_id = f"bench_user_{int(time.time())}"
-        email = f"{user_id}@benchmark.local"
-        
-        out = self._run_cli(
-            "create-user",
-            "--user-id", user_id,
-            "--email", email,
-            "--display-name", "Benchmark User"
-        )
-        
-        m = self._USER_REGEX.search(out)
-        if not m:
-            raise RuntimeError(f"Failed to parse user ID from CLI output:\n{out}")
-        return m.group(1)
 
     def _run_cli(self, *args: str) -> str:
         """Run mycelianCli command and return stdout."""
@@ -99,7 +61,6 @@ class MycelianMemoryClient:
         
         out = self._run_cli(
             "create-vault",
-            "--user-id", self.user_id,
             "--title", title,
             "--description", description,
         )
@@ -125,7 +86,6 @@ class MycelianMemoryClient:
             
         out = self._run_cli(
             "create-memory",
-            "--user-id", self.user_id,
             "--vault-id", vault_id,
             "--title", title,
             "--memory-type", memory_type,
@@ -140,7 +100,6 @@ class MycelianMemoryClient:
         """Return latest context document using CLI."""
         out = self._run_cli(
             "get-context",
-            "--user-id", self.user_id,
             "--memory-id", memory_id,
         ).strip()
 
@@ -164,7 +123,6 @@ class MycelianMemoryClient:
         """Return recent entries using CLI."""
         out = self._run_cli(
             "list-entries",
-            "--user-id", self.user_id,
             "--memory-id", memory_id,
             "--limit", str(limit),
         ).strip()
@@ -188,7 +146,6 @@ class MycelianMemoryClient:
         """Update context document using CLI."""
         self._run_cli(
             "put-context",
-            "--user-id", self.user_id,
             "--memory-id", memory_id,
             "--context", context,
         )
@@ -197,7 +154,6 @@ class MycelianMemoryClient:
         """Add entry using CLI."""
         out = self._run_cli(
             "create-entry",
-            "--user-id", self.user_id,
             "--memory-id", memory_id,
             "--raw-entry", raw_entry,
             "--summary", summary,
@@ -209,7 +165,6 @@ class MycelianMemoryClient:
         """Search memories using CLI."""
         out = self._run_cli(
             "search",
-            "--user-id", self.user_id,
             "--memory-id", memory_id,
             "--query", query,
             "--top-k", str(top_k),
@@ -246,23 +201,9 @@ class MycelianMemoryClient:
         try:
             self._run_cli(
                 "await-consistency",
-                "--user-id", self.user_id,
                 "--memory-id", memory_id,
             )
         except Exception:
             # Small delay as fallback
             time.sleep(0.5)
 
-    def get_user(self, user_id: str | None = None) -> Dict[str, Any]:
-        """Get user details using CLI."""
-        target_user = user_id or self.user_id
-        out = self._run_cli(
-            "get-user",
-            "--user-id", target_user,
-        ).strip()
-
-        try:
-            return json.loads(out) if out else {}
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse user JSON from CLI output")
-            return {}

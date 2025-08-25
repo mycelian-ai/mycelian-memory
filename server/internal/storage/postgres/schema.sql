@@ -1,4 +1,4 @@
--- PostgreSQL schema for Synapse Memory (parity with ADR 0014)
+-- PostgreSQL schema for Mycelian Memory (parity with ADR 0014)
 -- Users table eliminated - actor_id is now treated as opaque string identifier
 
 -- Vaults
