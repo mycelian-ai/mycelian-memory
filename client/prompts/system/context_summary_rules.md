@@ -25,13 +25,20 @@
    1. Read current context → understand message.
    2. Decide to store? If yes → generate summary & persist raw+summary.
    3. Update context from raw entry (merge/trim rules).
-   4. Flush cadence – put_context is expensive: after you’ve stored ≈ 6 messages (user + assistant) with add_entry, **issue `await_consistency()` to ensure writes are durable, then call `put_context`**, and continue. Always repeat the sequence (`await_consistency` → `put_context`) once more just before exit.
+   4. Flush cadence – put_context is expensive: after you've stored ≈ 6 messages (user + assistant) with add_entry, **issue `await_consistency()` to ensure writes are durable, then call `put_context`**, and continue. Always repeat the sequence (`await_consistency` → `put_context`) once more just before exit.
 
-6. **Overflow Handling**
+6. **Search guidance** – Only use `search_memories` when the incoming message contains:
+   • Contradictory information (updates/corrections to previous facts)
+   • References to specific past events ("as we discussed before", "like last time")
+   • Direct questions about memory content
+   • Information that may exist in older context shards (beyond current 5000-char limit)
+   For routine conversation turns, rely on current context and recent entries from bootstrap.
+
+7. **Overflow Handling**
    1. Context ≤ 5 000 chars: Before writing: if new text would exceed the cap, delete the oldest low-value lines until the length is ≈ 4 800 chars. Keep core facts (participants, active tasks, decisions).
-   2. Summary ≤ 512 chars: Trim sentences with little factual content (greetings, filler) first. Keep the lines that name entities, dates, numbers, or other data-rich details that boost vector search. Continue pruning until the text fits within 512 characters, then append “…” if any content was removed.
+   2. Summary ≤ 512 chars: Trim sentences with little factual content (greetings, filler) first. Keep the lines that name entities, dates, numbers, or other data-rich details that boost vector search. Continue pruning until the text fits within 512 characters, then append "…" if any content was removed.
 
-7. **Session bootstrap**
+8. **Session bootstrap**
    1. You **MUST** call `get_context()` first. If the result is **exactly** the default placeholder string
       `This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available.`
       (inserted automatically when a memory is created), treat it as empty and immediately call `put_context`. Otherwise, keep the returned string as your working context.
