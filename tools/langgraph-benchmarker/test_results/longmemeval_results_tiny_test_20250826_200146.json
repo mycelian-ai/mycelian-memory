@@ -1,0 +1,23 @@
+{
+  "run_id": "a5719fc5",
+  "total_questions": 1,
+  "correct_answers": 0,
+  "overall_accuracy": 0.0,
+  "accuracy_by_type": {
+    "unknown": 0.0
+  },
+  "counts_by_type": {
+    "unknown": 1
+  },
+  "question_results": [
+    {
+      "conversation_id": "tiny_001",
+      "error": "Recursion limit of 25 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/GRAPH_RECURSION_LIMIT",
+      "evaluation_score": 0.0,
+      "correct": false
+    }
+  ],
+  "config": "longmemeval_repo_path='./test' dataset_variant='tiny_test.json' mcp_url='http://localhost:11546/mcp' mcp_transport='streamable_http' memory_agent_model='anthropic.claude-3-haiku-20240307-v1:0' qa_agent_model='anthropic.claude-3-haiku-20240307-v1:0' evaluation_model='anthropic.claude-3-haiku-20240307-v1:0' aws_region='us-west-2' aws_access_key_id=None aws_secret_access_key=None vault_name='tiny-test-vault' output_dir='./test_results' max_concurrent_conversations=1 enable_debug_logging=True",
+  "total_runtime_seconds": 114.40189909934998,
+  "average_time_per_question": 114.40189909934998
+}

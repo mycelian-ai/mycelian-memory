@@ -1,0 +1,25 @@
+# Tiny Test Configuration - 10 messages across 2 sessions
+longmemeval_repo_path = "./test"
+dataset_variant = "tiny_test.json"
+
+# MCP Configuration
+mcp_url = "http://localhost:11546/mcp"
+mcp_transport = "streamable_http"
+
+# Model Configuration - All use Claude Haiku via Bedrock
+memory_agent_model = "anthropic.claude-3-haiku-20240307-v1:0"
+qa_agent_model = "anthropic.claude-3-haiku-20240307-v1:0"
+evaluation_model = "anthropic.claude-3-haiku-20240307-v1:0"
+
+# AWS Bedrock Configuration
+aws_region = "us-west-2"
+
+# Memory Configuration
+vault_name = "tiny-test-vault"
+output_dir = "./test_results"
+
+# Performance
+max_concurrent_conversations = 1
+
+# Logging
+enable_debug_logging = true
