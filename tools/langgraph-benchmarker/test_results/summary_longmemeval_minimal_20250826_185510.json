@@ -1,0 +1,12 @@
+{
+  "dataset_variant": "longmemeval_minimal.json",
+  "timestamp": "20250826_185510",
+  "total_questions": 1,
+  "correct_answers": 0,
+  "overall_accuracy": 0.0,
+  "accuracy_by_type": {
+    "unknown": 0.0
+  },
+  "runtime_seconds": 0.3570871353149414,
+  "avg_time_per_question": 0.3570871353149414
+}

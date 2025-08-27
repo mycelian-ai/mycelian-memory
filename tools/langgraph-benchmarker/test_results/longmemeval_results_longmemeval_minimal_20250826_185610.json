@@ -1,0 +1,23 @@
+{
+  "run_id": "4c6161ca",
+  "total_questions": 1,
+  "correct_answers": 0,
+  "overall_accuracy": 0.0,
+  "accuracy_by_type": {
+    "unknown": 0.0
+  },
+  "counts_by_type": {
+    "unknown": 1
+  },
+  "question_results": [
+    {
+      "conversation_id": "test_001",
+      "error": "'str' object has no attribute 'get'",
+      "evaluation_score": 0.0,
+      "correct": false
+    }
+  ],
+  "config": "longmemeval_repo_path='./test' dataset_variant='longmemeval_minimal.json' mcp_url='http://localhost:11546/mcp' mcp_transport='streamable_http' memory_agent_model='anthropic.claude-3-haiku-20240307-v1:0' qa_agent_model='anthropic.claude-3-haiku-20240307-v1:0' evaluation_model='anthropic.claude-3-haiku-20240307-v1:0' aws_region='us-west-2' aws_access_key_id=None aws_secret_access_key=None vault_name='longmemeval-test' output_dir='./test_results' max_concurrent_conversations=1 enable_debug_logging=True",
+  "total_runtime_seconds": 0.3425459861755371,
+  "average_time_per_question": 0.3425459861755371
+}

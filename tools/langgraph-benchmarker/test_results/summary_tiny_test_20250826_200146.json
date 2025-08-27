@@ -1,0 +1,12 @@
+{
+  "dataset_variant": "tiny_test.json",
+  "timestamp": "20250826_200146",
+  "total_questions": 1,
+  "correct_answers": 0,
+  "overall_accuracy": 0.0,
+  "accuracy_by_type": {
+    "unknown": 0.0
+  },
+  "runtime_seconds": 114.40189909934998,
+  "avg_time_per_question": 114.40189909934998
+}
