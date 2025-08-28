@@ -18,7 +18,9 @@ Policy: ADRs are immutable once Accepted. Future changes must be recorded in a n
 | 010 | Consolidated PostgreSQL Docker Stack| Accepted | Implemented  | 2025-08-09 |
 | 011 | Memory Scoping and Isolation        | Accepted | Pending      | 2025-08-10 |
 | 012 | API Key-Based Authorization         | Accepted | In progress  | 2025-08-11 |
-| 013 | LangGraph-Based LongMemEval Benchmarker | Accepted | Pending   | 2025-08-26 |
+| 013 | LangGraph-Based LongMemEval Benchmarker | Superseded by ADR-015 | Pending   | 2025-08-26 |
+| 014 | LangGraph Benchmarker Refinements       | Superseded by ADR-015 | Pending   | 2025-08-27 |
+| 015 | Minimal LangGraph Benchmarker (refined design) | Accepted | Pending | 2025-08-28 |
 
 Notes
 - ADRs are immutable artifacts once Accepted; do not edit historical decisions. Create a new ADR to change direction and reference the old one via Superseded by.

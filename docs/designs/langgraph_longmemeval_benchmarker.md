@@ -1,539 +1,254 @@
-# LangGraph-Based LongMemEval Benchmarker Design
+## LongMemEval Benchmarker (LangGraph) for Mycelian
 
-## Overview
+### Overview
+This document specifies a lightweight, reproducible benchmarker to evaluate long‑memory behavior using LangGraph as the orchestrator and Mycelian as the memory system. It aligns with the log‑structured architecture in `docs/designs/001_mycelian_memory_architecture.md`: agents append immutable entries and periodically persist context; retrieval uses hybrid search with a tunable alpha to blend sparse and dense signals.
 
-This document outlines the design for a LangGraph-based benchmarker to evaluate Mycelian Memory against the LongMemEval benchmark. The proposed architecture simplifies the current benchmarker by leveraging LangGraph's native MCP support and agent orchestration capabilities. It also serves as a proof-of-concept of how users will design memory management with Mycelian Memory.
+### Goals
+- Evaluate end‑to‑end agent memory: capture (entries + summaries), context persistence, retrieval, and answer quality.
+- Support retrieval‑only evaluation to isolate the index/search layer.
+- Provide parameter sweeps (alpha, topK, context cadence), deterministic runs, and JSON results for regression tracking.
+- Keep the orchestration simple: one tool‑enabled agent node, plus deterministic setup and evaluation nodes.
 
-**Last Updated**: August 2024 - Refined with architectural decisions
+### Non‑Goals
+- Building a complex multi‑agent system.
+- Implementing custom retrievers beyond Mycelian’s `/v0/search` and Weaviate‑native hybrid search.
+- Serving as a production agent runtime; this is a benchmark harness.
 
-## Problem Statement
+---
 
-The current benchmarker (`tools/benchmarker/`) has significant complexity:
+## Architecture
 
-- **SessionSimulator**: 2000+ lines managing conversation state, tool dispatch, bootstrap sequences
-- **Custom state tracking**: Manual flags for bootstrap completion (`_boot_seen_get_context`, `_boot_seen_list_entries`)
-- **Complex message routing**: Prefix-based routing (`benchmark_conversation:speaker_1`, `control:test_harness`)
-- **Manual tool orchestration**: Direct Anthropic API calls with custom tool dispatch logic
+### Fit with Mycelian (001)
+- **Data plane**: Agent writes per‑turn `entries` (raw text + concise summary) and persists `context` snapshots opportunistically. Both are durable, append‑only logs.
+- **Retrieval**: New sessions reconstruct working context by loading the latest context and searching for top‑K entries. Hybrids blend BM25 and embeddings via alpha.
+- **Observability**: Benchmark logs every decision (what was written, when persisted, how retrieved), timing each step.
 
-LangGraph's native MCP support offers a cleaner alternative by handling state management, tool routing, and agent orchestration automatically.
+### Interfaces
+- **MCP tools (preferred path)** via `mycelian-mcp-server`:
+  - `create_vault`, `list_vaults`
+  - `create_memory_in_vault`, `get_memory`
+  - `add_entry`, `list_entries`, `get_entry`
+  - `put_context`, `get_context`
+  - `await_consistency`
+  - `search_memories` (returns entries + latestContext)
+- **HTTP** (optional, for richer search payload):
+  - `POST /v0/search` returns `{ entries, latestContext, bestContext, timestamps }`. Alpha is service‑wide (see below).
+- Keep exactly one authoritative `memory-service` instance. See Operational Notes.
 
-## LongMemEval Requirements
+## Configuration (TOML)
 
-Based on analysis of the LongMemEval benchmark:
+Runs are controlled by a single TOML file passed to the CLI. Credentials are not stored in the file; they come from environment variables (e.g., `OPENAI_API_KEY`, AWS default chain for Bedrock).
 
-### Dataset Characteristics
-- **500 evaluation questions** testing 5 core memory abilities
-- **Standard OpenAI format**: `{"role": "user/assistant", "content": "...", "has_answer": true}`
-- **Three variants**: LongMemEval_S (~115k tokens), LongMemEval_M (~500 sessions), Oracle (evidence-only)
-- **Session-based structure**: Multiple conversation sessions with temporal ordering
+### Minimal schema
 
-### Evaluation Pipeline
-1. **Ingestion Phase**: Process haystack sessions to build memory
-2. **Question Phase**: Ask questions requiring cross-session recall
-3. **Evaluation Phase**: Compare responses against expected answers using GPT-4o judge
+```toml
+# Required: path to local clone of the LongMemEval repo
+dataset_repo_path = "/path/to/LongMemEval"
 
-### Memory Abilities Tested
-- Information Extraction
-- Multi-Session Reasoning  
-- Knowledge Updates
-- Temporal Reasoning
-- Abstention (identifying unanswerable questions)
+# Required: vault selection (prefer titles for portability)
+vault_title = "longmemeval"   # if absent, use vault_id
+# vault_id = "..."            # optional explicit UUID; overrides vault_title when provided
 
-## LangGraph Architecture Design
+# Optional: user-supplied run identifier; if omitted the runner auto-generates one
+# run_id = "2025-08-28_a"
 
-The memory agent builds its own independent context of the session without any lossy summarization. It uses this accumulated context to generate rich turn-by-turn summaries that are stored along with the evolving context. For this test we will be storing all turns in the memory but in-practice users can control what they want to persist based on their target precision and recall requirements.
+[provider]
+type = "openai"               # "openai" | "bedrock"
 
-## High Level Design
+[provider.openai]
+# Credentials via env: OPENAI_API_KEY
+base_url = "https://api.openai.com/v1"   # optional override
 
-The proposed architecture uses a single end-to-end LangGraph workflow that orchestrates three specialized sub-workflow nodes: Ingestion, QA, and Evaluation. Each node delegates specific operations to either stateless processing components or stateful LangGraph agents. 
+[provider.bedrock]
+# Credentials via standard AWS chain (env/profile/role). No secrets in file.
+region = "us-west-2"
 
-### Key Architectural Decisions
+[models]
+# Role-specific models; names must match the selected provider
+# OpenAI example:
+agent = "gpt-4o-mini"
+qa    = "gpt-4o-mini"
+# Bedrock example (Claude Haiku):
+# agent = "anthropic.claude-3-haiku-20240307"
+# qa    = "anthropic.claude-3-haiku-20240307"
+# Use an LLM judge by default; set to an explicit model for your provider
+eval  = "gpt-4o-mini"
 
-1. **Memory Agent Lifecycle**: A new Memory Agent instance is created **per session** (not per conversation). This mirrors production usage where agents don't persist indefinitely. Cross-session continuity is provided by Mycelian Memory through the bootstrap protocol.
+[params]
+# Keep defaults simple
+top_k = 10
+use_llm_judge = true
+# Prevent runaway tool loops; if exceeded, the harness marks the turn failed and continues
+max_tool_calls_per_turn = 5
 
-2. **Prompt Loading**: Context rules and prompts are **pre-loaded once** during Memory Agent initialization and embedded in the system prompt, avoiding repeated tool calls per turn.
-
-3. **Communication Pattern**: Memory Agent is wrapped in a dedicated LangGraph Node for better observability, error handling, and state management.
-
-4. **Vault Organization**: One vault per host/environment (e.g., "sam-macbook-longmemeval-vault"), reused across all benchmark runs on that host.
-
-5. **Error Handling**: Retry with exponential backoff for transient failures, with special handling for Bedrock throttling.
-
-6. **QA Strategy**: Single `search_memories()` call returns both relevant entries and context shards, eliminating multiple tool calls.
-
-The **Mycelian Memory Agent** follows an observer pattern - it's a stateful LangGraph Agent that maintains session awareness within its session, observing conversations like an independent note-taker and building high-quality memories using the exact protocol encoded in `@client/prompts/system/context_summary_rules.md`. The **Conversation Processor** is a stateful orchestrator that manages Memory Agent lifecycle, creating a new instance for each session. This design eliminates the complex state management and tool dispatch logic of the current 2000+ line SessionSimulator, replacing it with LangGraph's native orchestration capabilities. 
-### Core Components
-
-#### Individual Workflow Components
-
- **Color Legend**
-
-- 🔵 **LangGraph Nodes** (Light Blue): Stateless processing components
-- 🟣 **LangGraph Agents** (Purple): Stateful conversation components  
-- 🟢 **External Components** (Green): Data sources, services, outputs
-- 🔄🔍📊 **LangGraph Workflows** (Subgraphs): Complete workflow orchestration
-
-##### 1. Ingestion Workflow
-```mermaid
-graph TD
-    A[Haystack Sessions] --> B[Conversation Processor Node]
-    B --> C[Mycelian Memory Agent]
-    C --> D[MCP Server]
-    D --> E[Memory Stored]
-    
-    subgraph W1["🔄 Ingestion Workflow (LangGraph)"]
-        B
-    end
-    
-    classDef node fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
-    classDef agent fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef external fill:#f1f8e9,stroke:#388e3c,stroke-width:2px,color:#000
-    
-    class B node
-    class C agent
-    class A,D,E external
+# Memory naming convention per conversation (one LME question = one conversation)
+# Placeholders: {question_id}, {run_id}
+memory_title_template = "{question_id}__{run_id}"
 ```
 
-##### 2. QA Workflow  
-```mermaid
-graph TD
-    A[Question] --> B[QA Node]
-    B --> C[QA Agent]
-    C --> D[MCP Server]
-    D --> E[Memory Retrieval]
-    E --> C
-    C --> F[Answer]
-    
-    subgraph W2["🔍 QA Workflow (LangGraph)"]
-        B
-        C
-    end
-    
-    classDef node fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
-    classDef agent fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef external fill:#f1f8e9,stroke:#388e3c,stroke-width:2px,color:#000
-    
-    class B node
-    class C agent
-    class A,D,E,F external
-```
+### Semantics
+- Vault: If `vault_id` is provided, use it. Otherwise, ensure a vault with `vault_title` exists (create when missing).
+- Conversation mapping: One LongMemEval question maps to one Mycelian memory (which may span many sessions). The memory title is rendered using `memory_title_template`.
+- Defaults: Keep retrieval on service defaults (alpha from `SEARCH_ALPHA`) and `top_k=10`. Use an LLM judge when `models.eval` is set; otherwise fall back to EM.
+- Providers:
+  - OpenAI: use `OPENAI_API_KEY` and optional `base_url`.
+  - Bedrock: resolve credentials via AWS default chain; `region` required. Model IDs must be valid Bedrock model identifiers.
+- CLI: The CLI accepts only the path to the TOML file and derives all behavior from it.
 
-##### 3. Evaluation Workflow
-```mermaid
-graph TD
-    A[Answer] --> B[Evaluation Node]
-    C[Expected Answer] --> B
-    B --> D[GPT-4o Judge]
-    D --> E[Evaluation Score]
-    
-    subgraph W3["📊 Evaluation Workflow (LangGraph)"]
-        B
-    end
-    
-    classDef node fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
-    classDef agent fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef external fill:#f1f8e9,stroke:#388e3c,stroke-width:2px,color:#000
-    
-    class B node
-    class A,C,D,E external
-```
+### CLI contract (high-level)
+- Invocation: `mycelian-longmemeval run /path/to/run.toml`
+- The runner reads the TOML, prepares the provider clients, sets up the vault, and executes the pipeline. No other CLI flags are required for a normal run.
+- A minimal test config is provided at `tools/longmemeval-benchmarker/config.test.toml` (edit paths/models as needed).
 
+---
 
-##### 4. End-to-End LangGraph Workflow
-```mermaid
-graph TD
-    A[LongMemEval Dataset] --> B[Setup Memory Node]
-    B --> C[Ingestion Sub-Workflow Node]
-    C --> D[QA Sub-Workflow Node] 
-    D --> E[Evaluation Sub-Workflow Node]
-    E --> F[Results Aggregation Node]
-    F --> G[Benchmark Results]
-    
-    subgraph MW["🎯 End-to-End LangMemEval Workflow"]
-        B
-        C
-        D
-        E
-        F
-    end
-    
-    H["🔄 Ingestion Details:<br/>Conversation Processor<br/>→ Mycelian Memory Agent"]
-    I["🔍 QA Details:<br/>QA Node<br/>→ QA Agent"]
-    J["📊 Evaluation Details:<br/>Evaluation Node<br/>→ GPT-4o Judge"]
-    
-    C -.-> H
-    D -.-> I
-    E -.-> J
-    
-    classDef node fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
-    classDef external fill:#f1f8e9,stroke:#388e3c,stroke-width:2px,color:#000
-    classDef detail fill:#fafafa,stroke:#757575,stroke-width:1px,color:#000
-    
-    class B,C,D,E,F node
-    class A,G external
-    class H,I,J detail
-```
+## Graph Design (LangGraph)
 
-## Implementation Details 
+### Simplicity first
+- One setup step: create/get vault and create one memory per LME question.
+- One tool‑enabled agent node (prebuilt LangGraph agent) that calls MCP tools directly.
+- QA is a simple LLM call (no second agent); evaluation uses EM or an LLM judge.
 
-Following is the implementation ideas as of 08-26-2025. The developed langGraph based benchmarker code should be treated as source of truth. 
-### 1. Mycelian Memory Agent
+### Agent node behavior (agentic, not a fixed state‑machine)
+At each turn, the agent acts as an observer of a conversation between a User and an AI Assistant, tasked with recording accurate, high‑fidelity memories for this conversation. It:
+- Bootstraps every new session by fetching `latestContext` and/or issuing a quick search for priming.
+- Decides whether to `add_entry` with concise `summary`, or skip if content is phatic/redundant.
+- Decides when to `put_context` based on semantic delta, topic boundary, elapsed time, or size thresholds.
+- Uses `await_consistency` after bursts of writes to ensure strong read‑after‑write for subsequent reads.
 
-**Design Philosophy**: Observer agent that receives conversation turns and builds high-quality memories following the exact protocol in `@client/prompts/system/context_summary_rules.md`. Created fresh for each session with prompts pre-loaded.
+All policies are prompt‑ and budget‑driven; no rigid orchestration branching required.
+
+### Run modes
+- ingestion: stream sessions/messages to the agent to persist entries/context only
+- qa: run retrieval + answer only (assumes prior ingestion exists)
+- eval: compute metrics (EM or LLM judge) on stored answers
+
+---
+
+## Orchestration
+
+### Who runs what
+- The CLI runner (`mycelian-longmemeval`) orchestrates all phases. The agent only decides captures (tool calls) during ingestion. QA (answering) and Eval (scoring) are runner‑driven LLM calls.
+
+### Execution order
+- Default (simple): per‑question end‑to‑end
+  1) Create memory for the question
+  2) Ingest all its sessions (reset agent between sessions)
+  3) Run retrieval + QA for that question
+  4) Evaluate (EM or LLM judge) and write results
+
+### Components and responsibilities
+- Dataset loader: reads LongMemEval from `dataset_repo_path`, yields
+  `question → sessions → messages` for streaming.
+- Graph builder: constructs the prebuilt LangGraph agent (dynamic system prompt, MCP tools). Stateless per session.
+- Runner/controller: reads TOML, selects run mode, creates vault/memory names, streams messages to the agent (reset between sessions), enforces caps (`max_tool_calls_per_turn`), calls `await_consistency` as needed, runs `search_memories` + QA model, invokes the judge if configured, and writes JSONL results.
+
+### Separation of code
+- Keep these as small modules under `tools/longmemeval-benchmarker/`:
+  - `dataset_loader.py` – parsing/splitting into question/session/message
+  - `graph.py` (or `agent.py`) – builds the LangGraph agent
+  - `runner.py` – orchestrates phases per TOML (`mode` or `phases`), holds main loop
+  One CLI entrypoint imports these modules and coordinates them.
+
+### State passing
+- Maintain a map `{question_id → memory_id}` during a run to reuse memories across QA/Eval.
+- Memory titles follow `memory_title_template` and include `run_id` for isolation.
+
+### Concurrency (optional)
+- Default serial execution for reproducibility. Add an optional `concurrency` setting to process multiple questions in parallel with rate limits.
+
+---
+
+## Agent State Management
+
+This harness follows the proven pattern from `tools/benchmarker/` where the LLM is a tool‑enabled agent that maintains its own working state per turn, while durable memory is entrusted to Mycelian.
+
+### Principles
+- Use a dynamic prompt per LangGraph’s prebuilt agent pattern to insert system instructions.
+- Single system prompt: load governance + chat prompts once; do not append them to rolling chat history.
+- Full rolling transcript: each turn includes prior user/assistant messages from the dataset to maintain fidelity.
+- Session resets: orchestrator resets the agent between sessions within the same conversation so it bootstraps via Mycelian (`get_context`/`list_entries`) from prior sessions.
+- Tool‑first bootstrap: `get_context()` then `list_entries(limit=10)` before the first dataset turn.
+- Agentic persistence: `add_entry` with concise summary; `put_context` on semantic deltas; `await_consistency` after bursts.
+
+### Ephemeral state (in‑graph)
+- `history`: prior dataset turns (user/assistant). Excludes system.
+- `message_counter`: used to enforce simple cadence (e.g., flush after ≈6 stored messages).
+
+### Durable state (in Mycelian)
+- `entries`: append‑only raw + summary records per turn with trace tags `{run_id, dataset_id, question_id, turn_index}`.
+- `contexts`: periodic snapshots persisted by the agent according to policy.
+
+### Turn loop
+1) Receive the next dataset message (a single user or assistant utterance) from the LongMemEval loader; append to `history`.
+2) Call the model with: `system` (static prompts loaded at agent construction) + `messages` (full `history`) + `tools` (MCP schema).
+3) Execute any tool calls emitted by the model in order (e.g., `get_context`, `add_entry`, `await_consistency`, `put_context`).
+4) Record timings and decisions; update ephemeral counters and `last_context_*`.
+
+### Replay and determinism
+- Fix temperatures/seeds; log tool calls and emitted outputs.
+- Replay mode can consume `decision_log` to bypass live policy and isolate retrieval.
+
+### Provider differences
+- Anthropic/OpenAI/Bedrock adapters normalize to a `messages.create`‑like API that supports `system`, `messages`, `tools`.
+- Bedrock Anthropic models are invoked via an adapter that maps request/response blocks to the agent’s expectations (see `tools/benchmarker/model_provider.py`).
+
+---
+
+## LangGraph Agent Wiring (prebuilt)
+
+Use LangGraph’s prebuilt agent with a dynamic prompt. Keep it stateless per session (no checkpointer) and reset between sessions. For reference on dynamic prompts and memory configuration, see the LangGraph prebuilt agent guide ([LangGraph guide](https://langchain-ai.github.io/langgraph/agents/agents/#5-add-memory)).
+
+- Provide a `prompt(state, config)` function: return one system message (rules + chat prompts) plus `state["messages"]` (rolling transcript). Do not duplicate system content in the transcript.
+- Register Mycelian tools (MCP wrappers) with the agent: `add_entry`, `put_context`, `get_context`, `list_entries`, `await_consistency`, `search_memories`.
+
+Minimal sketch (illustrative):
 
 ```python
-async def create_memory_agent(vault_id: str, memory_id: str, mcp_client):
-    """Create a Memory Agent with pre-loaded prompts for a session."""
-    
-    # Fetch prompts ONCE during initialization
-    prompts_data = await mcp_client.call_tool(
-        "get_default_prompts", 
-        {"memory_type": "chat"}
-    )
-    
-    # Get MCP tools
-    memory_tools = await mcp_client.get_tools()
-    
-    # Build system prompt with pre-loaded rules
-    system_prompt = f"""You are the Mycelian Memory Agent.
+from langgraph.prebuilt import create_react_agent
+from langchain.chat_models import init_chat_model
 
-Here are the context_summary_rules you must follow:
-{prompts_data['context_summary_rules']}
+def build_system() -> str:
+  # Load once: context_summary_rules + chat prompts (entry_capture, summary, context)
+  return load_rules_and_prompts()
 
-Context Template:
-{prompts_data['templates']['context_prompt']}
+def prompt(state, config):
+  return [{"role": "system", "content": build_system()}] + state["messages"]
 
-Entry Capture Rules:
-{prompts_data['templates']['entry_capture_prompt']}
+agent = create_react_agent(
+  model=init_chat_model(provider_model_id, temperature=0),
+  tools=[add_entry, put_context, get_context, list_entries, await_consistency, search_memories],
+  prompt=prompt,
+)
 
-Vault ID: {vault_id}
-Memory ID: {memory_id}
-
-You will receive conversation turns in the format:
-"Observe this turn: <role>: <content>"
-
-Process each turn according to the rules above."""
-
-    # Create prompt function with embedded rules
-    def prompt(state):
-        return [{"role": "system", "content": system_prompt}] + state["messages"]
-    
-    return create_react_agent(
-        model="gpt-4o-mini-2024-07-18",
-        tools=memory_tools,
-        prompt=prompt  # Rules pre-loaded, no runtime fetching needed
-    )
+# Per session within a conversation, stream messages turn-by-turn (reset agent between sessions)
+for msg in session_messages:
+  agent.invoke({"messages": [msg]})
 ```
 
-### 2. End-to-End Workflow Implementation
+This keeps the agent fully agentic (deciding when to write/persist) while avoiding custom orchestration. Short‑term chat state lives in the agent process per session; Mycelian remains the durable store for entries and contexts.
 
-```python
-from langgraph.graph import StateGraph
-from typing import TypedDict, List
+---
 
-# End-to-end benchmark state containing all necessary data
-class LongMemEvalState(TypedDict):
-    # Input data
-    conversation_id: str
-    haystack_sessions: List[List[dict]]
-    question: str
-    expected_answer: str
-    
-    # Workflow management
-    run_id: str  # Generated at workflow level
-    vault_id: str  # Set by setup node
-    memory_id: str  # Set by setup node
-    mcp_client: Any  # MCP client instance
-    
-    # Intermediate results
-    ingestion_complete: bool
-    qa_response: str
-    
-    # Final results
-    evaluation_score: float
-    benchmark_results: dict
-    error: Optional[str]  # Error tracking
+## Minimal Flow
+1. Setup vault (by title) and create one memory per LongMemEval question using `memory_title_template`.
+2. Agent ingest: for each conversation → for each session → stream each message to the agent (reset agent between sessions). The agent uses a dynamic system prompt (rules + chat prompts) and tools `get_context`, `list_entries`, `add_entry`, `put_context`, `await_consistency`.
+3. Retrieval+QA: call `search_memories(top_k)`; build a compact context and answer with the QA model.
+4. Metric: default to EM. Enable LLM judge only if `models.eval` is set.
 
-def create_longmemeval_end_to_end_workflow():
-    workflow = StateGraph(LongMemEvalState)
-    
-    # End-to-end workflow nodes
-    workflow.add_node("setup", setup_memory_node)
-    workflow.add_node("ingestion", ingestion_sub_workflow_node)
-    workflow.add_node("qa", qa_sub_workflow_node)
-    workflow.add_node("evaluation", evaluation_sub_workflow_node)
-    workflow.add_node("results", results_aggregation_node)
-    
-    # Sequential flow
-    workflow.add_edge("setup", "ingestion")
-    workflow.add_edge("ingestion", "qa")
-    workflow.add_edge("qa", "evaluation") 
-    workflow.add_edge("evaluation", "results")
-    
-    workflow.set_entry_point("setup")
-    workflow.set_finish_point("results")
-    
-    return workflow.compile()
+---
 
-# Sub-workflow node implementations
-async def ingestion_sub_workflow_node(state: LongMemEvalState):
-    """Calls the ingestion sub-workflow"""
-    await conversation_processor_node(state)
-    state["ingestion_complete"] = True
-    return state
+## Operational Notes
 
-async def qa_sub_workflow_node(state: LongMemEvalState):
-    """Calls the QA sub-workflow"""
-    updated_state = await qa_agent_node(state)
-    state["qa_response"] = updated_state["response"]
-    return state
+- Use the provided Make targets for a single authoritative local stack:
+  - `make start-dev-mycelian-server` (starts Postgres/backend dependencies)
+  - `make start-mcp-streamable-server` (builds and runs the MCP server container)
+  - `make wait-backend-health` (waits for `/v0/health` to report healthy)
+  - Avoid host‑level debug binaries that create duplicate endpoints.
+- `mycelian-mcp-server` should point at `MEMORY_SERVICE_URL` (default `http://localhost:11545`).
+- To change hybrid alpha used by `/v0/search`, set `SEARCH_ALPHA` in the server’s environment.
+- Prefer `search_memories` via MCP; call `/v0/search` directly only if you need `bestContext` in the response.
 
-async def evaluation_sub_workflow_node(state: LongMemEvalState):
-    """Calls the evaluation sub-workflow"""
-    score = await evaluation_node(state)
-    state["evaluation_score"] = score
-    return state
-
-# Workflow orchestration
-async def run_longmemeval_benchmark(dataset, config):
-    """Process each LongMemEval conversation through end-to-end workflow"""
-    import uuid
-    from langchain_mcp_adapters.client import MultiServerMCPClient
-    
-    # Generate run_id once for entire benchmark
-    run_id = str(uuid.uuid4())[:8]
-    
-    # Initialize MCP client once
-    mcp_client = MultiServerMCPClient({
-        "mycelian": {
-            "url": config.mcp_url,
-            "transport": config.mcp_transport
-        }
-    })
-    
-    end_to_end_workflow = create_longmemeval_end_to_end_workflow()
-    results = []
-    
-    for conversation in dataset:
-        result = await end_to_end_workflow.ainvoke({
-            "conversation_id": conversation["question_id"],
-            "haystack_sessions": conversation["haystack_sessions"],
-            "question": conversation["question"],
-            "expected_answer": conversation["answer"],
-            "run_id": run_id,  # Same for all conversations
-            "mcp_client": mcp_client,
-            "vault_id": "",  # Will be set by setup node
-            "memory_id": "",  # Will be set by setup node
-            "ingestion_complete": False,
-            "qa_response": "",
-            "evaluation_score": 0.0,
-            "benchmark_results": {},
-            "error": None
-        })
-        results.append(result["benchmark_results"])
-    
-    return aggregate_benchmark_results(results)
-```
-
-### 3. Conversation Processor Node (Stateful Orchestrator)
-
-```python
-async def conversation_processor_node(state: LongMemEvalState):
-    """Stateful orchestrator that manages Memory Agent lifecycle per session."""
-    
-    vault_id = state["vault_id"]
-    memory_id = state["memory_id"]
-    mcp_client = state["mcp_client"]
-    
-    # Process each session with a fresh Memory Agent
-    for session_idx, session in enumerate(state["haystack_sessions"]):
-        # Create new Memory Agent for THIS session
-        memory_agent = await create_memory_agent(vault_id, memory_id, mcp_client)
-        
-        # Memory Agent bootstraps from Mycelian (get_context, list_entries)
-        # This provides continuity from previous sessions
-        
-        # Process all turns in this session
-        for turn in session:
-            turn_message = f"Observe this turn: {turn['role']}: {turn['content']}"
-            
-            # Delegate to Memory Agent Node for error handling
-            await memory_agent_node({
-                "agent": memory_agent,
-                "message": turn_message,
-                "session_idx": session_idx
-            })
-        
-        # Finalize session - ensure context is persisted
-        await memory_agent_node({
-            "agent": memory_agent,
-            "message": f"End of session {session_idx + 1}. Finalize memory.",
-            "finalize": True
-        })
-        
-        # Memory Agent instance is discarded
-        # Next session gets fresh agent that bootstraps from updated memory
-    
-    state["ingestion_complete"] = True
-    return state
-
-async def memory_agent_node(agent_state):
-    """Wrapper node for Memory Agent with error handling."""
-    max_retries = 3
-    backoff = 1.0
-    
-    for attempt in range(max_retries):
-        try:
-            response = await agent_state["agent"].ainvoke({
-                "messages": [{"role": "user", "content": agent_state["message"]}]
-            }, config={"recursion_limit": 100})
-            
-            agent_state["response"] = response
-            return agent_state
-            
-        except ThrottlingException as e:
-            if attempt == max_retries - 1:
-                agent_state["error"] = f"Throttled after {max_retries} attempts"
-                return agent_state
-            
-            # Bedrock needs longer backoff
-            wait_time = backoff * (2 if "bedrock" in str(e) else 1)
-            await asyncio.sleep(wait_time)
-            backoff *= 2
-        except RecursionLimitError:
-            # Try once with higher limit
-            if attempt == 0:
-                config["recursion_limit"] = 150
-            else:
-                raise
-```
-
-
-### 4. Evaluation Node
-
-```python
-async def evaluation_node(state: LongMemEvalState):
-    """Use GPT-4o judge to evaluate QA response against expected answer"""
-    
-    # Create evaluation client
-    evaluation_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-    
-    # Get evaluation prompt from LongMemEval's evaluate_qa.py logic
-    question_type = determine_question_type(state["question"])
-    abstention = "_abs" in state["conversation_id"]
-    
-    eval_prompt = get_anscheck_prompt(
-        task=question_type,
-        question=state["question"],
-        answer=state["expected_answer"], 
-        response=state["qa_response"],
-        abstention=abstention
-    )
-    
-    # Call GPT-4o judge
-    completion = evaluation_client.chat.completions.create(
-        model="gpt-4o-2024-08-06",
-        messages=[{"role": "user", "content": eval_prompt}],
-        temperature=0,
-        max_tokens=10
-    )
-    
-    eval_response = completion.choices[0].message.content.strip()
-    score = 1.0 if 'yes' in eval_response.lower() else 0.0
-    
-    state["evaluation_score"] = score
-    return state
-```
-
-### 5. Setup and Results Nodes
-
-```python
-async def setup_memory_node(state: LongMemEvalState):
-    """Initialize vault and memory for the conversation."""
-    import socket
-    
-    # Get or create vault per host/environment
-    hostname = socket.gethostname()
-    vault_name = f"{hostname}-longmemeval-vault"
-    
-    # Use get-or-create pattern for idempotency
-    vault_id = await create_or_get_vault(vault_name)
-    
-    # Generate run_id at workflow level (passed in state)
-    run_id = state["run_id"]  
-    
-    # Create memory for this conversation + run
-    memory_title = f"conv-{state['conversation_id']}-run-{run_id}"
-    memory_id = await create_memory(
-        vault_id=vault_id,
-        title=memory_title,
-        memory_type="chat"
-    )
-    
-    state["vault_id"] = vault_id
-    state["memory_id"] = memory_id
-    return state
-
-async def results_aggregation_node(state: LongMemEvalState):
-    """Aggregate final benchmark results."""
-    state["benchmark_results"] = {
-        "conversation_id": state["conversation_id"],
-        "run_id": state["run_id"],
-        "question_type": determine_question_type(state["question"]),
-        "score": state["evaluation_score"],
-        "qa_response": state["qa_response"],
-        "expected_answer": state["expected_answer"],
-        "memory_id": state["memory_id"]
-    }
-    return state
-```
-
-### 6. QA Agent Node (Simplified)
-
-```python
-async def qa_agent_node(state: LongMemEvalState):
-    """QA agent uses search_memories() to answer questions efficiently."""
-    
-    # Create QA agent with simplified approach
-    qa_agent = create_react_agent(
-        model="gpt-4o-2024-08-06",  # High-capability model for reasoning
-        tools=await state["mcp_client"].get_tools(),
-        system="""
-        You are a question answering agent. Use stored memories to answer questions.
-        
-        To answer a question:
-        1. Call search_memories() with the question - this returns:
-           - Relevant entries (ranked by similarity)
-           - Best matching context shard
-           - Latest context
-        2. Form your answer based on the search results
-        3. If insufficient information found, clearly state "I don't have enough information to answer this question"
-        
-        Be precise and only use information from the search results.
-        """
-    )
-    
-    qa_message = f"""
-    Answer this question using stored memories:
-    {state['question']}
-    
-    Memory ID: {state['memory_id']}
-    Vault ID: {state['vault_id']}
-    """
-    
-    try:
-        response = await qa_agent.ainvoke({
-            "messages": [{"role": "user", "content": qa_message}]
-        }, config={"recursion_limit": 50})  # Lower limit for QA
-        
-        # Extract the final answer
-        state["qa_response"] = response["messages"][-1]["content"]
-    except Exception as e:
-        # Handle search failures gracefully
-        state["qa_response"] = f"Error during search: {str(e)}"
-        state["error"] = str(e)
-    
-    return state
-```
+---
 
 
