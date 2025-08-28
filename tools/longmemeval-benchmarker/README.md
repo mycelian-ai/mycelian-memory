@@ -16,34 +16,45 @@ A clean, bottom-up integration of LongMemEval benchmarking with Mycelian Memory.
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -e .
+# Install deps
+pip install -r requirements.txt
 
-# Set environment variables
-export OPENAI_API_KEY="your-key-here"
+# Environment
+export OPENAI_API_KEY="your-openai-key"          # for provider=openai
+export AWS_REGION="us-west-2"                    # for provider=bedrock
 
-# Run a simple test (when implemented)
-python -m src.main --test
+# Create a config file (see config.example.toml)
+cp config.example.toml run.toml
+vi run.toml  # set dataset_repo_path, provider/models, vault_title
+
+# Run ingestion → qa → eval per-question (default)
+python -m longmemeval_benchmarker.runner run.toml
+
+# Or run a single phase
+python -m longmemeval_benchmarker.runner run.toml --mode ingestion
+python -m longmemeval_benchmarker.runner run.toml --mode qa
+python -m longmemeval_benchmarker.runner run.toml --mode eval
 ```
 
 ## Project Structure
 
 ```
-longmemeval-integration/
-├── src/                    # Main implementation
-├── test/data/              # Test datasets
-├── docs/                   # Documentation
-├── requirements.txt        # Dependencies
-└── README.md              # This file
+tools/longmemeval-benchmarker/
+├── longmemeval_benchmarker/
+│   ├── dataset_loader.py     # question → sessions → messages
+│   ├── agent.py              # builds LangGraph prebuilt agent
+│   ├── runner.py             # orchestrates ingestion/qa/eval per TOML
+│   └── mcp_client.py         # MCP client wrappers (if needed)
+├── config.example.toml       # starter config
+├── requirements.txt          # deps
+└── README.md                 # this file
 ```
 
-## Next Steps
+## Modes
 
-1. **Create basic MCP client connection**
-2. **Implement single conversation processing**
-3. **Add memory building for one session**
-4. **Add question answering**
-5. **Add basic evaluation**
+- ingestion: stream sessions/messages to the agent to persist entries/context only
+- qa: run retrieval + answer only (assumes prior ingestion exists)
+- eval: compute metrics (EM or LLM judge) on stored answers
 
 ## Development
 
