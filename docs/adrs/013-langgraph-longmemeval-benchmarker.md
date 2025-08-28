@@ -1,8 +1,8 @@
 # ADR-013: LangGraph-Based LongMemEval Benchmarker
 
-**Status**: Accepted  
+**Status**: Superseded  
 **Date**: 2025-08-26  
-**Superseded by**: N/A
+**Superseded by**: ADR-015
 
 ## Context
 
