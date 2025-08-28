@@ -1,0 +1,16 @@
+# LongMemEval Integration - Minimal Dependencies
+
+# Core LangGraph
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-openai>=0.2.0
+
+# MCP Integration
+langchain-mcp-adapters>=0.1.0
+
+# Data processing
+pandas>=2.0.0
+
+# Development
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
