@@ -1,0 +1,36 @@
+# Minimal config for LongMemEval bench run
+
+dataset_repo_path = "/absolute/path/to/LongMemEval"   # required
+
+# Prefer titles for portability; runner will get-or-create
+vault_title = "longmemeval"
+# vault_id = "00000000-0000-0000-0000-000000000000"   # optional explicit override
+
+[provider]
+type = "openai"   # "openai" | "bedrock"
+
+[provider.openai]
+base_url = "https://api.openai.com/v1"   # uses OPENAI_API_KEY
+
+[provider.bedrock]
+region = "us-west-2"                      # uses standard AWS creds chain
+
+[models]
+# OpenAI defaults
+agent = "gpt-4o-mini"
+qa    = "gpt-4o-mini"
+eval  = "gpt-4o-mini"    # use EM if left empty
+
+# Bedrock examples (comment out above and uncomment below)
+# agent = "anthropic.claude-3-haiku-20240307"
+# qa    = "anthropic.claude-3-haiku-20240307"
+# eval  = "anthropic.claude-3-haiku-20240307"
+
+[params]
+top_k = 10
+use_llm_judge = true
+max_tool_calls_per_turn = 5
+
+# {question_id} and {run_id} placeholders supported
+memory_title_template = "{question_id}__{run_id}"
+
