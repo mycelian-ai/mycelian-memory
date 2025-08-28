@@ -86,16 +86,16 @@ For memory_type="chat", use prompts from `prompts/default/chat/` including:
   2. `entry_capture_prompt.md` - for entry persistence 
   3. `summary_prompt.md` - for summary generation
 
-## Appendix A – Worked Examples
+## Appendix A – Worked Examples (ILLUSTRATIVE ONLY)
+
+**IMPORTANT**: These examples demonstrate the workflow and format only. NEVER use the example content (like "Q3 launch date" or "customer-support agent"). Always use ACTUAL content from the conversation you are observing.
 
 #### Example A-1: New memory bootstrap
 
 ```text
-// BEFORE
-get_context()  →  "NEW MEMORY – init context"
-
-// AGENT ACTION
-put_context("I am a helpful customer-support agent. Ready to greet customer.")"
+// BEFORE: get_context() returns the default placeholder
+// AGENT ACTION: put_context() with actual conversation content
+// For example, if conversation is about Paris trip, context would include Paris facts
 ```
 
 ---
@@ -103,17 +103,9 @@ put_context("I am a helpful customer-support agent. Ready to greet customer.")"
 #### Example A-2: Raw entry → summary → context update
 
 ```text
-// NEW RAW MESSAGE
-USER: "Hi Sam, our Q3 launch date moved to 17 Aug 2025. Please update the tracker."
-
-// GENERATED SUMMARY  (≤ 512 chars)
-"User stated the Q3 launch date is rescheduled to 17 Aug 2025 and asked Sam to update the project tracker."
-
-// CONTEXT  (diff view)
---- before
-• 17 Aug 2025 – tentative Q3 launch
-+++ 
-• 17 Aug 2025 – **confirmed** Q3 launch date
---- after
+// This shows the PATTERN only. Use YOUR conversation's actual content:
+// When you see a NEW RAW MESSAGE like "Hi, I'm planning a trip to Paris"
+// You would generate a SUMMARY like "User is planning a trip to Paris"
+// And update CONTEXT with actual facts from that conversation
 ```
 
