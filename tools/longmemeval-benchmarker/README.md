@@ -28,7 +28,7 @@ cp config.example.toml run.toml
 vi run.toml  # set dataset_repo_path, provider/models, vault_title
 
 # Ingest the first N questions from the dataset and write hypotheses.jsonl
-python -m longmemeval_benchmarker.runner run.toml --num-questions 10
+PYTHONPATH=src python -m runner run.toml --num-questions 10
 
 # Evaluate with LongMemEval's official QA evaluator
 cd /Users/deesam/workspace/LongMemEval/src/evaluation
@@ -41,7 +41,7 @@ python3 evaluate_qa.py gpt-4o \
 
 ```
 tools/longmemeval-benchmarker/
-├── longmemeval_benchmarker/
+├── src/
 │   ├── dataset_loader.py     # question → sessions → messages
 │   ├── mycelian_memory_agent.py  # wraps MCP tools for ingestion/search
 │   ├── runner.py             # ingest N questions and write hypotheses.jsonl

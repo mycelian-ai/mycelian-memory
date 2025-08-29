@@ -3,15 +3,20 @@ import tempfile
 import textwrap
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
-from longmemeval_benchmarker.runner import main, parse_config, build_memory_title
+from runner import main, parse_config, build_memory_title
 
 
 def _toml_text(tmp_dataset_dir: str) -> str:
+    # Create a dummy dataset file
+    dataset_file = os.path.join(tmp_dataset_dir, "longmemeval_s.json")
+    with open(dataset_file, "w") as f:
+        f.write("[]")  # Empty dataset
+    
     return textwrap.dedent(
         f"""
-        dataset_repo_path = "{tmp_dataset_dir}"
+        dataset_file_path = "{dataset_file}"
         vault_title = "longmemeval"
         memory_title_template = "{{question_id}}__{{run_id}}"
         [provider]
@@ -19,10 +24,8 @@ def _toml_text(tmp_dataset_dir: str) -> str:
         [models]
         agent = "gpt-4o-mini"
         qa = "gpt-4o-mini"
-        eval = "gpt-4o-mini"
         [params]
         top_k = 10
-        use_llm_judge = true
         max_tool_calls_per_turn = 5
         """
     ).strip()

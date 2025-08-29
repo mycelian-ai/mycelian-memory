@@ -6,9 +6,9 @@ import pytest
 
 # Package path
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
-from longmemeval_benchmarker.dataset_loader import load_longmemeval
+from dataset_loader import load_longmemeval
 
 
 def test_load_raises_on_invalid_path():

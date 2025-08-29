@@ -5,8 +5,8 @@ import tomllib
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from .dataset_loader import load_longmemeval_file
-from .mycelian_memory_agent import build_agent
+from dataset_loader import load_longmemeval_file
+from mycelian_memory_agent import build_agent
 
 
 @dataclass
