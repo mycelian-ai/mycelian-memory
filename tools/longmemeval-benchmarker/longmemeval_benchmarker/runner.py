@@ -1,10 +1,13 @@
 import argparse
 import os
+import json
+from datetime import datetime, timezone
 import tomllib
 from dataclasses import dataclass
 from typing import Any, Dict
 
 from .dataset_loader import load_longmemeval
+from .mycelian_memory_agent import build_agent
 
 
 @dataclass
@@ -26,6 +29,7 @@ class ParamsConfig:
     top_k: int = 10
     use_llm_judge: bool = True
     max_tool_calls_per_turn: int = 5
+    debug: bool = False
 
 
 @dataclass
@@ -80,6 +84,7 @@ def parse_config(cfg: Dict[str, Any]) -> AppConfig:
         top_k=int(pr.get("top_k", 10)),
         use_llm_judge=bool(pr.get("use_llm_judge", True)),
         max_tool_calls_per_turn=int(pr.get("max_tool_calls_per_turn", 5)),
+        debug=bool(pr.get("debug", False)),
     )
 
     # Memory title template
@@ -117,6 +122,12 @@ def main() -> None:
         raw_cfg: dict[str, Any] = tomllib.load(f)
 
     cfg = parse_config(raw_cfg)
+    # LangSmith (optional): enable tracing when API key is present
+    if os.environ.get("LANGCHAIN_API_KEY"):
+        os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+        os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+        os.environ.setdefault("LANGCHAIN_PROJECT", f"longmemeval_{os.getpid()}_{int(cfg.run_id)}")
+        print(f"[trace] LangSmith enabled project={os.environ.get('LANGCHAIN_PROJECT')}")
     mode = args.mode or "end_to_end"
 
     print(
@@ -125,23 +136,73 @@ def main() -> None:
         f"top_k={cfg.params.top_k} run_id={cfg.run_id} mode={mode}"
     )
 
-    # Scaffold ingestion loop (no LangGraph yet)
+    agent = build_agent(
+        cfg.models.agent,
+        max_tool_calls_per_turn=cfg.params.max_tool_calls_per_turn,
+        provider_type=cfg.provider.type,
+    )
+    # Agent owns MCP tool usage. Runner only coordinates vault/memory binding.
+
+    # Ingestion
     if mode in ("ingestion", "end_to_end"):
         count_q = 0
+        total_turns = 0
+        total_tool_calls = 0
+        # Resolve vault once for the run via agent
+        vault_id = agent.ensure_vault(cfg.vault_title, cfg.vault_id)
         for q in load_longmemeval(cfg.dataset_repo_path):
             count_q += 1
-            mem_title = build_memory_title(cfg.memory_title_template, q.get("question_id", f"Q{count_q}"), cfg.run_id)
-            print(f"[ingest] question={q.get('question_id')} → memory_title={mem_title}")
+            qid = q.get("question_id", f"Q{count_q}")
+            mem_title = build_memory_title(cfg.memory_title_template, qid, cfg.run_id)
+            print(f"[ingest] question={qid} → memory_title={mem_title}")
+            # Ensure memory, bind to agent, then stream sessions (agent decides tool usage per prompts)
+            memory_id = agent.ensure_memory(vault_id, mem_title, memory_type="NOTES")
+            agent.bind_memory(vault_id, memory_id)
+            # Optional breadcrumb: write mapping for QA/Eval convenience
+            out_dir = os.path.join(os.path.dirname(__file__), "..", "out", f"run_{cfg.run_id}")
+            out_dir = os.path.normpath(out_dir)
+            os.makedirs(out_dir, exist_ok=True)
+            mapping_path = os.path.join(out_dir, "mapping.jsonl")
+            mapping = {
+                "question_id": qid,
+                "vault_id": vault_id,
+                "memory_id": memory_id,
+                "memory_title": mem_title,
+                "run_id": cfg.run_id,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
+            with open(mapping_path, "a", encoding="utf-8") as mf:
+                mf.write(json.dumps(mapping) + "\n")
             for s in q.get("sessions", []):
-                print(f"  [session] {s.get('session_id')}: {len(s.get('messages', []))} messages (stub)")
+                msgs = s.get("messages", [])
+                if cfg.params.debug:
+                    sid = s.get("session_id")
+                    print(f"[coord][session] {sid} turns={len(msgs)}")
+                    for idx, mm in enumerate(msgs, start=1):
+                        rc = mm.get("role")
+                        ct = mm.get("content", "")
+                        preview = ct[:120].replace("\n", " ") if isinstance(ct, str) else str(ct)[:120]
+                        print(f"[coord][turn] {idx} role={rc} len={len(ct) if isinstance(ct, str) else 'n/a'} preview={preview}")
+                turns, tool_calls = agent.run_session(msgs)
+                total_turns += turns
+                total_tool_calls += tool_calls
+                print(f"  [session] {s.get('session_id')} turns={turns} tool_calls={tool_calls}")
         if count_q == 0:
             print("[ingest] no questions found – ensure JSONL present in dataset_repo_path")
+        else:
+            print(f"[ingest] summary: questions={count_q} turns={total_turns} tool_calls={total_tool_calls}")
 
     if mode in ("qa", "end_to_end"):
         print("[qa] stub – will call search_memories and answer using QA model")
 
     if mode in ("eval", "end_to_end"):
         print("[eval] stub – will compute EM or LLM-judge and write JSONL")
+
+    # Best-effort cleanup
+    try:
+        agent.close()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

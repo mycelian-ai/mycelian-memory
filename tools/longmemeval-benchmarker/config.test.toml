@@ -1,0 +1,21 @@
+dataset_repo_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/test"
+vault_title = "longmemeval"
+
+[provider]
+type = "bedrock"
+
+[provider.bedrock]
+region = "us-west-2"
+
+[models]
+agent = "anthropic.claude-3-5-haiku-20241022-v1:0"
+qa    = "anthropic.claude-3-5-haiku-20241022-v1:0"
+eval  = "anthropic.claude-3-5-haiku-20241022-v1:0"
+
+[params]
+top_k = 10
+use_llm_judge = true
+max_tool_calls_per_turn = 5
+
+memory_title_template = "{question_id}__{run_id}"
+

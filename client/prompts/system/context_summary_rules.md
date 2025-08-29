@@ -27,12 +27,24 @@
    3. Update context from raw entry (merge/trim rules).
    4. Flush cadence – put_context is expensive: after you've stored ≈ 6 messages (user + assistant) with add_entry, **issue `await_consistency()` to ensure writes are durable, then call `put_context`**, and continue. Always repeat the sequence (`await_consistency` → `put_context`) once more just before exit.
 
-6. **Search guidance** – Only use `search_memories` when the incoming message contains:
-   • Contradictory information (updates/corrections to previous facts)
-   • References to specific past events ("as we discussed before", "like last time")
-   • Direct questions about memory content
-   • Information that may exist in older context shards (beyond current 5000-char limit)
-   For routine conversation turns, rely on current context and recent entries from bootstrap.
+6. **TOOL: search_memories (STRICT)**
+
+   • YOU MUST NOT call `search_memories` on assistant turns.
+   • YOU MUST call at most once per user turn.
+   • YOU MUST NOT search if the information is already in your current context, in the latest `list_entries(10)`, or was stated in THIS session.
+   • If your query equals or paraphrases the current user message and the answer is derivable from your working context, YOU MUST NOT call `search_memories`.
+   • If your working context already contains the answer, YOU MUST answer directly and MUST NOT call `search_memories`.
+   • If you already confirmed the fact in THIS session, YOU MUST answer directly and MUST NOT call `search_memories`.
+   • YOU MUST use `top_k=5` by default; increase ONLY if nothing relevant is found.
+   • YOU MUST NOT repeat a semantically similar query within the last 3 turns.
+   • YOU MAY search ONLY when:
+     – The user references prior discussion or specific past events, or
+     – The user asks about remembered facts, or
+     – There is a contradiction/update to a prior fact, or
+     – Needed facts likely sit beyond the 5,000‑char context window.
+   • QUERY STYLE: ≤8 tokens; include key entities/IDs/dates; avoid generic terms (e.g., NOT "sky color" if discussed this session).
+
+   For routine conversation turns, rely on current context and the recent entries from bootstrap.
 
 7. **Overflow Handling**
    1. Context ≤ 5 000 chars: Before writing: if new text would exceed the cap, delete the oldest low-value lines until the length is ≈ 4 800 chars. Keep core facts (participants, active tasks, decisions).
