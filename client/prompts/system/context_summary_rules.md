@@ -51,10 +51,14 @@
    2. Summary ≤ 512 chars: Trim sentences with little factual content (greetings, filler) first. Keep the lines that name entities, dates, numbers, or other data-rich details that boost vector search. Continue pruning until the text fits within 512 characters, then append "…" if any content was removed.
 
 8. **Session bootstrap**
-   1. You **MUST** call `get_context()` first. If the result is **exactly** the default placeholder string
+   1. You **MUST** call `get_context()` exactly once at the start of the session. If the result is **exactly** the default placeholder string
       `This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available.`
       (inserted automatically when a memory is created), treat it as empty and immediately call `put_context`. Otherwise, keep the returned string as your working context.
    2. Immediately afterwards you **MUST** call `list_entries(limit = 10)` and merge any facts that are missing from the working context **before** replying to the user.
+   3. Subsequent usage of `get_context`: YOU MUST NOT call `get_context` on every turn. After bootstrap, call it only when:
+      • immediately after `put_context` followed by `await_consistency`, to verify the write; or
+      • resuming a previously paused session; or
+      • explicitly instructed by the user to reload the context.
 
 ### State machines
 

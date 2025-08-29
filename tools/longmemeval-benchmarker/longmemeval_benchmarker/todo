@@ -35,5 +35,9 @@ Implementing langgraph_longmemeval_benchmarker.md design
 - [x] Strict search policy in prompts (MUST/NEVER) to reduce redundant searches
 - [x] Cleanup unused files from old path (mcp_store.py, bedrock_model.py)
 
+# Search/QA improvements
+- [x] Document `search_memories` now returns latestContext + bestContext (+ timestamps/scores)
+- [ ] Build QA context using latestContext, bestContext, and top‑K entries’ raw text
+
 
 

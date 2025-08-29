@@ -29,20 +29,33 @@ class MycelianMemoryAgent:
         # Memory binding (set per question)
         self._vault_id: Optional[str] = None
         self._memory_id: Optional[str] = None
+        # Batching state for context flushes (enforced in wrapper)
+        self._entries_since_flush: int = 0
+        try:
+            self._flush_threshold: int = int(os.environ.get("LME_PUT_CONTEXT_BATCH", "6"))
+        except Exception:
+            self._flush_threshold = 6
 
-        # Load default prompts (system guidance + templates) from MCP
+        # Load local rules file (no bootstrap) + MCP templates
         import asyncio as _asyncio
+        
+        # Read local rules file
+        local_rules_path = os.path.join(os.path.dirname(__file__), "context_summary_rules.md")
+        try:
+            with open(local_rules_path, "r", encoding="utf-8") as f:
+                rules = f.read()
+        except Exception:
+            rules = ""
 
         async def _get_prompts() -> Dict[str, Any]:
             try:
-                # MCP tool: get_default_prompts(memory_type)
+                # MCP tool: get_default_prompts(memory_type) - only for templates
                 res = await self._mcp.call_tool(self._server_name, "get_default_prompts", {"memory_type": "chat"})  # type: ignore[attr-defined]
                 return res or {}
             except Exception:
                 return {}
 
         prompts = _asyncio.run(_get_prompts())
-        rules = prompts.get("context_summary_rules") or ""
         templates = prompts.get("templates") or {}
         entry_capture_prompt = templates.get("entry_capture_prompt") or ""
         summary_prompt = templates.get("summary_prompt") or ""
@@ -73,8 +86,14 @@ class MycelianMemoryAgent:
             return await self._mcp.get_tools()  # type: ignore[attr-defined]
 
         self._base_tools = _asyncio_tools.run(_load_tools())
+        # Expose tools to the agent excluding get_context (bootstrap handled in Python)
+        self._agent_tools = [t for t in self._base_tools if getattr(t, "name", None) != "get_context"]
+        if self._debug:
+            filtered = [getattr(t, "name", "tool") for t in self._base_tools if getattr(t, "name", None) == "get_context"]
+            if filtered:
+                print(f"[agent] hiding tools from LLM: {filtered}")
         # Build logging-wrapped tools for observability (no behavior change)
-        self._tools_with_logging = [self._wrap_tool_with_logging(t) for t in self._base_tools]
+        self._tools_with_logging = [self._wrap_tool_with_logging(t) for t in self._agent_tools]
 
         # Defer agent construction until memory is bound
         self._llm = init_chat_model(self._model_id)
@@ -214,6 +233,55 @@ class MycelianMemoryAgent:
                     return mmid
         raise RuntimeError("create_memory_in_vault did not return an id and it was not found in list_memories")
 
+    def search_memories(self, memory_id: str, query: str, top_k: int = 10) -> Dict[str, Any]:
+        """Call MCP search_memories and normalize the response to a dict.
+
+        Expected fields include: entries, count, latestContext, contextTimestamp,
+        bestContext, bestContextTimestamp, bestContextScore.
+        """
+        args: Dict[str, Any] = {"memory_id": memory_id, "query": query, "top_k": int(top_k)}
+        out = self._call_tool("search_memories", args)
+        if isinstance(out, dict):
+            return out
+        # Attempt to parse JSON string
+        try:
+            import json as _json
+            return _json.loads(out) if isinstance(out, str) else {}
+        except Exception:
+            return {}
+
+    def _bootstrap_memory(self, vault_id: str, memory_id: str) -> str:
+        """Bootstrap memory by calling get_context and list_entries. Returns working context."""
+        # Step 1: Get context
+        context_result = self._call_tool("get_context", {"vault_id": vault_id, "memory_id": memory_id})
+        
+        # Handle different response formats
+        working_context = ""
+        if isinstance(context_result, dict):
+            working_context = context_result.get("activeContext") or context_result.get("context") or ""
+        elif isinstance(context_result, str):
+            working_context = context_result
+            
+        # Step 2: If placeholder, initialize empty context
+        placeholder = "This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."
+        if working_context.strip() == placeholder:
+            self._call_tool("put_context", {"vault_id": vault_id, "memory_id": memory_id, "content": ""})
+            self._call_tool("await_consistency", {"memory_id": memory_id})
+            working_context = ""
+            
+        # Step 3: Load recent entries
+        entries_result = self._call_tool("list_entries", {"vault_id": vault_id, "memory_id": memory_id, "limit": "10"})
+        entries = []
+        if isinstance(entries_result, dict):
+            entries = entries_result.get("entries", [])
+        elif isinstance(entries_result, list):
+            entries = entries_result
+            
+        if self._debug:
+            print(f"[bootstrap] context_len={len(working_context)} entries_count={len(entries)}")
+            
+        return working_context
+
     def bind_memory(self, vault_id: str, memory_id: str) -> None:
         from langgraph.prebuilt import create_react_agent  # type: ignore
         self._vault_id = vault_id
@@ -227,13 +295,8 @@ class MycelianMemoryAgent:
             + "\n"
             + f"If a tool requires a memory identifier (memory_id or memoryId), use '{memory_id}'."
             + "\n\n"
-            + "SESSION BOOTSTRAP – Before the first model response of each new session, you MUST strictly follow this sequence:"
-            + "\n1) Call get_context() immediately."
-            + "\n2) If it returns the exact default placeholder string:"
-            + "\n   'This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available.'"
-            + "\n   then immediately call put_context({}) to initialize an empty context."
-            + "\n3) Call list_entries(limit=10) and merge any missing facts into your working context BEFORE replying to the user."
-
+            + "IMPORTANT: Memory has been pre-initialized with current context and recent entries. "
+            + "Use your working context for decision making. Follow the tool usage rules strictly."
         )
 
         self._agent = create_react_agent(
@@ -243,18 +306,65 @@ class MycelianMemoryAgent:
         )
 
     def run_session(self, messages: List[Dict[str, str]]) -> Tuple[int, int]:
-        # Maintain rolling transcript externally per session; pass full history each turn
+        # Bootstrap memory once at session start
+        if self._vault_id and self._memory_id:
+            working_context = self._bootstrap_memory(self._vault_id, self._memory_id)
+        
+        # Process each message individually (not cumulative history)
         turns = 0
         tool_calls = 0
-        history: List[Dict[str, str]] = []
         for m in messages:
-            history.append(m)
             role = m.get("role")
             content = m.get("content", "")
-            print(f"[agent][turn] {turns+1} role={role} len(content)={len(content)}")
-            _ = self._agent.invoke({"messages": history})
+            
+            # Create turn-specific guidance
+            should_flush = self._entries_since_flush >= self._flush_threshold
+            is_final_turn = (turns + 1) == len(messages)
+            
+            if should_flush or is_final_turn:
+                flush_guidance = (
+                    f"\n\nTURN CONTEXT: entries_since_flush={self._entries_since_flush}, flush_threshold={self._flush_threshold}. "
+                    + f"YOU MUST call put_context after processing this message ({'threshold reached' if should_flush else 'final turn'})."
+                )
+            else:
+                flush_guidance = (
+                    f"\n\nTURN CONTEXT: entries_since_flush={self._entries_since_flush}, flush_threshold={self._flush_threshold}. "
+                    + f"DO NOT call put_context for this message (below threshold, not final turn)."
+                )
+            
+            # Create agent with turn-specific system prompt
+            from langgraph.prebuilt import create_react_agent  # type: ignore
+            turn_prompt = (
+                self._system_prompt
+                + "\n\n"
+                + f"For all MCP tool calls, use vault_id or vaultId = '{self._vault_id}'."
+                + "\n"
+                + f"If a tool requires a memory identifier (memory_id or memoryId), use '{self._memory_id}'."
+                + "\n\n"
+                + "IMPORTANT: Memory has been pre-initialized with current context and recent entries. "
+                + "Use your working context for decision making. Follow the tool usage rules strictly."
+                + flush_guidance
+            )
+            
+            turn_agent = create_react_agent(
+                model=self._llm,
+                tools=self._tools_with_logging,
+                prompt=turn_prompt,
+            )
+            
+            # Process only this single message, not cumulative history
+            print(f"[agent][turn] {turns+1} role={role} len(content)={len(content)} entries_since_flush={self._entries_since_flush}")
+            # When debug is enabled, also print the raw message content preview
+            if self._debug:
+                try:
+                    _preview = content if len(content) <= 500 else (content[:500] + "…")
+                    print(f"[agent][turn] {turns+1} RAW {role}: {_preview}")
+                except Exception:
+                    pass
+            _ = turn_agent.invoke({"messages": [m]})
             print(f"[agent][turn] {turns+1} -> completed")
             turns += 1
+        
         return turns, tool_calls
 
     def _wrap_tool_with_logging(self, tool: Any) -> Any:
@@ -273,11 +383,21 @@ class MycelianMemoryAgent:
             if self._debug:
                 print(f"[agent][tool] {name} args={prev}")
             try:
-                if hasattr(tool, "ainvoke"):
-                    res = await tool.ainvoke(kwargs)  # type: ignore[attr-defined]
+                # Track counters for batching guidance
+                if name == "add_entry":
+                    res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                    self._entries_since_flush += 1
+                elif name == "put_context":
+                    # Auto-call await_consistency before put_context for durability
+                    try:
+                        _ = await self._tool_by_name("await_consistency").ainvoke({"memory_id": self._memory_id})  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                    res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                    self._entries_since_flush = 0  # Reset counter after flush
                 else:
-                    # run sync in thread via run_in_executor not needed here; call directly
-                    res = tool.invoke(kwargs)
+                    res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                
                 if self._debug:
                     rp = str(res)
                     if len(rp) > 200:
@@ -296,11 +416,21 @@ class MycelianMemoryAgent:
             if self._debug:
                 print(f"[agent][tool] {name} (sync) args={prev}")
             try:
-                # MCP tools are async-only, so run them in an event loop
-                if hasattr(tool, "ainvoke"):
-                    res = asyncio.run(tool.ainvoke(kwargs))  # type: ignore[attr-defined]
+                # Track counters for batching guidance
+                if name == "add_entry":
+                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                    self._entries_since_flush += 1
+                elif name == "put_context":
+                    # Auto-call await_consistency before put_context for durability
+                    try:
+                        _ = asyncio.run(self._tool_by_name("await_consistency").ainvoke({"memory_id": self._memory_id}))  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                    self._entries_since_flush = 0  # Reset counter after flush
                 else:
-                    res = tool.invoke(kwargs)
+                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                
                 if self._debug:
                     rp = str(res)
                     if len(rp) > 200:

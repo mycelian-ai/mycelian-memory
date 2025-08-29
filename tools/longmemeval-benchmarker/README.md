@@ -13,7 +13,7 @@ A clean, bottom-up integration of LongMemEval benchmarking with Mycelian Memory.
 
 🚧 **Starting Fresh** - All previous complex code has been removed.
 
-## Quick Start
+## Quick Start (Simple Flow)
 
 ```bash
 # Install deps
@@ -27,13 +27,14 @@ export AWS_REGION="us-west-2"                    # for provider=bedrock
 cp config.example.toml run.toml
 vi run.toml  # set dataset_repo_path, provider/models, vault_title
 
-# Run ingestion → qa → eval per-question (default)
-python -m longmemeval_benchmarker.runner run.toml
+# Ingest the first N questions from the dataset and write hypotheses.jsonl
+python -m longmemeval_benchmarker.runner run.toml --num-questions 10
 
-# Or run a single phase
-python -m longmemeval_benchmarker.runner run.toml --mode ingestion
-python -m longmemeval_benchmarker.runner run.toml --mode qa
-python -m longmemeval_benchmarker.runner run.toml --mode eval
+# Evaluate with LongMemEval's official QA evaluator
+cd /Users/deesam/workspace/LongMemEval/src/evaluation
+python3 evaluate_qa.py gpt-4o \
+  /Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/out/run_<RUN_ID>/hypotheses.jsonl \
+  ../../data/longmemeval_oracle.json
 ```
 
 ## Project Structure
@@ -42,19 +43,21 @@ python -m longmemeval_benchmarker.runner run.toml --mode eval
 tools/longmemeval-benchmarker/
 ├── longmemeval_benchmarker/
 │   ├── dataset_loader.py     # question → sessions → messages
-│   ├── agent.py              # builds LangGraph prebuilt agent
-│   ├── runner.py             # orchestrates ingestion/qa/eval per TOML
-│   └── mcp_client.py         # MCP client wrappers (if needed)
+│   ├── mycelian_memory_agent.py  # wraps MCP tools for ingestion/search
+│   ├── runner.py             # ingest N questions and write hypotheses.jsonl
+│   └── eval.py               # (optional) local EM/judge helpers
 ├── config.example.toml       # starter config
 ├── requirements.txt          # deps
 └── README.md                 # this file
 ```
 
-## Modes
+## Flow
 
-- ingestion: stream sessions/messages to the agent to persist entries/context only
-- qa: run retrieval + answer only (assumes prior ingestion exists)
-- eval: compute metrics (EM or LLM judge) on stored answers
+- Single run: For each of the first N questions, the runner:
+  - Creates/binds a memory
+  - Streams all sessions/turns via MCP tools
+  - Searches memory, builds a compact QA context, calls the QA model
+  - Appends `{question_id, hypothesis}` to `out/run_<RUN_ID>/hypotheses.jsonl`
 
 ## Development
 
