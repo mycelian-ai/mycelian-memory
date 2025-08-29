@@ -51,12 +51,15 @@ func (sh *SearchHandler) handleSearch(ctx context.Context, req mcp.CallToolReque
 		return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil
 	}
 
-	// Build payload preserving LatestContext raw JSON.
+	// Build payload preserving raw JSON fields; use camelCase to match client/docs.
 	payload := map[string]interface{}{
-		"entries":           resp.Entries,
-		"count":             resp.Count,
-		"latest_context":    json.RawMessage(resp.LatestContext),
-		"context_timestamp": resp.ContextTimestamp,
+		"entries":              resp.Entries,
+		"count":                resp.Count,
+		"latestContext":        json.RawMessage(resp.LatestContext),
+		"contextTimestamp":     resp.ContextTimestamp,
+		"bestContext":          json.RawMessage(resp.BestContext),
+		"bestContextTimestamp": resp.BestContextTimestamp,
+		"bestContextScore":     resp.BestContextScore,
 	}
 	b, _ := json.MarshalIndent(payload, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil

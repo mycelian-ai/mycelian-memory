@@ -1,5 +1,5 @@
-dataset_repo_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/test"
-vault_title = "longmemeval"
+dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/out/longmemeval_5s.json"
+vault_title = "longmemeval-quick"
 
 [provider]
 type = "bedrock"
@@ -14,8 +14,10 @@ eval  = "anthropic.claude-3-5-haiku-20241022-v1:0"
 
 [params]
 top_k = 10
-use_llm_judge = true
 max_tool_calls_per_turn = 5
+question_limit = 1
+# No session limit - process all sessions to find answers
+debug = true
 
 memory_title_template = "{question_id}__{run_id}"
 

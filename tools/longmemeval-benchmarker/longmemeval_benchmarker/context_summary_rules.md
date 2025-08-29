@@ -24,8 +24,12 @@
 5. **Flow per incoming message** (await_consistency barrier)
    1. Read current context → understand message.
    2. Decide to store? If yes → generate summary & persist raw+summary.
-   3. Update context from raw entry (merge/trim rules).
-   4. Flush cadence – put_context is expensive: after you've stored ≈ 6 messages (user + assistant) with add_entry, **issue `await_consistency()` to ensure writes are durable, then call `put_context`**, and continue. Always repeat the sequence (`await_consistency` → `put_context`) once more just before exit.
+   3. Update context from raw entry (merge/trim rules) in your working memory (not persisted yet).
+   4. **Flush cadence (STRICT)** – `put_context` is expensive and MUST be batched:
+      • You **MUST NOT** call `put_context` after every message.
+      • You **MUST** call `put_context` only after you have stored ≈ 6 messages (user + assistant) via `add_entry`.
+      • Before calling `put_context`, you **MUST** issue `await_consistency()` to ensure previous writes are durable.
+      • Just before session end, repeat `await_consistency()` → `put_context` once more to flush any remaining updates.
 
 6. **TOOL: search_memories (STRICT)**
 
@@ -44,21 +48,19 @@
      – Needed facts likely sit beyond the 5,000‑char context window.
    • QUERY STYLE: ≤8 tokens; include key entities/IDs/dates; avoid generic terms (e.g., NOT "sky color" if discussed this session).
 
-   For routine conversation turns, rely on current context and the recent entries from bootstrap.
+   For routine conversation turns, rely on current context and the recent entries.
 
-7. **Overflow Handling**
+7. **TOOL: get_context (RESTRICTED)**
+   
+   • DO NOT call `get_context` on every turn or automatically before processing messages.
+   • Call `get_context` only when:
+     – immediately after `put_context` followed by `await_consistency`, to verify the write; or
+     – resuming a previously paused session; or
+     – explicitly instructed by the user to reload the context.
+
+8. **Overflow Handling**
    1. Context ≤ 5 000 chars: Before writing: if new text would exceed the cap, delete the oldest low-value lines until the length is ≈ 4 800 chars. Keep core facts (participants, active tasks, decisions).
    2. Summary ≤ 512 chars: Trim sentences with little factual content (greetings, filler) first. Keep the lines that name entities, dates, numbers, or other data-rich details that boost vector search. Continue pruning until the text fits within 512 characters, then append "…" if any content was removed.
-
-8. **Session bootstrap**
-   1. You **MUST** call `get_context()` exactly once at the start of the session. If the result is **exactly** the default placeholder string
-      `This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available.`
-      (inserted automatically when a memory is created), treat it as empty and immediately call `put_context`. Otherwise, keep the returned string as your working context.
-   2. Immediately afterwards you **MUST** call `list_entries(limit = 10)` and merge any facts that are missing from the working context **before** replying to the user.
-   3. Subsequent usage of `get_context`: YOU MUST NOT call `get_context` on every turn. After bootstrap, call it only when:
-      • immediately after `put_context` followed by `await_consistency`, to verify the write; or
-      • resuming a previously paused session; or
-      • explicitly instructed by the user to reload the context.
 
 ### State machines
 
@@ -69,28 +71,6 @@ flowchart TD
     Store? -- No --> Continue
     Store? -- Yes --> Summ[Generate ≤512-char summary]
     Summ --> Add[add_entry(raw_entry, summary)] --> Continue[Continue conversation]
-```
-
-**Session Lifecycle**
-```mermaid
-flowchart TD
-    Boot[get_context()]
-    Boot -->|plain-text placeholder| Base[put_context({})]
-    Boot -->|JSON context| Load[list_entries(10) → merge]
-    Base --> Load
-    Load --> Loop[Message loop]
-
-    %% per-message handling
-    Loop --> Store?[store this entry?]
-    Store? -- Yes --> Add[add_entry & track ≈6] --> Check
-    Store? -- No  --> Check
-    Check{≈6 stored?}
-    Check -- Yes / put_context; reset --> Loop
-    Check -- No  --> Loop
-
-    %% graceful exit
-    Loop --> Bye{<END_SESSION>?}
-    Bye -- Yes --> Finish[add_entry (any remaining)] --> Barrier[await_consistency()] --> Final[put_context] --> Exit[Session ends]
 ```
 
 ### Prompt loading
@@ -106,17 +86,7 @@ For memory_type="chat", use prompts from `prompts/default/chat/` including:
 
 **IMPORTANT**: These examples demonstrate the workflow and format only. NEVER use the example content (like "Q3 launch date" or "customer-support agent"). Always use ACTUAL content from the conversation you are observing.
 
-#### Example A-1: New memory bootstrap
-
-```text
-// BEFORE: get_context() returns the default placeholder
-// AGENT ACTION: put_context() with actual conversation content
-// For example, if conversation is about Paris trip, context would include Paris facts
-```
-
----
-
-#### Example A-2: Raw entry → summary → context update
+#### Example A-1: Context update
 
 ```text
 // This shows the PATTERN only. Use YOUR conversation's actual content:
@@ -124,4 +94,3 @@ For memory_type="chat", use prompts from `prompts/default/chat/` including:
 // You would generate a SUMMARY like "User is planning a trip to Paris"
 // And update CONTEXT with actual facts from that conversation
 ```
-

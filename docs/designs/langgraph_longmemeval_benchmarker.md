@@ -30,7 +30,7 @@ This document specifies a lightweight, reproducible benchmarker to evaluate long
   - `add_entry`, `list_entries`, `get_entry`
   - `put_context`, `get_context`
   - `await_consistency`
-  - `search_memories` (returns entries + latestContext)
+  - `search_memories` (returns entries + latestContext + bestContext with timestamps/scores)
 - **HTTP** (optional, for richer search payload):
   - `POST /v0/search` returns `{ entries, latestContext, bestContext, timestamps }`. Alpha is service‑wide (see below).
 - Keep exactly one authoritative `memory-service` instance. See Operational Notes.
@@ -125,7 +125,7 @@ All policies are prompt‑ and budget‑driven; no rigid orchestration branching
 
 ### Run modes
 - ingestion: stream sessions/messages to the agent to persist entries/context only
-- qa: run retrieval + answer only (assumes prior ingestion exists)
+- qa: run retrieval + answer only (assumes prior ingestion exists). Build a compact QA context from: latestContext, bestContext (when present), and the top‑K entries’ raw text.
 - eval: compute metrics (EM or LLM judge) on stored answers
 
 ---
@@ -146,7 +146,7 @@ All policies are prompt‑ and budget‑driven; no rigid orchestration branching
 - Dataset loader: reads LongMemEval from `dataset_repo_path`, yields
   `question → sessions → messages` for streaming.
 - Graph builder: constructs the prebuilt LangGraph agent (dynamic system prompt, MCP tools). Stateless per session.
-- Runner/controller: reads TOML, selects run mode, creates vault/memory names, streams messages to the agent (reset between sessions), enforces caps (`max_tool_calls_per_turn`), calls `await_consistency` as needed, runs `search_memories` + QA model, invokes the judge if configured, and writes JSONL results.
+- Runner/controller: reads TOML, selects run mode, creates vault/memory names, streams messages to the agent (reset between sessions), enforces caps (`max_tool_calls_per_turn`), calls `await_consistency` as needed, runs `search_memories` (consume latestContext + bestContext + entries) + QA model, invokes the judge if configured, and writes JSONL results.
 
 ### Separation of code
 - Keep these as small modules under `tools/longmemeval-benchmarker/`:
