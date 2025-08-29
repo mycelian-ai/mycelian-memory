@@ -1,0 +1,39 @@
+LongMemEval Benchmarker TODOs
+
+Implementing langgraph_longmemeval_benchmarker.md design
+
+- [x] Implement dataset loader for LongMemEval JSONL
+- [x] Create AgentRunner placeholder and build_agent stub
+- [x] Parse TOML config and basic ingestion orchestration
+- [x] Provide config.example.toml and minimal README
+- [x] Add Ingester with Store protocol and in-memory store + tests
+- [x] Wire MCP client to real memory-service tools
+- [x] Create a stripped down LongMemEval dataset with 1 question, 2 sessions, 6 turns each
+- [x] Add minimal config.test.toml referenced in design
+- [x] Build LangGraph prebuilt agent with tools and dynamic prompt
+- [x] Test ingestion with test data but real target implementations
+- [ ] Implement QA phase: search_memories + QA model answer
+- [ ] Test QA with test data but real target implementations
+- [ ] Implement Eval phase: EM and optional LLM judge
+- [ ] Test EVAL with test data but real target implementations
+- [ ] Write JSONL results and basic run metadata
+- [ ] Add CLI entrypoint script `mycelian-longmemeval`
+- [x] Determinism & logging: run_id + live logs
+- [ ] Determinism: decision log (succinct tool decisions per turn)
+- [ ] Determinism: caps/budgets (optional)
+
+- [x] Add debug mode (runner params.debug, LME_DEBUG) and live logs
+- [x] Write breadcrumb mapping.jsonl per run
+- [x] Fix MCP args: include vault_id on reads; add_entry uses raw_entry
+- [x] Load MCP tools dynamically
+- [x] Pass vault_id/memory_id via prompt (no hardcoded arg names)
+
+# Agent-only MCP integration hardening (completed)
+- [x] Remove legacy MCPStore; agent is sole MCP user
+- [x] Add MCP tool call observability (name, truncated args, result) under LME_DEBUG
+- [x] Session bootstrap: get_context → (placeholder) put_context({}) → list_entries(10)
+- [x] Strict search policy in prompts (MUST/NEVER) to reduce redundant searches
+- [x] Cleanup unused files from old path (mcp_store.py, bedrock_model.py)
+
+
+

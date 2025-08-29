@@ -111,10 +111,15 @@ memory_title_template = "{question_id}__{run_id}"
 
 ### Agent node behavior (agentic, not a fixed state‑machine)
 At each turn, the agent acts as an observer of a conversation between a User and an AI Assistant, tasked with recording accurate, high‑fidelity memories for this conversation. It:
-- Bootstraps every new session by fetching `latestContext` and/or issuing a quick search for priming.
+- Bootstraps every new session by calling `get_context()`; if the placeholder is returned, immediately `put_context({})`; then `list_entries(limit=10)` to prime the working context. Do not search during bootstrap.
 - Decides whether to `add_entry` with concise `summary`, or skip if content is phatic/redundant.
 - Decides when to `put_context` based on semantic delta, topic boundary, elapsed time, or size thresholds.
 - Uses `await_consistency` after bursts of writes to ensure strong read‑after‑write for subsequent reads.
+
+Strict search policy (prompt‑driven):
+- Never call `search_memories` on assistant turns; at most once per user turn.
+- Do not search if the information is already in the working context, in the recent `list_entries(10)`, or was stated in this session.
+- Default `top_k=5`; increase only if nothing relevant is found. Avoid repeating semantically equivalent queries within the past 3 turns.
 
 All policies are prompt‑ and budget‑driven; no rigid orchestration branching required.
 
@@ -252,3 +257,78 @@ This keeps the agent fully agentic (deciding when to write/persist) while avoidi
 ---
 
 
+
+
+## Appendix: Memory ReAct Agent (low‑level design)
+
+- System prompt
+  - Fetch once via MCP `get_default_prompts("chat")`.
+  - Compose a single static system message as: prefix “You are the Mycelian Memory Agent… observer…” + `context_summary_rules` + `entry_capture_prompt` + `summary_prompt` + `context_prompt`.
+  - Pass this composed string directly as `prompt` when creating the prebuilt agent. No dynamic prompt function; no per‑turn fetch. See LangGraph prebuilt agents guide: [LangGraph prebuilt agents](https://langchain-ai.github.io/langgraph/agents/agents/).
+
+- Tools (MCP over HTTP)
+  - Use MCP tools exposed by `mycelian-mcp-server` over streamable HTTP (e.g., `http://localhost:11546/mcp`).
+  - Register: `get_context`, `list_entries`, `add_entry`, `put_context`, `await_consistency`, `search_memories`.
+  - Keep tools unmodified (structured). Do not code‑bind IDs; instruct the model via the system prompt to include `vault_id`/`memory_id` on calls.
+
+### Dynamic MCP tooling (no hardcoded arg names)
+
+- Load tools dynamically from the MCP server and let the agent see their live JSON schemas. Only inject stable IDs via prompt instructions.
+- Pattern:
+
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.prebuilt import create_react_agent
+from langchain.chat_models import init_chat_model
+
+# 1) Connect to streamable MCP
+client = MultiServerMCPClient({
+  "mycelian": {"url": "http://localhost:11546/mcp", "transport": "streamable_http"}
+})
+
+# 2) Discover tools once (async in real code)
+tools = await client.get_tools()
+
+# 3) Build agent with unmodified tools; IDs provided via prompt instructions
+agent = create_react_agent(
+  model=init_chat_model("bedrock:anthropic.claude-3-5-haiku-20241022-v1:0"),
+  tools=tools,
+  prompt=system_prompt_with_id_instructions,  # prefix + rules + entry_capture + summary + context + ID guidance
+)
+```
+
+- Benefits:
+  - No hardcoded argument names (e.g., `raw_entry` vs `raw`). The model follows the live tool schema.
+  - Only stable runtime context (IDs) is injected via prompt; future server schema changes don’t require code edits.
+  - Simpler lifecycle: one long‑lived MCP client; tools loaded once; observability via `LME_DEBUG` (tool name, args, result preview).
+
+- Model config
+  - Use provider defaults (do not override temperature unless explicitly needed).
+
+- Graph and state
+  - The prebuilt agent from `create_react_agent` is the LangGraph app. No extra nodes/checkpointer.
+  - Minimal state: only `messages` (rolling transcript) maintained externally per session by the runner.
+
+- Policies (prompt‑driven)
+  - Bootstrap via `get_context` then `list_entries(10)`; 6‑message cadence with `await_consistency` → `put_context`; summaries ≤512 chars (SVO); context cap ≈5k chars with trimming; selective `search_memories` — all defined in the prompts/rules, not hard‑coded in orchestration.
+
+- Invocation sketch (runner side)
+  ```python
+  from langgraph.prebuilt import create_react_agent
+  from langchain.chat_models import init_chat_model
+
+  # Build once per question
+  system_prompt = prefix + rules + entry_capture + summary + context  # fetched once via MCP
+  model = init_chat_model(cfg.models.agent)  # provider defaults
+  agent = create_react_agent(
+      model=model,
+      tools=bound_mcp_tools,  # tools bound to (vault_id, memory_id)
+      prompt=system_prompt,
+  )
+
+  # Stream turns per session
+  history = []
+  for msg in session_messages:
+      history.append(msg)  # includes the latest message
+      agent.invoke({"messages": history})
+  ```
