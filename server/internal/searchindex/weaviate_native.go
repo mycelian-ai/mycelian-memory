@@ -222,6 +222,65 @@ func (w *weavNative) BestContext(ctx context.Context, actorID string, memoryID, 
 	return ctxText, ts, score, nil
 }
 
+// SearchContexts returns top-K matching context shards for a query.
+func (w *weavNative) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
+	hy := (&gql.HybridArgumentBuilder{}).
+		WithQuery(query).
+		WithVector(vec).
+		WithAlpha(alpha).
+		WithProperties([]string{"context"})
+
+	where := filters.Where().WithPath([]string{"memoryId"}).WithOperator(filters.Equal).WithValueText(memoryID)
+	req := w.client.GraphQL().Get().
+		WithClassName("MemoryContext").
+		WithWhere(where).
+		WithHybrid(hy).
+		WithLimit(topK).
+		WithFields(
+			gql.Field{Name: "context"},
+			gql.Field{Name: "creationTime"},
+			gql.Field{Name: "_additional", Fields: []gql.Field{{Name: "score"}}},
+		)
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
+	}
+	getData, ok := resp.Data["Get"].(map[string]interface{})
+	if !ok {
+		return nil, nil
+	}
+	val := getData["MemoryContext"]
+	if val == nil {
+		return []model.ContextHit{}, nil
+	}
+	arr, ok := val.([]interface{})
+	if !ok {
+		return nil, nil
+	}
+	out := make([]model.ContextHit, 0, len(arr))
+	for _, it := range arr {
+		m := it.(map[string]interface{})
+		ctxText, _ := m["context"].(string)
+		tsStr, _ := m["creationTime"].(string)
+		ts, _ := time.Parse(time.RFC3339, tsStr)
+		var score float64
+		if add, ok := m["_additional"].(map[string]interface{}); ok {
+			switch v := add["score"].(type) {
+			case float64:
+				score = v
+			case string:
+				f, _ := strconv.ParseFloat(v, 64)
+				score = f
+			}
+		}
+		out = append(out, model.ContextHit{Context: ctxText, Timestamp: ts, Score: score})
+	}
+	return out, nil
+}
+
 func (w *weavNative) DeleteEntry(ctx context.Context, actorID string, entryID string) error {
 	if w == nil || w.client == nil || entryID == "" {
 		return nil

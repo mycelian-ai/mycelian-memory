@@ -41,10 +41,19 @@ type SearchEntry struct {
 	Score float64 `json:"score"`
 }
 
+// SearchContext represents a context shard in search results
+type SearchContext struct {
+	Context   json.RawMessage `json:"context"`
+	Timestamp string          `json:"timestamp"`
+	Kind      string          `json:"kind"`
+	Score     *float64        `json:"score,omitempty"`
+}
+
 // SearchResponse wraps the /api/search result
 type SearchResponse struct {
 	Entries              []SearchEntry   `json:"entries"`
 	Count                int             `json:"count"`
+	Contexts             []SearchContext `json:"contexts,omitempty"`
 	LatestContext        json.RawMessage `json:"latestContext,omitempty"`
 	ContextTimestamp     *time.Time      `json:"contextTimestamp,omitempty"`
 	BestContext          json.RawMessage `json:"bestContext,omitempty"`

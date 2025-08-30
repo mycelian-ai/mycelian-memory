@@ -456,6 +456,7 @@ func newGetContextCmd() *cobra.Command {
 func newSearchCmd() *cobra.Command {
 	var memoryID, query string
 	var topK int
+	var ke, kc int
 
 	cmd := &cobra.Command{
 		Use:   "search",
@@ -471,11 +472,19 @@ func newSearchCmd() *cobra.Command {
 			if topK <= 0 || topK > 100 {
 				return fmt.Errorf("--top-k must be between 1 and 100")
 			}
+			if ke < 0 || ke > 100 {
+				return fmt.Errorf("--ke must be between 1 and 100 when provided")
+			}
+			if kc < 0 || kc > 100 {
+				return fmt.Errorf("--kc must be between 1 and 100 when provided")
+			}
 
 			log.Debug().
 				Str("memory_id", memoryID).
 				Str("query", query).
 				Int("top_k", topK).
+				Int("ke", ke).
+				Int("kc", kc).
 				Str("service_url", serviceURL).
 				Msg("searching memories")
 
@@ -491,6 +500,8 @@ func newSearchCmd() *cobra.Command {
 				MemoryID: memoryID,
 				Query:    query,
 				TopK:     topK,
+				KE:       ke,
+				KC:       kc,
 			})
 			elapsed := time.Since(start)
 
@@ -517,7 +528,9 @@ func newSearchCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&query, "query", "", "Search query (required)")
-	cmd.Flags().IntVar(&topK, "top-k", defaultTopK, "Number of results to return (1-100)")
+	cmd.Flags().IntVar(&topK, "top-k", defaultTopK, "Legacy combined top-k (1-100); prefer --ke/--kc")
+	cmd.Flags().IntVar(&ke, "ke", 0, "Entries top-k (recommended 5; overrides --top-k when >0)")
+	cmd.Flags().IntVar(&kc, "kc", 0, "Context shards top-k (recommended 3)")
 
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("query")

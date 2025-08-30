@@ -1,1 +1,0 @@
-An error occurred (ValidationException) when calling the InvokeModel operation: messages: final assistant content cannot end with trailing whitespace

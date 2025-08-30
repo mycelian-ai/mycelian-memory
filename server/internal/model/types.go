@@ -66,6 +66,13 @@ type SearchHit struct {
 	Score    float64 `json:"score"`
 }
 
+// ContextHit represents a matching context shard result
+type ContextHit struct {
+	Context   string    `json:"context"`
+	Timestamp time.Time `json:"timestamp"`
+	Score     float64   `json:"score"`
+}
+
 // ListEntriesRequest captures filters used when listing entries.
 type ListEntriesRequest struct {
 	ActorID  string

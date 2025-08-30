@@ -1,2 +1,0 @@
-Expected dict, got SESSION_START: Call get_context if resuming a session.
-For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/INVALID_GRAPH_NODE_RETURN_VALUE

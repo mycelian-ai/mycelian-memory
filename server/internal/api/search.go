@@ -12,10 +12,11 @@ import (
 //
 // Fields:
 //
-
 //	memoryId – required, non-empty string
 //	query – required, non-empty string
-//	topK  – optional, 1-100 (defaults to 10)
+//	topK  – optional, 1-100 (defaults to 10; legacy combined top-k)
+//	ke    – optional, entries top-k (preferred over topK when provided)
+//	kc    – optional, context shards top-k (no default; recommended 3)
 //
 // Validation is done via the Validate method.
 // User identification comes from API key authorization.
@@ -25,6 +26,8 @@ type SearchRequest struct {
 	MemoryID string `json:"memoryId"`
 	Query    string `json:"query"`
 	TopK     int    `json:"topK,omitempty"`
+	KE       int    `json:"ke,omitempty"`
+	KC       int    `json:"kc,omitempty"`
 }
 
 // Validate sanitises the struct and applies defaults.
@@ -37,7 +40,8 @@ func (r *SearchRequest) Validate() error {
 	if r.Query == "" {
 		return errors.New("query cannot be empty")
 	}
-	if r.TopK <= 0 {
+	// Default legacy topK only if neither topK nor ke are specified
+	if r.TopK <= 0 && r.KE <= 0 {
 		r.TopK = 10
 	}
 	if r.TopK > 100 {

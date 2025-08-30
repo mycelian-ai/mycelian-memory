@@ -23,9 +23,9 @@ func TestSearchMemoriesTool(t *testing.T) {
             "count": 0,
             "latestContext": "{}",
             "contextTimestamp": "2025-07-27T00:00:00Z",
-            "bestContext": "{\"summary\": \"test context\"}",
-            "bestContextTimestamp": "2025-07-27T01:00:00Z",
-            "bestContextScore": 0.85
+            "contexts": [
+              {"context": "{\"summary\": \"test context\"}", "timestamp": "2025-07-27T01:00:00Z", "score": 0.85}
+            ]
         }`))
 	}))
 	defer ts.Close()
@@ -42,6 +42,7 @@ func TestSearchMemoriesTool(t *testing.T) {
 				"memory_id": "m1",
 				"query":     "hello",
 				"top_k":     5,
+				"kc":        1,
 			},
 		},
 	}
@@ -54,7 +55,7 @@ func TestSearchMemoriesTool(t *testing.T) {
 		t.Fatalf("nil result")
 	}
 
-	// Verify the response contains best context fields
+	// Verify the response contains contexts array and score
 	if len(res.Content) == 0 {
 		t.Fatalf("no content in response")
 	}
@@ -71,16 +72,13 @@ func TestSearchMemoriesTool(t *testing.T) {
 		t.Fatalf("failed to parse response JSON: %v", err)
 	}
 
-	// Check that best context fields are present
-	expectedFields := []string{"bestContext", "bestContextTimestamp", "bestContextScore"}
-	for _, field := range expectedFields {
-		if _, exists := payload[field]; !exists {
-			t.Errorf("missing field %s in response", field)
-		}
+	// Check that contexts array exists with one item and correct score
+	ctxs, exists := payload["contexts"].([]interface{})
+	if !exists || len(ctxs) != 1 {
+		t.Fatalf("expected one context, got %v", payload["contexts"])
 	}
-
-	// Verify best context score is correct
-	if score, ok := payload["bestContextScore"].(float64); !ok || score != 0.85 {
-		t.Errorf("expected bestContextScore=0.85, got %v", payload["bestContextScore"])
+	first, _ := ctxs[0].(map[string]interface{})
+	if score, ok := first["score"].(float64); !ok || score != 0.85 {
+		t.Errorf("expected contexts[0].score=0.85, got %v", first["score"])
 	}
 }

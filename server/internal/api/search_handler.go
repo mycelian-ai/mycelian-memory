@@ -53,7 +53,7 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("topK", req.TopK).Str("actorId", actorInfo.ActorID).Msg("search request received")
+	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("topK", req.TopK).Int("ke", req.KE).Int("kc", req.KC).Str("actorId", actorInfo.ActorID).Msg("search request received")
 
 	vec, err := h.emb.Embed(r.Context(), req.Query)
 	if err != nil {
@@ -63,7 +63,12 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debug().Int("vectorLength", len(vec)).Msg("embedding generated")
 
-	hits, err := h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, req.TopK, h.alpha)
+	// Entries search: prefer KE if provided, else legacy TopK
+	kEntries := req.TopK
+	if req.KE > 0 {
+		kEntries = req.KE
+	}
+	hits, err := h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, kEntries, h.alpha)
 	if err != nil {
 		log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
 		respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")
@@ -77,24 +82,37 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		"count":   len(hits),
 	}
 
-	// Latest context
-	ctxStr, ts, err := h.idx.LatestContext(r.Context(), actorInfo.ActorID, req.MemoryID)
-	if err != nil {
-		respond.WriteError(w, http.StatusInternalServerError, "latest context unavailable")
-		return
+	if req.KC > 0 {
+		// Return top-K contexts (no special 'best' semantics)
+		ctxHits, err := h.idx.SearchContexts(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, req.KC, h.alpha)
+		if err != nil {
+			respond.WriteError(w, http.StatusInternalServerError, "context search unavailable")
+			return
+		}
+		contexts := make([]map[string]any, 0, len(ctxHits))
+		for _, ch := range ctxHits {
+			contexts = append(contexts, map[string]any{
+				"context":   ch.Context,
+				"timestamp": ch.Timestamp.Format(time.RFC3339),
+				"score":     ch.Score,
+			})
+		}
+		resp["contexts"] = contexts
+		if len(contexts) > 0 {
+			if c0, ok := contexts[0]["context"].(string); ok {
+				resp["latestContext"] = c0
+			}
+		}
+	} else {
+		// Legacy fields
+		ctxStr, ts, err := h.idx.LatestContext(r.Context(), actorInfo.ActorID, req.MemoryID)
+		if err != nil {
+			respond.WriteError(w, http.StatusInternalServerError, "latest context unavailable")
+			return
+		}
+		resp["latestContext"] = ctxStr
+		resp["contextTimestamp"] = ts.Format(time.RFC3339)
 	}
-	resp["latestContext"] = ctxStr
-	resp["contextTimestamp"] = ts.Format(time.RFC3339)
-
-	// Best-matching context
-	best, bts, score, err := h.idx.BestContext(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, h.alpha)
-	if err != nil {
-		respond.WriteError(w, http.StatusInternalServerError, "best context unavailable")
-		return
-	}
-	resp["bestContext"] = best
-	resp["bestContextTimestamp"] = bts.Format(time.RFC3339)
-	resp["bestContextScore"] = score
 
 	respond.WriteJSON(w, http.StatusOK, resp)
 }
