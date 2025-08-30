@@ -43,4 +43,6 @@ type SearchRequest struct {
 	MemoryID string `json:"memoryId"`
 	Query    string `json:"query"`
 	TopK     int    `json:"topK,omitempty"`
+	KE       int    `json:"ke,omitempty"`
+	KC       int    `json:"kc,omitempty"`
 }

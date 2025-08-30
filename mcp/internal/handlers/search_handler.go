@@ -22,10 +22,12 @@ func NewSearchHandler(c *client.Client) *SearchHandler {
 // RegisterTools registers the search_memories tool.
 func (sh *SearchHandler) RegisterTools(s *server.MCPServer) error {
 	searchTool := mcp.NewTool("search_memories",
-		mcp.WithDescription("Hybrid semantic + keyword search within a memory. Results include:\n • entries – top-K entry hits.\n • latestContext – the most recent consolidated context snapshot (string).\n • bestContext – the context snapshot that most closely matches the query, if found, plus score & timestamp."),
+		mcp.WithDescription("Hybrid semantic + keyword search within a memory. Results include:\n • entries – entry hits (controlled by ke).\n • latestContext – the most recent consolidated context snapshot (string).\n • bestContext – the context snapshot that most closely matches the query, if found, plus score & timestamp.\n\nParameters:\n • memory_id (required) – target memory.\n • query (required) – search text.\n • top_k (optional) – legacy combined top-k (1–100); retained for back-compat.\n • ke (optional) – top-k for entries (recommended 5).\n • kc (optional) – top-k for context shards (recommended 3)."),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query text")),
-		mcp.WithNumber("top_k", mcp.Description("Number of results to return (1-100, default 10)")),
+		mcp.WithNumber("top_k", mcp.Description("Legacy combined top-k (1–100); prefer ke/kc")),
+		mcp.WithNumber("ke", mcp.Description("Top-k for entries (recommended 5)")),
+		mcp.WithNumber("kc", mcp.Description("Top-k for context shards (recommended 3)")),
 	)
 	s.AddTool(searchTool, sh.handleSearch)
 	return nil
