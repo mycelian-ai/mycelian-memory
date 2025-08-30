@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, TextIO
 import os
 import asyncio
 from langchain_core.tools import StructuredTool  # type: ignore
@@ -11,14 +11,15 @@ class MycelianMemoryAgent:
     runner. Tools are bound to a specific (vault_id, memory_id) via closures.
     """
 
-    def __init__(self, model_id: str, max_tool_calls_per_turn: int = 5, server_url: Optional[str] = None):
+    def __init__(self, model_id: str, max_tool_calls_per_turn: int = 5, server_url: Optional[str] = None, debug: bool = False):
         from langchain.chat_models import init_chat_model  # type: ignore
         from langchain_mcp_adapters.client import MultiServerMCPClient  # type: ignore
 
         self._model_id = model_id
         self._max_tools = max_tool_calls_per_turn
         self._server_url = server_url or os.environ.get("MYCELIAN_MCP_URL", "http://localhost:11546/mcp")
-        self._debug = bool(os.environ.get("LME_DEBUG"))
+        self._debug = debug or bool(os.environ.get("LME_DEBUG"))
+        self._log_stream: Optional[TextIO] = None
 
         # MCP client over HTTP
         self._server_name = "mycelian-memory-streamable"
@@ -91,13 +92,26 @@ class MycelianMemoryAgent:
         if self._debug:
             filtered = [getattr(t, "name", "tool") for t in self._base_tools if getattr(t, "name", None) == "get_context"]
             if filtered:
-                print(f"[agent] hiding tools from LLM: {filtered}")
+                self._log(f"[agent] hiding tools from LLM: {filtered}")
         # Build logging-wrapped tools for observability (no behavior change)
         self._tools_with_logging = [self._wrap_tool_with_logging(t) for t in self._agent_tools]
 
         # Defer agent construction until memory is bound
         self._llm = init_chat_model(self._model_id)
         self._agent = None
+
+    def set_log_stream(self, stream: Optional[TextIO]) -> None:
+        self._log_stream = stream
+
+    def _log(self, msg: str) -> None:
+        try:
+            if self._log_stream is not None:
+                print(msg, file=self._log_stream, flush=True)
+            else:
+                print(msg)
+        except Exception:
+            # Best-effort logging; never raise
+            pass
 
     def close(self) -> None:
         try:
@@ -120,7 +134,7 @@ class MycelianMemoryAgent:
             prev = str(arguments)
             if len(prev) > 200:
                 prev = prev[:200] + "…"
-            print(f"[agent][mcp] call {name} args={prev}")
+            self._log(f"[agent][mcp] call {name} args={prev}")
         if hasattr(t, "ainvoke"):
             result = asyncio.run(t.ainvoke(arguments))  # type: ignore[attr-defined]
         elif hasattr(t, "invoke"):
@@ -133,7 +147,7 @@ class MycelianMemoryAgent:
                 rp = str(result)
                 if len(rp) > 200:
                     rp = rp[:200] + "…"
-                print(f"[agent][mcp] {name} -> {rp}")
+                self._log(f"[agent][mcp] {name} -> {rp}")
             return result
         try:
             import json as _json
@@ -142,14 +156,14 @@ class MycelianMemoryAgent:
                 rp = str(parsed)
                 if len(rp) > 200:
                     rp = rp[:200] + "…"
-                print(f"[agent][mcp] {name} -> {rp}")
+                self._log(f"[agent][mcp] {name} -> {rp}")
             return parsed
         except Exception:
             if self._debug:
                 rp = str(result)
                 if len(rp) > 200:
                     rp = rp[:200] + "…"
-                print(f"[agent][mcp] {name} -> {rp}")
+                self._log(f"[agent][mcp] {name} -> {rp}")
             return result
 
     def ensure_vault(self, title: Optional[str], vault_id: Optional[str]) -> str:
@@ -278,7 +292,7 @@ class MycelianMemoryAgent:
             entries = entries_result
             
         if self._debug:
-            print(f"[bootstrap] context_len={len(working_context)} entries_count={len(entries)}")
+            self._log(f"[bootstrap] context_len={len(working_context)} entries_count={len(entries)}")
             
         return working_context
 
@@ -353,16 +367,16 @@ class MycelianMemoryAgent:
             )
             
             # Process only this single message, not cumulative history
-            print(f"[agent][turn] {turns+1} role={role} len(content)={len(content)} entries_since_flush={self._entries_since_flush}")
+            self._log(f"[agent][turn] {turns+1} role={role} len(content)={len(content)} entries_since_flush={self._entries_since_flush}")
             # When debug is enabled, also print the raw message content preview
             if self._debug:
                 try:
                     _preview = content if len(content) <= 500 else (content[:500] + "…")
-                    print(f"[agent][turn] {turns+1} RAW {role}: {_preview}")
+                    self._log(f"[agent][turn] {turns+1} RAW {role}: {_preview}")
                 except Exception:
                     pass
             _ = turn_agent.invoke({"messages": [m]})
-            print(f"[agent][turn] {turns+1} -> completed")
+            self._log(f"[agent][turn] {turns+1} -> completed")
             turns += 1
         
         return turns, tool_calls
@@ -381,7 +395,7 @@ class MycelianMemoryAgent:
             if len(prev) > 200:
                 prev = prev[:200] + "…"
             if self._debug:
-                print(f"[agent][tool] {name} args={prev}")
+                self._log(f"[agent][tool] {name} args={prev}")
             try:
                 # Track counters for batching guidance
                 if name == "add_entry":
@@ -402,11 +416,11 @@ class MycelianMemoryAgent:
                     rp = str(res)
                     if len(rp) > 200:
                         rp = rp[:200] + "…"
-                    print(f"[agent][tool] {name} -> SUCCESS: {rp}")
+                    self._log(f"[agent][tool] {name} -> SUCCESS: {rp}")
                 return res
             except Exception as e:
                 if self._debug:
-                    print(f"[agent][tool] {name} -> ERROR: {e}")
+                    self._log(f"[agent][tool] {name} -> ERROR: {e}")
                 raise
 
         def _func(**kwargs: Any) -> Any:
@@ -414,7 +428,7 @@ class MycelianMemoryAgent:
             if len(prev) > 200:
                 prev = prev[:200] + "…"
             if self._debug:
-                print(f"[agent][tool] {name} (sync) args={prev}")
+                self._log(f"[agent][tool] {name} (sync) args={prev}")
             try:
                 # Track counters for batching guidance
                 if name == "add_entry":
@@ -435,11 +449,11 @@ class MycelianMemoryAgent:
                     rp = str(res)
                     if len(rp) > 200:
                         rp = rp[:200] + "…"
-                    print(f"[agent][tool] {name} (sync) -> SUCCESS: {rp}")
+                    self._log(f"[agent][tool] {name} (sync) -> SUCCESS: {rp}")
                 return res
             except Exception as e:
                 if self._debug:
-                    print(f"[agent][tool] {name} (sync) -> ERROR: {e}")
+                    self._log(f"[agent][tool] {name} (sync) -> ERROR: {e}")
                 raise
 
         # Construct a new StructuredTool with identical schema and name/description
@@ -493,10 +507,10 @@ class _BoundArgsTool:
         return asyncio.run(self._base.ainvoke(args))  # type: ignore[attr-defined]
 
 
-def build_agent(model_id: str, max_tool_calls_per_turn: int = 5, provider_type: str | None = None) -> MycelianMemoryAgent:
+def build_agent(model_id: str, max_tool_calls_per_turn: int = 5, provider_type: str | None = None, debug: bool = False) -> MycelianMemoryAgent:
     resolved_model = model_id
     if provider_type and provider_type.lower() == "bedrock" and not str(model_id).startswith("bedrock:"):
         resolved_model = f"bedrock:{model_id}"
-    return MycelianMemoryAgent(model_id=resolved_model, max_tool_calls_per_turn=max_tool_calls_per_turn)
+    return MycelianMemoryAgent(model_id=resolved_model, max_tool_calls_per_turn=max_tool_calls_per_turn, debug=debug)
 
 
