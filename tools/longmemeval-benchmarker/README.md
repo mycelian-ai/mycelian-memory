@@ -45,11 +45,11 @@ For testing, you can create a smaller subset from the full LongMemEval dataset:
 cd tools/longmemeval-benchmarker
 
 # Option 1: Point to directory (auto-finds longmemeval_s.json, longmemeval_m.json, etc.)
-python lme_sampler.py /path/to/LongMemEval --num-questions 10 --copy-as-s
+python -m src.lme_sampler /path/to/LongMemEval --num-questions 10 --copy-as-s
 
 # Option 2: Point directly to specific file
-python lme_sampler.py /path/to/LongMemEval/data/longmemeval_s.json --num-questions 10 --copy-as-s
-python lme_sampler.py /path/to/LongMemEval/data/longmemeval_m.json --num-questions 10 --copy-as-s
+python -m src.lme_sampler /path/to/LongMemEval/data/longmemeval_s.json --num-questions 10 --copy-as-s
+python -m src.lme_sampler /path/to/LongMemEval/data/longmemeval_m.json --num-questions 10 --copy-as-s
 ```
 
 This creates `longmemeval_s_10.json` with 10 questions (one from each question type) and copies it as `longmemeval_s.json` for the loader. The sampler systematically selects questions to cover all core abilities: single-session-user, multi-session, knowledge-update, temporal-reasoning, single-session-preference, single-session-assistant, and abstention questions.
