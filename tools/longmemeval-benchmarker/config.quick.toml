@@ -16,6 +16,7 @@ eval  = "anthropic.claude-3-5-haiku-20241022-v1:0"
 top_k = 10
 max_tool_calls_per_turn = 5
 question_limit = 1
+workers = 2
 # No session limit - process all sessions to find answers
 debug = true
 

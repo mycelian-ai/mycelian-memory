@@ -29,6 +29,7 @@ qa    = "gpt-4o-mini"
 [params]
 top_k = 10
 max_tool_calls_per_turn = 5
+workers = 1
 
 # {question_id} and {run_id} placeholders supported
 memory_title_template = "{question_id}__{run_id}"
