@@ -17,7 +17,7 @@ top_k = 10
 max_tool_calls_per_turn = 5
 question_limit = 1
 workers = 1
-max_sessions_per_question = 1
+max_sessions_per_question = 2
 max_turns_per_session = 0
 # Limit sessions for quick behavior check
 debug = true

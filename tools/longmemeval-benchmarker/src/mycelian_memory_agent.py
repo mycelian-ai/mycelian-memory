@@ -2,8 +2,7 @@ from typing import Any, Dict, List, Tuple, Optional, TextIO
 import os
 import asyncio
 from .error_handler import invoke_with_backoff
-from .message_schema import parse_message, is_system, to_llm_payload
-# Lazy import StructuredTool through mcp_tools wrapper to avoid linter errors
+from langchain_core.tools import StructuredTool
 
 
 class MycelianMemoryAgent:
@@ -101,14 +100,7 @@ class MycelianMemoryAgent:
             names = [getattr(t, "name", "tool") for t in self._agent_tools]
             self._log(f"[agent] tools exposed to LLM: {names}")
         # Build logging-wrapped tools for observability (no behavior change)
-        from .mcp_tools import wrap_tools_with_logging
-        self._tools_with_logging = wrap_tools_with_logging(
-            self._agent_tools,
-            log=self._log,
-            debug=self._debug,
-            await_consistency_fn=lambda mid: asyncio.run(self._tool_by_name("await_consistency").ainvoke({"memory_id": mid})),  # type: ignore[attr-defined]
-            get_memory_id_fn=lambda: self._memory_id,
-        )
+        self._tools_with_logging = [self._wrap_tool_with_logging(t) for t in self._agent_tools]
 
         # Defer agent construction until memory is bound
         self._llm = init_chat_model(self._model_id)
@@ -313,13 +305,34 @@ class MycelianMemoryAgent:
         
         for m in messages:
             content = m.get("content", "")
-            msg = parse_message(content if isinstance(content, str) else str(content))
-            self._log_turn(msg, turns)
-
-            payload = to_llm_payload(msg.get("content", ""))
+            # Parse JSON string for logging type/role without changing behavior
+            msg_type = "unknown"
+            role = ""
+            try:
+                import json as _json
+                parsed = _json.loads(content) if isinstance(content, str) else {}
+                if isinstance(parsed, dict):
+                    msg_type = parsed.get("type", msg_type)
+                    role = parsed.get("role", role)
+            except Exception:
+                pass
+            if msg_type == "system":
+                self._log(f"[agent][ctrl] type=system len(content)={len(content)}")
+            else:
+                self._log(f"[agent][turn] {turns+1} type={msg_type} role={role} len(content)={len(content)}")
+            if self._debug:
+                try:
+                    preview = content if len(content) <= 500 else (content[:500] + "…")
+                    self._log(f"[agent][turn] {turns+1} RAW: {preview}")
+                except Exception:
+                    pass
+            
+            # Send the JSON message so the model can read type/role/content
+            # Runner already provides messages as JSON strings in content
+            rendered = content if isinstance(content, str) else str(content)
+            payload = {"messages": [{"role": "user", "content": rendered}]}
             _ = invoke_with_backoff(lambda: self._agent.invoke(payload), debug=self._debug, log=self._log)
-
-            if is_system(msg):
+            if msg_type == "system":
                 self._log("[agent][ctrl] -> completed")
             else:
                 self._log(f"[agent][turn] {turns+1} -> completed")
@@ -327,25 +340,84 @@ class MycelianMemoryAgent:
 
         return turns, tool_calls
 
-    def _log_turn(self, msg: Dict[str, str], turn_index: int, preview_len: int = 500) -> None:
-        try:
-            body = msg.get("content", "")
-            role = msg.get("role", "")
-            kind = msg.get("type", "")
-            head = (body if len(body) <= preview_len else (body[:preview_len] + "…"))
-            if is_system(msg):
-                self._log(f"[agent][ctrl] type=system len(content)={len(body)}")
-            else:
-                self._log(f"[agent][turn] {turn_index+1} type=conversation role={role} len(content)={len(body)}")
-            if self._debug and head:
-                prefix = "[agent][ctrl] RAW:" if is_system(msg) else f"[agent][turn] {turn_index+1} RAW:"
-                self._log(f"{prefix} {head}")
-        except Exception:
-            pass
-
     # Backoff logic now lives in error_handler.invoke_with_backoff
 
-    # Old per-tool wrapper removed; replaced by mcp_tools.wrap_tools_with_logging
+    def _wrap_tool_with_logging(self, tool: Any) -> Any:
+        name = getattr(tool, "name", "tool")
+        description = getattr(tool, "description", "")
+        args_schema = getattr(tool, "args_schema", None)
+
+        # If we cannot read args_schema, fall back to the original tool (no wrapping)
+        if args_schema is None:
+            return tool
+
+        async def _acoroutine(**kwargs: Any) -> Any:
+            prev = str(kwargs)
+            if len(prev) > 200:
+                prev = prev[:200] + "…"
+            if self._debug:
+                self._log(f"[agent][tool] {name} args={prev}")
+            try:
+                # Auto-call await_consistency before put_context for durability
+                if name == "put_context":
+                    try:
+                        _ = await self._tool_by_name("await_consistency").ainvoke({"memory_id": self._memory_id})  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                
+                res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                
+                if self._debug:
+                    rp = str(res)
+                    if len(rp) > 200:
+                        rp = rp[:200] + "…"
+                    self._log(f"[agent][tool] {name} -> SUCCESS: {rp}")
+                return res
+            except Exception as e:
+                if self._debug:
+                    self._log(f"[agent][tool] {name} -> ERROR: {e}")
+                raise
+
+        def _func(**kwargs: Any) -> Any:
+            prev = str(kwargs)
+            if len(prev) > 200:
+                prev = prev[:200] + "…"
+            if self._debug:
+                self._log(f"[agent][tool] {name} (sync) args={prev}")
+            try:
+                if name == "put_context":
+                    # Auto-call await_consistency before put_context for durability
+                    try:
+                        _ = asyncio.run(self._tool_by_name("await_consistency").ainvoke({"memory_id": self._memory_id}))  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                else:
+                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
+                
+                if self._debug:
+                    rp = str(res)
+                    if len(rp) > 200:
+                        rp = rp[:200] + "…"
+                    self._log(f"[agent][tool] {name} (sync) -> SUCCESS: {rp}")
+                return res
+            except Exception as e:
+                if self._debug:
+                    self._log(f"[agent][tool] {name} (sync) -> ERROR: {e}")
+                raise
+
+        # Construct a new StructuredTool with identical schema and name/description
+        try:
+            return StructuredTool.from_function(
+                name=name,
+                description=description,
+                args_schema=args_schema,
+                func=_func,
+                coroutine=_acoroutine,
+            )
+        except Exception:
+            # If wrapping fails, use the original tool
+            return tool
 
 
 class _BoundArgsTool:
