@@ -16,8 +16,10 @@ eval  = "anthropic.claude-3-5-haiku-20241022-v1:0"
 top_k = 10
 max_tool_calls_per_turn = 5
 question_limit = 1
-workers = 2
-# No session limit - process all sessions to find answers
+workers = 1
+max_sessions_per_question = 1
+max_turns_per_session = 0
+# Limit sessions for quick behavior check
 debug = true
 
 memory_title_template = "{question_id}__{run_id}"

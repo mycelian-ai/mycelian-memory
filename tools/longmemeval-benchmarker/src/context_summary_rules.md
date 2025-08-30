@@ -14,22 +14,15 @@
 
 **Tool Scoping** – If several tool-specific instruction blocks exist in the prompt window, obey **only** the block whose `### TOOL:` label matches the function you are currently executing; ignore all other blocks.
 
-1. **Source of truth** – The *context document* grows directly from NEW RAW ENTRIES only; never from summaries.
-2. **Context purpose** – Store lasting knowledge: participants, stable facts, timeline, decisions, open tasks. Size cap: **5000 chars**. Use Mermaid diagrams (≤10 nodes) when helpful.
-3. **Summary purpose** – Optimize vector search. Each stored entry has ONE context-aware summary capped at **512 characters** (≈80 tokens). Summaries must:
-   • resolve pronouns using current context
-   • follow Subject-Verb-Object past-tense
-   • keep names, dates, IDs; drop filler
-4. **No feedback loop** – Summaries must NOT be used to update the context.
-5. **Flow per incoming message** (await_consistency barrier)
-   1. Read current context → understand message.
-   2. Decide to store? If yes → generate summary & persist raw+summary.
-   3. Update context from raw entry (merge/trim rules) in your working memory (not persisted yet).
-   4. **Flush cadence (STRICT)** – `put_context` is expensive and MUST be batched:
-      • You **MUST NOT** call `put_context` after every message.
-      • You **MUST** call `put_context` only after you have stored ≈ 6 messages (user + assistant) via `add_entry`.
-      • Before calling `put_context`, you **MUST** issue `await_consistency()` to ensure previous writes are durable.
-      • Just before session end, repeat `await_consistency()` → `put_context` once more to flush any remaining updates.
+1. **Workflow scope** – This file defines WHEN to call tools, not WHAT to write. For content and formatting of context and summaries, see the dedicated prompt files referenced below.
+2. **Flow per incoming message** (await_consistency barrier)
+   1. Process the message.
+   2. You MUST call `add_entry` exactly once for every user and assistant message.
+   3. **Flush cadence (STRICT)** – `put_context` is expensive and MUST be batched:
+      • Do NOT call `put_context` after every message.
+      • Call `put_context` only after ≈ 6 messages (user + assistant) have been stored via `add_entry`.
+      • Before calling `put_context`, issue `await_consistency()` to ensure previous writes are durable.
+      • At session end, issue `await_consistency()` → `put_context` once to flush any remaining updates.
 
 6. **TOOL: search_memories (STRICT)**
 
@@ -58,39 +51,35 @@
      – resuming a previously paused session; or
      – explicitly instructed by the user to reload the context.
 
-8. **Overflow Handling**
-   1. Context ≤ 5 000 chars: Before writing: if new text would exceed the cap, delete the oldest low-value lines until the length is ≈ 4 800 chars. Keep core facts (participants, active tasks, decisions).
-   2. Summary ≤ 512 chars: Trim sentences with little factual content (greetings, filler) first. Keep the lines that name entities, dates, numbers, or other data-rich details that boost vector search. Continue pruning until the text fits within 512 characters, then append "…" if any content was removed.
+8. **References**
+   • Context content/format: `client/prompts/default/chat/context_prompt.md`
+   • Entry capture guidance: `client/prompts/default/chat/entry_capture_prompt.md`
+   • Summary content/format: `client/prompts/default/chat/summary_prompt.md`
+
+9. **Prompt usage**
+   • For `add_entry`: Generate the summary using `client/prompts/default/chat/summary_prompt.md` and construct tool inputs per `client/prompts/default/chat/entry_capture_prompt.md`. Do not include any `[SYSTEM_MSG]`/`[CONVERSATION_MSG]` markers in raw_entry or summary.
+   • For `put_context`: Produce the full context string using `client/prompts/default/chat/context_prompt.md`, then write it via `put_context`.
+
+10. **Creation procedures**
+   **Entry (per message):**
+   1) Take the incoming conversation turn (user/assistant). Use its text as `raw_entry` (strip any prompt markers; exclude system/control content).
+   2) Generate `summary` by invoking the summary template in `client/prompts/default/chat/summary_prompt.md` over the same text.
+   3) Call `add_entry` with `{ raw_entry, summary }` and, if supported, `tags` (e.g., `{ "role": "user" | "assistant" }`).
+   4) On success, increment the local counter for flush cadence; on failure, retry per tool policy.
+
+   **Context (on flush or session end):**
+   1) When cadence triggers (≈6 stored entries) or at session end, construct the full context by invoking `client/prompts/default/chat/context_prompt.md`.
+   2) Do NOT include any system/control text or prompt markers in the context.
+   3) Issue `await_consistency()`; then call `put_context` with the generated context.
 
 ### State machines
 
 **Entry Persistence (per message)**
 ```mermaid
 flowchart TD
-    NewMsg[New user / assistant message] --> Store?{Store this?}
-    Store? -- No --> Continue
-    Store? -- Yes --> Summ[Generate ≤512-char summary]
-    Summ --> Add[add_entry(raw_entry, summary)] --> Continue[Continue conversation]
+    NewMsg[New user / assistant message] --> Summ[Generate ≤512-char summary]
+    Summ --> Add[add_entry(raw_entry, summary)]
+    Add --> Continue[Continue conversation]
 ```
 
-### Prompt loading
-
-Load memory-type-specific prompts from `prompts/default/{memory_type}/` directory. 
-
-For memory_type="chat", use prompts from `prompts/default/chat/` including:
-  1. `context_prompt.md` - for context maintenance
-  2. `entry_capture_prompt.md` - for entry persistence 
-  3. `summary_prompt.md` - for summary generation
-
-## Appendix A – Worked Examples (ILLUSTRATIVE ONLY)
-
-**IMPORTANT**: These examples demonstrate the workflow and format only. NEVER use the example content (like "Q3 launch date" or "customer-support agent"). Always use ACTUAL content from the conversation you are observing.
-
-#### Example A-1: Context update
-
-```text
-// This shows the PATTERN only. Use YOUR conversation's actual content:
-// When you see a NEW RAW MESSAGE like "Hi, I'm planning a trip to Paris"
-// You would generate a SUMMARY like "User is planning a trip to Paris"
-// And update CONTEXT with actual facts from that conversation
-```
+<!-- See References above for the canonical prompt files -->
