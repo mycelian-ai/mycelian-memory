@@ -41,13 +41,14 @@ def extract_bedrock_error_code(exc: Exception) -> str:
         pass
     # Fallback: parse from string
     msg = str(exc)
-    for code in list(RETRYABLE_BEDROCK_CODES) | {
+    codes_to_check = RETRYABLE_BEDROCK_CODES | {
         "ValidationException",
         "AccessDeniedException",
         "ResourceNotFoundException",
         "ServiceQuotaExceededException",
         "ModelErrorException",
-    }:
+    }
+    for code in codes_to_check:
         if code in msg:
             return code
     if "429" in msg or "Too many requests" in msg or "Rate limit" in msg:
