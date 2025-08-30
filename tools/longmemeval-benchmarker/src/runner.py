@@ -5,8 +5,8 @@ import tomllib
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from dataset_loader import load_longmemeval_file
-from mycelian_memory_agent import build_agent
+from .dataset_loader import load_longmemeval_file
+from .mycelian_memory_agent import build_agent
 
 
 @dataclass
@@ -151,6 +151,52 @@ def _build_qa_context(search_result: Dict, top_k: int) -> str:
     return "\n\n".join(parts)
 
 
+def _with_control_messages(msgs: List[Dict[str, Any]], every: int = 6) -> List[Dict[str, Any]]:
+    """Insert system control messages at session start, every N turns, and session end.
+
+    Returns a list of items where each item is {"content": "<json-string>"} so the
+    agent can forward directly to the model.
+    """
+    out: List[Dict[str, Any]] = []
+    import json as _json
+
+    # Session start
+    out.append({
+        "content": _json.dumps({
+            "type": "system",
+            "content": "SESSION_START: Call get_context, and then list_entries(limit=10) if resuming a session."
+        })
+    })
+
+    # Add conversation messages with flush controls
+    for i, m in enumerate(msgs):
+        msg_obj = {
+            "type": "conversation",
+            "role": m.get("role"),
+            "content": m.get("content", "")
+        }
+        out.append({"content": _json.dumps(msg_obj)})
+
+        # Insert flush control every N messages
+        if (i + 1) % every == 0:
+            out.append({
+                "content": _json.dumps({
+                    "type": "system",
+                    "content": "FLUSH_CONTEXT: Call await_consistency then put_context now."
+                })
+            })
+
+    # Session end
+    out.append({
+        "content": _json.dumps({
+            "type": "system",
+            "content": "SESSION_END: Call await_consistency then put_context to finalize."
+        })
+    })
+
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run LongMemEval (simple): ingest first N questions and write hypotheses.jsonl")
     parser.add_argument("config", help="Path to TOML config")
@@ -264,6 +310,8 @@ def main() -> None:
                     msgs = s.get("messages", [])
                     if cfg.params.max_turns_per_session and isinstance(msgs, list):
                         msgs = msgs[: cfg.params.max_turns_per_session]
+                    # Insert control messages: session start, every 6 turns, and session end
+                    msgs = _with_control_messages(list(msgs), every=6)
                     print(f"[worker][{idx}] session {session_idx} START ({len(msgs)} messages)", file=lf, flush=True)
                     ag.run_session(msgs)
                     print(f"[worker][{idx}] session {session_idx} END", file=lf, flush=True)

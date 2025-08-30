@@ -1,7 +1,9 @@
 from typing import Any, Dict, List, Tuple, Optional, TextIO
 import os
 import asyncio
-from langchain_core.tools import StructuredTool  # type: ignore
+from .error_handler import invoke_with_backoff
+from .message_schema import parse_message, is_system, to_llm_payload
+# Lazy import StructuredTool through mcp_tools wrapper to avoid linter errors
 
 
 class MycelianMemoryAgent:
@@ -30,12 +32,6 @@ class MycelianMemoryAgent:
         # Memory binding (set per question)
         self._vault_id: Optional[str] = None
         self._memory_id: Optional[str] = None
-        # Batching state for context flushes (enforced in wrapper)
-        self._entries_since_flush: int = 0
-        try:
-            self._flush_threshold: int = int(os.environ.get("LME_PUT_CONTEXT_BATCH", "6"))
-        except Exception:
-            self._flush_threshold = 6
 
         # Load local rules file (no bootstrap) + MCP templates
         import asyncio as _asyncio
@@ -65,8 +61,20 @@ class MycelianMemoryAgent:
         # Compose one static system message: prefix + rules + entry + summary + context
         prefix = (
             "You are the Mycelian Memory Agent. You OBSERVE a conversation between a USER and an AI ASSISTANT. "
-            "You do not role-play either participant. Your sole task is to capture durable memory for this conversation "
-            "in Mycelian using the MCP tools."
+            "You do not role-play either participant. Your task is to capture durable memory using MCP tools."
+            "\n\nMESSAGE SCHEMA (read carefully):\n"
+            "Each incoming item is a JSON object: { type: \"conversation\" | \"system\", content: string, role?: \"user\" | \"assistant\" }.\n"
+            "- type=conversation: content is an actual dialogue turn (role provided).\n"
+            "- type=system: content is a control instruction (not part of the conversation).\n"
+            "\nHANDLING RULES:\n"
+            "- NEVER persist or summarize system messages. Use them ONLY to decide which tools to call and when.\n"
+            "- For conversation: you MUST call add_entry exactly once per item (raw_entry=content; generate summary per summary_prompt).\n"
+            "  Optionally set tags.role = role if supported. Do not include any control text in raw_entry or summary.\n"
+            "- For system content, interpret high-level commands:\n"
+            "  • SESSION_START → If resuming, you MAY call get_context and list_entries(limit=10).\n"
+            "  • FLUSH_CONTEXT → You MUST call await_consistency, then put_context.\n"
+            "  • SESSION_END → You MUST call await_consistency, then put_context to finalize.\n"
+            "  • Unknown command → Do nothing.\n"
         )
         self._system_prompt: str = (
             (prefix or "").strip()
@@ -87,14 +95,20 @@ class MycelianMemoryAgent:
             return await self._mcp.get_tools()  # type: ignore[attr-defined]
 
         self._base_tools = _asyncio_tools.run(_load_tools())
-        # Expose tools to the agent excluding get_context (bootstrap handled in Python)
-        self._agent_tools = [t for t in self._base_tools if getattr(t, "name", None) != "get_context"]
+        # Expose all tools to the agent (including get_context). Guidance will be given via SystemMessage.
+        self._agent_tools = list(self._base_tools)
         if self._debug:
-            filtered = [getattr(t, "name", "tool") for t in self._base_tools if getattr(t, "name", None) == "get_context"]
-            if filtered:
-                self._log(f"[agent] hiding tools from LLM: {filtered}")
+            names = [getattr(t, "name", "tool") for t in self._agent_tools]
+            self._log(f"[agent] tools exposed to LLM: {names}")
         # Build logging-wrapped tools for observability (no behavior change)
-        self._tools_with_logging = [self._wrap_tool_with_logging(t) for t in self._agent_tools]
+        from .mcp_tools import wrap_tools_with_logging
+        self._tools_with_logging = wrap_tools_with_logging(
+            self._agent_tools,
+            log=self._log,
+            debug=self._debug,
+            await_consistency_fn=lambda mid: asyncio.run(self._tool_by_name("await_consistency").ainvoke({"memory_id": mid})),  # type: ignore[attr-defined]
+            get_memory_id_fn=lambda: self._memory_id,
+        )
 
         # Defer agent construction until memory is bound
         self._llm = init_chat_model(self._model_id)
@@ -264,37 +278,10 @@ class MycelianMemoryAgent:
         except Exception:
             return {}
 
-    def _bootstrap_memory(self, vault_id: str, memory_id: str) -> str:
-        """Bootstrap memory by calling get_context and list_entries. Returns working context."""
-        # Step 1: Get context
-        context_result = self._call_tool("get_context", {"vault_id": vault_id, "memory_id": memory_id})
-        
-        # Handle different response formats
-        working_context = ""
-        if isinstance(context_result, dict):
-            working_context = context_result.get("activeContext") or context_result.get("context") or ""
-        elif isinstance(context_result, str):
-            working_context = context_result
-            
-        # Step 2: If placeholder, initialize empty context
-        placeholder = "This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."
-        if working_context.strip() == placeholder:
-            self._call_tool("put_context", {"vault_id": vault_id, "memory_id": memory_id, "content": ""})
-            self._call_tool("await_consistency", {"memory_id": memory_id})
-            working_context = ""
-            
-        # Step 3: Load recent entries
-        entries_result = self._call_tool("list_entries", {"vault_id": vault_id, "memory_id": memory_id, "limit": "10"})
-        entries = []
-        if isinstance(entries_result, dict):
-            entries = entries_result.get("entries", [])
-        elif isinstance(entries_result, list):
-            entries = entries_result
-            
+    def _bootstrap_memory(self, vault_id: str, memory_id: str) -> None:
+        """Agentic bootstrap: no automatic get_context; rely on session-start guidance."""
         if self._debug:
-            self._log(f"[bootstrap] context_len={len(working_context)} entries_count={len(entries)}")
-            
-        return working_context
+            self._log("[bootstrap] agentic mode: no automatic get_context; LLM will decide per rules")
 
     def bind_memory(self, vault_id: str, memory_id: str) -> None:
         from langgraph.prebuilt import create_react_agent  # type: ignore
@@ -320,154 +307,45 @@ class MycelianMemoryAgent:
         )
 
     def run_session(self, messages: List[Dict[str, str]]) -> Tuple[int, int]:
-        # Bootstrap memory once at session start
-        if self._vault_id and self._memory_id:
-            working_context = self._bootstrap_memory(self._vault_id, self._memory_id)
-        
-        # Process each message individually (not cumulative history)
-        turns = 0
+        """Process messages sent by runner. Runner handles all control signals."""
+        turns = 0  # counts only conversation turns
         tool_calls = 0
-        for m in messages:
-            role = m.get("role")
-            content = m.get("content", "")
-            
-            # Create turn-specific guidance
-            should_flush = self._entries_since_flush >= self._flush_threshold
-            is_final_turn = (turns + 1) == len(messages)
-            
-            if should_flush or is_final_turn:
-                flush_guidance = (
-                    f"\n\nTURN CONTEXT: entries_since_flush={self._entries_since_flush}, flush_threshold={self._flush_threshold}. "
-                    + f"YOU MUST call put_context after processing this message ({'threshold reached' if should_flush else 'final turn'})."
-                )
-            else:
-                flush_guidance = (
-                    f"\n\nTURN CONTEXT: entries_since_flush={self._entries_since_flush}, flush_threshold={self._flush_threshold}. "
-                    + f"DO NOT call put_context for this message (below threshold, not final turn)."
-                )
-            
-            # Create agent with turn-specific system prompt
-            from langgraph.prebuilt import create_react_agent  # type: ignore
-            turn_prompt = (
-                self._system_prompt
-                + "\n\n"
-                + f"For all MCP tool calls, use vault_id or vaultId = '{self._vault_id}'."
-                + "\n"
-                + f"If a tool requires a memory identifier (memory_id or memoryId), use '{self._memory_id}'."
-                + "\n\n"
-                + "IMPORTANT: Memory has been pre-initialized with current context and recent entries. "
-                + "Use your working context for decision making. Follow the tool usage rules strictly."
-                + flush_guidance
-            )
-            
-            turn_agent = create_react_agent(
-                model=self._llm,
-                tools=self._tools_with_logging,
-                prompt=turn_prompt,
-            )
-            
-            # Process only this single message, not cumulative history
-            self._log(f"[agent][turn] {turns+1} role={role} len(content)={len(content)} entries_since_flush={self._entries_since_flush}")
-            # When debug is enabled, also print the raw message content preview
-            if self._debug:
-                try:
-                    _preview = content if len(content) <= 500 else (content[:500] + "…")
-                    self._log(f"[agent][turn] {turns+1} RAW {role}: {_preview}")
-                except Exception:
-                    pass
-            _ = turn_agent.invoke({"messages": [m]})
-            self._log(f"[agent][turn] {turns+1} -> completed")
-            turns += 1
         
+        for m in messages:
+            content = m.get("content", "")
+            msg = parse_message(content if isinstance(content, str) else str(content))
+            self._log_turn(msg, turns)
+
+            payload = to_llm_payload(msg.get("content", ""))
+            _ = invoke_with_backoff(lambda: self._agent.invoke(payload), debug=self._debug, log=self._log)
+
+            if is_system(msg):
+                self._log("[agent][ctrl] -> completed")
+            else:
+                self._log(f"[agent][turn] {turns+1} -> completed")
+                turns += 1
+
         return turns, tool_calls
 
-    def _wrap_tool_with_logging(self, tool: Any) -> Any:
-        name = getattr(tool, "name", "tool")
-        description = getattr(tool, "description", "")
-        args_schema = getattr(tool, "args_schema", None)
-
-        # If we cannot read args_schema, fall back to the original tool (no wrapping)
-        if args_schema is None:
-            return tool
-
-        async def _acoroutine(**kwargs: Any) -> Any:
-            prev = str(kwargs)
-            if len(prev) > 200:
-                prev = prev[:200] + "…"
-            if self._debug:
-                self._log(f"[agent][tool] {name} args={prev}")
-            try:
-                # Track counters for batching guidance
-                if name == "add_entry":
-                    res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
-                    self._entries_since_flush += 1
-                elif name == "put_context":
-                    # Auto-call await_consistency before put_context for durability
-                    try:
-                        _ = await self._tool_by_name("await_consistency").ainvoke({"memory_id": self._memory_id})  # type: ignore[attr-defined]
-                    except Exception:
-                        pass
-                    res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
-                    self._entries_since_flush = 0  # Reset counter after flush
-                else:
-                    res = await tool.ainvoke(kwargs) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
-                
-                if self._debug:
-                    rp = str(res)
-                    if len(rp) > 200:
-                        rp = rp[:200] + "…"
-                    self._log(f"[agent][tool] {name} -> SUCCESS: {rp}")
-                return res
-            except Exception as e:
-                if self._debug:
-                    self._log(f"[agent][tool] {name} -> ERROR: {e}")
-                raise
-
-        def _func(**kwargs: Any) -> Any:
-            prev = str(kwargs)
-            if len(prev) > 200:
-                prev = prev[:200] + "…"
-            if self._debug:
-                self._log(f"[agent][tool] {name} (sync) args={prev}")
-            try:
-                # Track counters for batching guidance
-                if name == "add_entry":
-                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
-                    self._entries_since_flush += 1
-                elif name == "put_context":
-                    # Auto-call await_consistency before put_context for durability
-                    try:
-                        _ = asyncio.run(self._tool_by_name("await_consistency").ainvoke({"memory_id": self._memory_id}))  # type: ignore[attr-defined]
-                    except Exception:
-                        pass
-                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
-                    self._entries_since_flush = 0  # Reset counter after flush
-                else:
-                    res = asyncio.run(tool.ainvoke(kwargs)) if hasattr(tool, "ainvoke") else tool.invoke(kwargs)  # type: ignore[attr-defined]
-                
-                if self._debug:
-                    rp = str(res)
-                    if len(rp) > 200:
-                        rp = rp[:200] + "…"
-                    self._log(f"[agent][tool] {name} (sync) -> SUCCESS: {rp}")
-                return res
-            except Exception as e:
-                if self._debug:
-                    self._log(f"[agent][tool] {name} (sync) -> ERROR: {e}")
-                raise
-
-        # Construct a new StructuredTool with identical schema and name/description
+    def _log_turn(self, msg: Dict[str, str], turn_index: int, preview_len: int = 500) -> None:
         try:
-            return StructuredTool.from_function(
-                name=name,
-                description=description,
-                args_schema=args_schema,
-                func=_func,
-                coroutine=_acoroutine,
-            )
+            body = msg.get("content", "")
+            role = msg.get("role", "")
+            kind = msg.get("type", "")
+            head = (body if len(body) <= preview_len else (body[:preview_len] + "…"))
+            if is_system(msg):
+                self._log(f"[agent][ctrl] type=system len(content)={len(body)}")
+            else:
+                self._log(f"[agent][turn] {turn_index+1} type=conversation role={role} len(content)={len(body)}")
+            if self._debug and head:
+                prefix = "[agent][ctrl] RAW:" if is_system(msg) else f"[agent][turn] {turn_index+1} RAW:"
+                self._log(f"{prefix} {head}")
         except Exception:
-            # If wrapping fails, use the original tool
-            return tool
+            pass
+
+    # Backoff logic now lives in error_handler.invoke_with_backoff
+
+    # Old per-tool wrapper removed; replaced by mcp_tools.wrap_tools_with_logging
 
 
 class _BoundArgsTool:
