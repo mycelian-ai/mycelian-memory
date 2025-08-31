@@ -306,7 +306,7 @@ class MycelianMemoryAgent:
         turns = 0  # counts only conversation turns
         tool_calls = 0
 
-        # Maintain full prior history and send it every turn
+        # Maintain full prior history of conversation-only turns (no system controls)
         history_messages_for_llm: List[Dict[str, str]] = []
 
         try:
@@ -325,9 +325,19 @@ class MycelianMemoryAgent:
                     preview = content if len(content) <= 500 else (content[:500] + "…")
                     self._log(f"[agent][raw] {preview}")
 
-                # Append current item to history and send full history to the agent
-                history_messages_for_llm.append({"role": "user", "content": content})
-                payload = {"messages": list(history_messages_for_llm)}
+                # Build per-turn payload: include prior conversation history, plus this turn
+                payload_messages: List[Dict[str, str]] = list(history_messages_for_llm)
+
+                if msg_type == "system":
+                    # Do NOT persist system messages in history; include only for this turn as system
+                    payload_messages.append({"role": "system", "content": content})
+                else:
+                    # Conversation turn: persist and include in payload with original role
+                    chat_role = "user" if (role or "user").lower() == "user" else "assistant"
+                    history_messages_for_llm.append({"role": chat_role, "content": content})
+                    payload_messages = list(history_messages_for_llm)
+
+                payload = {"messages": payload_messages}
 
                 if self._debug:
                     self._log(f"[agent] invoke history_len={len(history_messages_for_llm)}")

@@ -20,4 +20,7 @@ workers = 1
 # No session/turn limits - process all sessions for this question
 debug = true
 
+# Limit to first 2 sessions for this test
+max_sessions_per_question = 3
+
 memory_title_template = "{question_id}__{run_id}"
