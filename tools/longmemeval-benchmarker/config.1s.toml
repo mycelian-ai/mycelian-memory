@@ -1,0 +1,23 @@
+# Config for running single question (question 2: 0a995998)
+dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval_0a995998.json"
+vault_title = "longmemeval-q2"
+
+[provider]
+type = "openai"
+
+[provider.openai]
+base_url = "https://api.openai.com/v1"
+
+[models]
+agent = "gpt-5-nano-2025-08-07"
+qa    = "gpt-5-nano-2025-08-07"
+
+[params]
+top_k = 10
+max_tool_calls_per_turn = 5
+question_limit = 1
+workers = 1
+# No session/turn limits - process all sessions for this question
+debug = true
+
+memory_title_template = "{question_id}__{run_id}"

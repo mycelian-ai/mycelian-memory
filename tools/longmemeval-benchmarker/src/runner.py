@@ -154,18 +154,16 @@ def _build_qa_context(search_result: Dict, top_k: int) -> str:
 def _with_control_messages(msgs: List[Dict[str, Any]], every: int = 6) -> List[Dict[str, Any]]:
     """Insert system control messages at session start, every N turns, and session end.
 
-    Returns a list of items where each item is {"content": "<json-string>"} so the
-    agent can forward directly to the model.
+    Returns a list of items with simplified message format:
+    - System messages: {"type": "system", "content": "..."}
+    - Conversation messages: {"type": "conversation", "role": "user/assistant", "content": "..."}
     """
     out: List[Dict[str, Any]] = []
-    import json as _json
 
     # Session start
     out.append({
-        "content": _json.dumps({
-            "type": "system",
-            "content": "SESSION_START: Call get_context, and then list_entries(limit=10) if resuming a session."
-        })
+        "type": "system",
+        "content": "SESSION_START: Call get_context, and then list_entries(limit=10) if resuming a session."
     })
 
     # Add conversation messages with flush controls
@@ -175,23 +173,19 @@ def _with_control_messages(msgs: List[Dict[str, Any]], every: int = 6) -> List[D
             "role": m.get("role"),
             "content": m.get("content", "")
         }
-        out.append({"content": _json.dumps(msg_obj)})
+        out.append(msg_obj)
 
         # Insert flush control every N messages
         if (i + 1) % every == 0:
             out.append({
-                "content": _json.dumps({
-                    "type": "system",
-                    "content": "FLUSH_CONTEXT: Call await_consistency then put_context now."
-                })
+                "type": "system",
+                "content": "FLUSH_CONTEXT: Call await_consistency then put_context now."
             })
 
     # Session end
     out.append({
-        "content": _json.dumps({
-            "type": "system",
-            "content": "SESSION_END: Call await_consistency then put_context to finalize."
-        })
+        "type": "system",
+        "content": "SESSION_END: Call await_consistency then put_context to finalize."
     })
 
     return out

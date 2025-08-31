@@ -1,8 +1,10 @@
 from typing import Any, Dict, List, Tuple, Optional, TextIO
 import os
 import asyncio
-from .error_handler import invoke_with_backoff
+from .tenacious_agent_invoker import invoke_with_backoff
 from langchain_core.tools import StructuredTool
+import json
+import asyncio as _asyncio
 
 
 class MycelianMemoryAgent:
@@ -31,9 +33,6 @@ class MycelianMemoryAgent:
         # Memory binding (set per question)
         self._vault_id: Optional[str] = None
         self._memory_id: Optional[str] = None
-
-        # Load local rules file (no bootstrap) + MCP templates
-        import asyncio as _asyncio
         
         # Read local rules file
         local_rules_path = os.path.join(os.path.dirname(__file__), "context_summary_rules.md")
@@ -62,11 +61,13 @@ class MycelianMemoryAgent:
             "You are the Mycelian Memory Agent. You OBSERVE a conversation between a USER and an AI ASSISTANT. "
             "You do not role-play either participant. Your task is to capture durable memory using MCP tools."
             "\n\nMESSAGE SCHEMA (read carefully):\n"
-            "Each incoming item is a JSON object: { type: \"conversation\" | \"system\", content: string, role?: \"user\" | \"assistant\" }.\n"
+            "Each incoming item has this format:\n"
+            "- type=\"conversation\": { type: \"conversation\", role: \"user\" | \"assistant\", content: string }\n"
+            "- type=\"system\": { type: \"system\", content: string }\n"
             "- type=conversation: content is an actual dialogue turn (role provided).\n"
             "- type=system: content is a control instruction (not part of the conversation).\n"
             "\nHANDLING RULES:\n"
-            "- NEVER persist or summarize system messages. Use them ONLY to decide which tools to call and when.\n"
+            "- NEVER persist or summarize system messages. Use them ONLY to decide what action to take, which tools to call and when.\n"
             "- For conversation: you MUST call add_entry exactly once per item (raw_entry=content; generate summary per summary_prompt).\n"
             "  Optionally set tags.role = role if supported. Do not include any control text in raw_entry or summary.\n"
             "- For system content, interpret high-level commands:\n"
@@ -298,49 +299,55 @@ class MycelianMemoryAgent:
             prompt=prompt_with_ids,
         )
 
-    def run_session(self, messages: List[Dict[str, str]]) -> Tuple[int, int]:
+
+
+    def run_session(self, messages: List[Dict[str, Any]]) -> Tuple[int, int]:
         """Process messages sent by runner. Runner handles all control signals."""
         turns = 0  # counts only conversation turns
         tool_calls = 0
-        
-        for m in messages:
-            content = m.get("content", "")
-            # Parse JSON string for logging type/role without changing behavior
-            msg_type = "unknown"
-            role = ""
-            try:
-                import json as _json
-                parsed = _json.loads(content) if isinstance(content, str) else {}
-                if isinstance(parsed, dict):
-                    msg_type = parsed.get("type", msg_type)
-                    role = parsed.get("role", role)
-            except Exception:
-                pass
-            if msg_type == "system":
-                self._log(f"[agent][ctrl] type=system len(content)={len(content)}")
-            else:
-                self._log(f"[agent][turn] {turns+1} type={msg_type} role={role} len(content)={len(content)}")
-            if self._debug:
-                try:
+
+        # Maintain full prior history and send it every turn
+        history_messages_for_llm: List[Dict[str, str]] = []
+
+        try:
+            for m in messages:
+                # Extract message details from simplified format
+                msg_type = m.get("type", "unknown")
+                role = m.get("role", "")
+                content = m.get("content", "")
+                
+                # Log message details
+                if msg_type == "system":
+                    self._log("[agent][ctrl] system message")
+                else:
+                    self._log(f"[agent][turn] {turns+1} type={msg_type} role={role} len={len(content)}")
+                if self._debug:
                     preview = content if len(content) <= 500 else (content[:500] + "…")
-                    self._log(f"[agent][turn] {turns+1} RAW: {preview}")
-                except Exception:
-                    pass
-            
-            # Send the JSON message so the model can read type/role/content
-            # Runner already provides messages as JSON strings in content
-            rendered = content if isinstance(content, str) else str(content)
-            payload = {"messages": [{"role": "user", "content": rendered}]}
-            _ = invoke_with_backoff(lambda: self._agent.invoke(payload), debug=self._debug, log=self._log)
-            if msg_type == "system":
-                self._log("[agent][ctrl] -> completed")
-            else:
-                self._log(f"[agent][turn] {turns+1} -> completed")
-                turns += 1
+                    self._log(f"[agent][raw] {preview}")
+
+                # Append current item to history and send full history to the agent
+                history_messages_for_llm.append({"role": "user", "content": content})
+                payload = {"messages": list(history_messages_for_llm)}
+
+                if self._debug:
+                    self._log(f"[agent] invoke history_len={len(history_messages_for_llm)}")
+
+                _ = invoke_with_backoff(lambda: self._agent.invoke(payload), debug=self._debug, log=self._log)
+
+                if msg_type == "system":
+                    self._log("[agent][ctrl] -> completed")
+                else:
+                    self._log(f"[agent][turn] {turns+1} -> completed")
+                    turns += 1
+        except Exception as e:
+            import traceback
+            tb_str = traceback.format_exc()
+            self._log(f"[agent][FATAL] Exception during run_session: {e}\nTraceback:\n{tb_str}")
+            raise
 
         return turns, tool_calls
 
-    # Backoff logic now lives in error_handler.invoke_with_backoff
+    # Backoff logic now lives in tenacious_agent_invoker.invoke_with_backoff
 
     def _wrap_tool_with_logging(self, tool: Any) -> Any:
         name = getattr(tool, "name", "tool")
@@ -459,8 +466,12 @@ class _BoundArgsTool:
 
 def build_agent(model_id: str, max_tool_calls_per_turn: int = 5, provider_type: str | None = None, debug: bool = False) -> MycelianMemoryAgent:
     resolved_model = model_id
-    if provider_type and provider_type.lower() == "bedrock" and not str(model_id).startswith("bedrock:"):
-        resolved_model = f"bedrock:{model_id}"
+    if provider_type:
+        p = provider_type.lower()
+        if p == "bedrock" and not str(model_id).startswith("bedrock:"):
+            resolved_model = f"bedrock:{model_id}"
+        elif p == "openai" and not str(model_id).startswith("openai:"):
+            resolved_model = f"openai:{model_id}"
     return MycelianMemoryAgent(model_id=resolved_model, max_tool_calls_per_turn=max_tool_calls_per_turn, debug=debug)
 
 

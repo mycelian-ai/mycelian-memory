@@ -109,30 +109,47 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Create LongMemEval subset (systematic sampling).")
     ap.add_argument("dataset_path", help="Path to LongMemEval dataset file (e.g., longmemeval_s.json) or directory containing it")
     ap.add_argument("--num-questions", type=int, default=5, help="Number of questions to sample (default: 5)")
-    ap.add_argument("--output", help="Output JSON filename (default: longmemeval_s_{num}.json)")
+    ap.add_argument("--question-id", help="Filter to a specific question ID (overrides --num-questions)")
+    ap.add_argument("--output", help="Output JSON filename (default: longmemeval_s_{num}.json or longmemeval_{question_id}.json)")
     ap.add_argument("--copy-as-s", action="store_true",
                     help="Also write a copy named 'longmemeval_s.json' for loaders that expect that name")
     args = ap.parse_args()
 
-    if not args.output:
-        args.output = f"longmemeval_s_{args.num_questions}.json"
+    # Handle question ID filtering vs sampling
+    if args.question_id:
+        if not args.output:
+            args.output = f"longmemeval_{args.question_id}.json"
+        
+        print(f"Loading dataset from: {args.dataset_path}")
+        questions = load_dataset(args.dataset_path)
+        print(f"Total questions loaded: {len(questions)}")
+        
+        # Filter to specific question ID
+        subset = [q for q in questions if q.get("question_id") == args.question_id]
+        if not subset:
+            print(f"Error: Question ID '{args.question_id}' not found in dataset")
+            return
+        print(f"Found question: {args.question_id} ({subset[0].get('question_type', 'unknown')})")
+    else:
+        if not args.output:
+            args.output = f"longmemeval_s_{args.num_questions}.json"
 
-    target_types = [
-        "single-session-user",      # IE
-        "multi-session",            # MR
-        "knowledge-update",         # KU
-        "temporal-reasoning",       # TR
-        "single-session-preference", # SP
-        "single-session-assistant", # SA
-        # ABS handled by '_abs' in question_id
-    ]
+        target_types = [
+            "single-session-user",      # IE
+            "multi-session",            # MR
+            "knowledge-update",         # KU
+            "temporal-reasoning",       # TR
+            "single-session-preference", # SP
+            "single-session-assistant", # SA
+            # ABS handled by '_abs' in question_id
+        ]
 
-    print(f"Loading dataset from: {args.dataset_path}")
-    questions = load_dataset(args.dataset_path)
-    print(f"Total questions loaded: {len(questions)}")
+        print(f"Loading dataset from: {args.dataset_path}")
+        questions = load_dataset(args.dataset_path)
+        print(f"Total questions loaded: {len(questions)}")
 
-    subset = sample_questions(questions, target_types, args.num_questions)
-    print(f"Subset size: {len(subset)}")
+        subset = sample_questions(questions, target_types, args.num_questions)
+        print(f"Subset size: {len(subset)}")
 
     out_path = Path(args.output)
     with out_path.open("w", encoding="utf-8") as f:
@@ -147,7 +164,10 @@ def main() -> None:
 
     print("\nSubset summary:")
     for i, q in enumerate(subset, 1):
-        print(f"{i}. {q.get('question_id')} ({q.get('question_type')})")
+        question_text = q.get('question', 'No question text')
+        if len(question_text) > 80:
+            question_text = question_text[:77] + "..."
+        print(f"{i}. {q.get('question_id')} ({q.get('question_type')}): {question_text}")
 
 
 if __name__ == "__main__":
