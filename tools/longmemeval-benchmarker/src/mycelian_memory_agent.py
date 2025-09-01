@@ -257,8 +257,10 @@ class MycelianMemoryAgent:
             pass  # Silent failure for state dump
 
     def bind_memory(self, vault_id: str, memory_id: str) -> None:
-        from langgraph.prebuilt import create_react_agent  # type: ignore
+        from langgraph.prebuilt import ToolNode  # type: ignore
         from langgraph.checkpoint.memory import InMemorySaver  # type: ignore
+        from langgraph.graph import StateGraph, MessagesState, START, END  # type: ignore
+        from langchain_core.messages import SystemMessage, ChatMessage, AIMessage, ToolMessage  # type: ignore
         self._vault_id = vault_id
         self._memory_id = memory_id
         # Supply IDs via prompt guidance only
@@ -271,6 +273,17 @@ class MycelianMemoryAgent:
             + "\n\n"
             + "IMPORTANT: Memory has been pre-initialized with current context and recent entries. "
             + "Use your working context for decision making. Follow the tool usage rules strictly."
+            + "\n\n"
+            + "ENFORCEMENT (concise):\n"
+            + "IDENTITY: You are 'mycelian'. Use role='mycelian' only for self-reference; never persist role='mycelian'.\n"
+            + "OUTPUT: Emit ONLY MCP tool calls; never write assistant chat text.\n"
+            + "CONVERSATION: One add_entry per (thread_id,msg_idx).\n"
+            + "  Build raw_entry following the entry_capture_prompt; build summary following the summary_prompt.\n"
+            + "  Tags MUST be {role} only. DO NOT include msg_idx in tags.\n"
+            + "SYSTEM: SESSION_START → get_context once then list_entries(limit=10). FLUSH_CONTEXT/SESSION_END → await_consistency then put_context. Do not persist system messages.\n"
+            + "NO_CONTEXT_ON_CONVO: Never call get_context or list_entries during conversation messages.\n"
+            + "FLUSH_MOD6: Use msg_idx ONLY to decide flushing. If msg_idx % 6 == 0 → await_consistency then put_context.\n"
+            + "NO_DUPES: If a tool errors, do NOT reissue add_entry for the same (thread_id,msg_idx)."
         )
 
         # Use a checkpointer so we only send the latest message; state persists by thread_id
@@ -352,12 +365,100 @@ class MycelianMemoryAgent:
             except Exception:
                 pass
 
-        self._agent = create_react_agent(
-            model=self._llm,
-            tools=self._agent_tools,
-            prompt=prompt_with_ids,
-            checkpointer=self._checkpointer,
+        # Build custom tool-only graph: model sees only system+chat; returns tool_calls only
+        llm_with_tools = self._llm.bind_tools(self._agent_tools)
+
+        def _curate_for_model(msgs: list[Any]) -> list[Any]:
+            curated: list[Any] = []
+            for m in msgs:
+                # Exclude historical SystemMessage entries; we always prepend the latest system prompt.
+                # Include:
+                # - ChatMessage (prior conversation turns)
+                # - ToolMessage (tool results for progress)
+                # - AIMessage only when it contains tool_calls (provider pairing requirement)
+                if isinstance(m, (ChatMessage, ToolMessage)):
+                    curated.append(m)
+                else:
+                    try:
+                        if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):
+                            curated.append(m)
+                    except Exception:
+                        pass
+            return curated
+
+        def llm_call(state: MessagesState):
+            model_input = [SystemMessage(content=prompt_with_ids)]
+            curated = _curate_for_model(state["messages"])
+            # Include the latest SystemMessage (e.g., SESSION_START) if present, while
+            # still excluding historical system messages from prior turns.
+            try:
+                last_msg = state["messages"][-1]
+                if isinstance(last_msg, SystemMessage):
+                    curated.append(last_msg)
+            except Exception:
+                pass
+            model_input += curated
+            # Debug log: input sizes
+            try:
+                logging.getLogger("lme.agent").info(
+                    "LLM_CALL curated_messages=%d", len(model_input)
+                )
+            except Exception:
+                pass
+            resp = llm_with_tools.invoke(model_input)
+            # Debug log: tool_calls count
+            try:
+                tc = getattr(resp, "tool_calls", []) or []
+                logging.getLogger("lme.agent").info(
+                    "LLM_CALL tool_calls=%d", len(tc)
+                )
+                # Log planned tool calls with args for visibility
+                for tcall in tc:
+                    try:
+                        name = tcall.get("name") if isinstance(tcall, dict) else getattr(tcall, "name", "")
+                        args = tcall.get("args") if isinstance(tcall, dict) else getattr(tcall, "args", {})
+                        try:
+                            args_str = json.dumps(args, ensure_ascii=False)
+                        except Exception:
+                            args_str = str(args)
+                        if len(args_str) > 1500:
+                            args_str = args_str[:1497] + "..."
+                        logging.getLogger("lme.tool").info(
+                            "TOOL_PLAN tool=%s args=%s",
+                            str(name or ""),
+                            args_str,
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            return {
+                "messages": [
+                    AIMessage(
+                        content="",
+                        tool_calls=getattr(resp, "tool_calls", []),
+                        additional_kwargs=getattr(resp, "additional_kwargs", {}),
+                    )
+                ]
+            }
+
+        def should_continue(state: MessagesState):
+            messages = state["messages"]
+            last = messages[-1]
+            return "tools" if getattr(last, "tool_calls", None) else END
+
+        builder = StateGraph(MessagesState)
+        builder.add_node("llm_call", llm_call)
+        builder.add_node("tools", ToolNode(self._agent_tools))
+        builder.add_edge(START, "llm_call")
+        builder.add_conditional_edges(
+            "llm_call",
+            should_continue,
+            {"tools": "tools", END: END},
         )
+        builder.add_edge("tools", "llm_call")
+
+        self._agent = builder.compile(checkpointer=self._checkpointer)
 
         # Agent ready for invocation
 
@@ -377,12 +478,12 @@ class MycelianMemoryAgent:
         if self._agent is None:
             raise RuntimeError("Agent not initialized. Call bind_memory first.")
         
-        # Build message per spec
+        # Build message per spec (LangChain Message objects for custom graph)
         if type == "system":
             if role is not None or msg_idx is not None:
                 raise ValueError("System messages must not have role or msg_idx")
-            msg = {"type": "system", "content": content}
-            payload = {"messages": [{"role": "system", "content": content}]}
+            from langchain_core.messages import SystemMessage as _SysMsg  # type: ignore
+            lc_msg = _SysMsg(content=content)
         elif type == "conversation":
             if role is None or msg_idx is None:
                 raise ValueError("Conversation messages require role and msg_idx")
@@ -390,15 +491,15 @@ class MycelianMemoryAgent:
                 raise ValueError(f"Invalid role: {role}")
             if not isinstance(msg_idx, int) or msg_idx < 1:
                 raise ValueError(f"msg_idx must be positive integer, got: {msg_idx}")
-            msg = {"type": "conversation", "role": role, "content": content, "msg_idx": msg_idx}
-            payload = {"messages": [{"role": role, "content": content}]}
+            from langchain_core.messages import ChatMessage as _ChatMsg  # type: ignore
+            lc_msg = _ChatMsg(role=role, content=content)
         else:
             raise ValueError(f"Invalid type: {type}")
         
         if not isinstance(content, str) or not content.strip():
             raise ValueError("content must be non-empty string")
         
-        config = {"configurable": {"thread_id": thread_id}}
+        config = {"configurable": {"thread_id": thread_id, "recursion_limit": 12}}
 
         # Record current message context (not used for logging now)
         self._current_msg_ctx = {"thread_id": thread_id, "type": type, "role": role, "msg_idx": msg_idx, "memory_id": self._memory_id}
@@ -426,11 +527,20 @@ class MycelianMemoryAgent:
             pass
 
         # Invoke agent asynchronously so tools run via coroutine paths
-        result = invoke_with_backoff(
-            lambda: asyncio.run(self._agent.ainvoke(payload, config)),
-            debug=self._debug,
-            log=lambda m: logging.getLogger("lme.agent").info(str(m)),
-        )
+        payload = {"messages": [lc_msg]}
+        def _invoke_async():
+            async def _run():
+                return await asyncio.wait_for(self._agent.ainvoke(payload, config), timeout=60.0)
+            return asyncio.run(_run())
+        try:
+            result = invoke_with_backoff(
+                _invoke_async,
+                debug=self._debug,
+                log=lambda m: logging.getLogger("lme.agent").info(str(m)),
+            )
+        except Exception as e:
+            logging.getLogger("lme.agent").info("AINVOKE_ERROR %s", str(e)[:200])
+            raise
 
         # Result summary (messages count) for quick visibility
         try:
