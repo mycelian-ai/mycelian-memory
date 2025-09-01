@@ -2,15 +2,15 @@ dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/long
 vault_title = "longmemeval-quick"
 
 [provider]
-type = "bedrock"
+type = "openai"
 
-[provider.bedrock]
-region = "us-west-2"
+[provider.openai]
+base_url = "https://api.openai.com/v1"
 
 [models]
-agent = "anthropic.claude-3-5-haiku-20241022-v1:0"
-qa    = "anthropic.claude-3-5-haiku-20241022-v1:0"
-eval  = "anthropic.claude-3-5-haiku-20241022-v1:0"
+agent = "gpt-4o-mini"
+qa    = "gpt-4o-mini"
+eval  = "gpt-4o-mini"
 
 [params]
 top_k = 10
@@ -20,7 +20,6 @@ workers = 1
 max_sessions_per_question = 2
 max_turns_per_session = 0
 # Limit sessions for quick behavior check
-debug = true
 
 memory_title_template = "{question_id}__{run_id}"
 

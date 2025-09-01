@@ -18,7 +18,6 @@ max_tool_calls_per_turn = 5
 question_limit = 1
 workers = 1
 # No session/turn limits - process all sessions for this question
-debug = true
 
 # Limit to first 2 sessions for this test
 max_sessions_per_question = 3

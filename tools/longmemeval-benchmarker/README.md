@@ -2,28 +2,42 @@
 
 The benchmarker allows us to run the LongMemEval benchmark using Mycelian Memory as the backend. Please refer to the benchmarker [design doc](../../docs/designs/langgraph_longmemeval_benchmarker.md) to learn more. 
 
-LongMemEval is designed to test not just the performance of the memory system but also it's scale. The large version contains 500 questions. Each question is composed of 500 sessions. Each session contains turns between a user and an assistant. To evaluate real world performance, we must store memories as a production agent will. This creates scaling challenges. Answering a single question of smaller dataset with ~50 sessions requires ~60 mins with Claude Haiku 3.5. Hence, the benchmarker supports sharding by questions and processing each question in parallel. ITS IMPORTANT that we DO NOT parallelize sessions inside a question as the Memory Agent must build chronological context. 
+LongMemEval is designed to test not just the performance of the memory system but also its scale. The large version contains 500 questions. Each question is composed of 500 sessions. Each session contains turns between a user and an assistant. To evaluate real world performance, we must store memories as a production agent will. This creates scaling challenges. Answering a single question of smaller dataset with ~50 sessions requires ~60 mins with Claude Haiku 3.5. Hence, the benchmarker supports sharding by questions and processing each question in parallel. **IMPORTANT**: we DO NOT parallelize sessions inside a question as the Memory Agent must build chronological context. 
 
-Note: I got heavily throttled by both AWS Bedrock and OpenAI while trying to run more than one question in parallel, so did a small scale smoke test with 5 questions one of each type. The sampler script allows to extract these questions from `longmemeval_{s/m}.json` files. 
+Note: Running many questions in parallel can hit provider rate limits. The sampler script allows extracting a representative subset from `longmemeval_{s/m}.json` files.
 
-Please use following steps to run the benchmarker yourself.
+## Prerequisites
 
-## Environment setup
+1. **Start Mycelian services** (from repo root):
+   ```bash
+   # Start the backend memory service
+   make start-dev-mycelian-server
+   
+   # Start the MCP server for benchmarker communication
+   make start-mcp-streamable-server
+   ```
 
-```bash
-# Python deps (from repo root)
-pip install -r tools/longmemeval-benchmarker/requirements.txt
+2. **Set up Python environment**:
+   ```bash
+   cd tools/longmemeval-benchmarker
+   python -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-# Start Mycelian MCP server (single authoritative instance)
-docker compose -f deployments/docker/docker-compose.streamable.yml up -d
+3. **Provider credentials** (OpenAI only):
+   ```bash
+   export OPENAI_API_KEY=your-openai-key
+   ```
 
-# Provider credentials
-export OPENAI_API_KEY=...      # if provider=openai
-export AWS_REGION=us-west-2    # if provider=bedrock
-```
+## Dataset Setup
 
-## Dependency on LongMemEval repo
+You can either use the full LongMemEval dataset or work with the included sample:
 
+### Option 1: Use included sample dataset
+The benchmarker includes a sample dataset file `longmemeval_0a995998.json` for testing.
+
+### Option 2: Full LongMemEval dataset
 ```bash
 # Clone LongMemEval and place datasets under data/
 git clone https://github.com/xiaowu0162/LongMemEval.git
@@ -35,7 +49,7 @@ mkdir -p data
 #   data/longmemeval_oracle.json
 ```
 
-Then set `dataset_repo_path` in your TOML to that LongMemEval directory.
+Then set `dataset_file_path` in your TOML config to point to the dataset file.
 
 ## Creating a sample dataset
 
@@ -54,74 +68,109 @@ python -m src.lme_sampler /path/to/LongMemEval/data/longmemeval_m.json --num-que
 
 This creates `longmemeval_s_10.json` with 10 questions (one from each question type) and copies it as `longmemeval_s.json` for the loader. The sampler systematically selects questions to cover all core abilities: single-session-user, multi-session, knowledge-update, temporal-reasoning, single-session-preference, single-session-assistant, and abstention questions.
 
-## Quick Start (Simple Flow)
+## Quick Start
 
-```bash
-# Install deps
-pip install -r requirements.txt
+1. **Create a config file**:
+   ```bash
+   cd tools/longmemeval-benchmarker
+   cp config.example.toml run.toml
+   # Edit run.toml to set dataset_file_path, provider/models, vault_title
+   ```
 
-# Environment
-export OPENAI_API_KEY="your-openai-key"          # for provider=openai
-export AWS_REGION="us-west-2"                    # for provider=bedrock
+2. **Run the benchmarker**:
+   ```bash
+   source venv/bin/activate
+   PYTHONPATH=src python -m src.benchmarker run.toml --num-questions 1
+   ```
 
-# Create a config file (see config.example.toml)
-cp config.example.toml run.toml
-vi run.toml  # set dataset_repo_path, provider/models, vault_title
+3. **Check results**:
+   ```bash
+   cat out/run_<RUN_ID>/hypotheses.jsonl
+   ls out/run_<RUN_ID>/logs/  # Per-question logs
+   ```
 
-# Ingest the first N questions from the dataset and write hypotheses.jsonl
-cd tools/longmemeval-benchmarker
-python -m src.runner run.toml --num-questions 10
-
-# Evaluate with LongMemEval's official QA evaluator
-cd /path/to/LongMemEval/src/evaluation
-python3 evaluate_qa.py gpt-4o \
-  /path/to/mycelian-memory/tools/longmemeval-benchmarker/out/run_<RUN_ID>/hypotheses.jsonl \
-  ../../data/longmemeval_oracle.json
-```
+4. **Evaluate with LongMemEval's official QA evaluator** (if using full dataset):
+   ```bash
+   cd /path/to/LongMemEval/src/evaluation
+   python3 evaluate_qa.py gpt-4o \
+     /path/to/mycelian-memory/tools/longmemeval-benchmarker/out/run_<RUN_ID>/hypotheses.jsonl \
+     ../../data/longmemeval_oracle.json
+   ```
 
 ## Project Structure
 
 ```
 tools/longmemeval-benchmarker/
 ├── src/
-│   ├── dataset_loader.py         # question → sessions → messages
-│   ├── mycelian_memory_agent.py  # wraps MCP tools for ingestion/search
-│   ├── runner.py                 # ingest N questions and write hypotheses.jsonl
-│   └── eval.py                   # (optional) local EM/judge helpers
-├── config.example.toml       # starter config
-├── requirements.txt          # deps
-└── README.md                 # this file
+│   ├── benchmarker.py              # Main entrypoint: config/dataset/vault/dirs → workers
+│   ├── dataset_loader.py           # Load and parse LongMemEval JSON files
+│   ├── mycelian_memory_agent.py    # LangGraph agent with MCP tools for memory operations
+│   ├── memory_manager.py           # Vault/memory management via MCP
+│   ├── single_question_runner.py   # Process one question end-to-end (ingestion + QA)
+│   ├── worker_manager.py           # Sequential/parallel orchestration + logging
+│   ├── tenacious_agent_invoker.py  # Retry logic for agent calls
+│   └── lme_sampler.py              # Extract subsets from full datasets
+├── config.example.toml             # Example configuration
+├── config.1s.toml                  # Single question test config
+├── longmemeval_0a995998.json       # Sample dataset for testing
+├── requirements.txt                # Python dependencies
+└── README.md                       # This file
 ```
 
-## Generating a small sample
+## Configuration
 
-Run one question end-to-end to sanity check output:
+The benchmarker uses TOML configuration files. Key settings:
 
+- `dataset_file_path`: Path to LongMemEval JSON file
+- `vault_title`: Vault name for storing memories
+- `provider.type`: "openai" (currently supported)
+- `models.agent`: Model for the memory agent
+- `models.qa`: Model for question answering
+- `params.question_limit`: Number of questions to process
+- `params.workers`: Parallel workers (keep at 1 for chronological consistency)
+
+## How It Works
+
+For each question in the dataset, the benchmarker:
+
+1. **Memory Setup**: Creates/binds a memory using `memory_title_template`
+2. **Ingestion**: Streams all sessions/turns chronologically via MCP tools:
+   - `add_entry`: Store individual messages
+   - `put_context`: Save consolidated context
+   - `await_consistency`: Ensure writes are committed
+3. **Question Answering**: 
+   - `search_memories`: Retrieve relevant context
+   - Call QA model with retrieved context
+   - Append `{question_id, hypothesis}` to `out/run_<RUN_ID>/hypotheses.jsonl`
+
+## Troubleshooting
+
+### Import Errors
+If you see `ModuleNotFoundError`, ensure you're using the correct Python path:
 ```bash
-cd tools/longmemeval-benchmarker
-python -m src.runner run.toml --num-questions 1
-cat out/run_<RUN_ID>/hypotheses.jsonl
+PYTHONPATH=src python -m src.benchmarker config.toml
 ```
 
-## Running ingestion + QA to produce hypotheses
-
-- Single run (no extra modes). For each of the first N questions, the runner:
-  - Creates/binds a memory (uses `memory_title_template`)
-  - Streams all sessions/turns via MCP tools (`add_entry`, `put_context`, `get_context`, `await_consistency`, `search_memories`)
-  - Builds a compact QA context from search results and calls the QA model
-  - Appends `{question_id, hypothesis}` to `out/run_<RUN_ID>/hypotheses.jsonl`
-
-## Use LongMemEval evaluator to generate accuracy metrics
-
+### Connection Issues
+Ensure the Mycelian services are running:
 ```bash
-cd /path/to/LongMemEval/src/evaluation
-python3 evaluate_qa.py gpt-4o \
-  /path/to/mycelian-memory/tools/longmemeval-benchmarker/out/run_<RUN_ID>/hypotheses.jsonl \
-  ../../data/longmemeval_oracle.json
+# Check backend service status
+make backend-status
+
+# Check MCP server logs
+docker compose -f deployments/docker/docker-compose.streamable.yml logs -f
 ```
 
-The evaluator prints per-question logs (with `autoeval_label`) and overall accuracy. You can further aggregate with `print_qa_metrics.py` from the LongMemEval repo.
+The benchmarker connects to `http://localhost:11546/mcp` by default. You can override with:
+```bash
+export MYCELIAN_MCP_URL="http://localhost:11546/mcp"
+```
 
-## Development
+### Rate Limits
+If you hit OpenAI rate limits, reduce `workers` or add delays in the retry logic.
 
-This is a fresh start - no legacy code to maintain or refactor. Build exactly what you need, step by step.
+## Development Notes
+
+- **No Go PATH needed**: The benchmarker is pure Python and connects via HTTP/MCP
+- **Chronological ordering**: Sessions within a question are processed sequentially to maintain temporal context
+- **Parallel processing**: Only questions can be parallelized, not sessions within a question
