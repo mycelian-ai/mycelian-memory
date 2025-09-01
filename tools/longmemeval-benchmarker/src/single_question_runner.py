@@ -1,8 +1,8 @@
 from typing import Any, Dict, TextIO
 import logging
 
-from mycelian_memory_agent import build_agent
-from memory_manager import MemoryManager
+from src.agent import build_agent
+from src.memory_manager import MemoryManager
 
 
 def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
@@ -76,8 +76,11 @@ class SingleQuestionRunner:
         runner_log = logging.getLogger("lme.runner")
         runner_log.info("RUN qid=%s run_id=%s vault_id=%s agent=%s qa=%s", qid, run_id, vault_id, self.cfg.models.agent, self.cfg.models.qa)
 
+        # Build a temporary agent for MCP client reuse in vault resolution
         ag = build_agent(
             self.cfg.models.agent,
+            vault_id="temp",  # temporary values for setup
+            memory_id="temp",
             max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
             provider_type="openai",
             debug=self.cfg.params.debug,
@@ -92,7 +95,23 @@ class SingleQuestionRunner:
             mm = MemoryManager(ag._mcp, debug=self.cfg.params.debug)
             memory_id = mm.ensure_memory(vault_id, mem_title, memory_type="NOTES")
             runner_log.info("MEMORY_BOUND qid=%s memory_id=%s title=%s", qid, memory_id, mem_title)
-            ag.bind_memory(vault_id, memory_id)
+            # Recreate agent with required IDs (graph compiled with ID-infused prompt)
+            try:
+                ag.close()
+            except Exception:
+                pass
+            ag = build_agent(
+                self.cfg.models.agent,
+                vault_id=vault_id,
+                memory_id=memory_id,
+                max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
+                provider_type="openai",
+                debug=self.cfg.params.debug,
+            )
+            try:
+                ag.set_log_stream(log)  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
             for s_idx, s in enumerate(q.get("sessions", []), start=1):
                 thread_id = f"{memory_id}:s{s_idx}"

@@ -21,10 +21,10 @@ import time
 import logging
 from typing import Any, Dict, List
 
-from dataset_loader import load_longmemeval_file
-from mycelian_memory_agent import build_agent
-from memory_manager import MemoryManager
-from single_question_runner import SingleQuestionRunner
+from src.dataset_loader import load_longmemeval_file
+from src.agent import build_agent
+from src.memory_manager import MemoryManager
+from src.single_question_runner import SingleQuestionRunner
 
 # Minimal helpers (replacing the deleted runner module)
 class _SimpleConfig:
@@ -122,7 +122,7 @@ def main() -> None:
         return
 
     # Resolve vault once
-    temp_agent = build_agent(cfg.models.agent, max_tool_calls_per_turn=cfg.params.max_tool_calls_per_turn, provider_type="openai", debug=cfg.params.debug)
+    temp_agent = build_agent(cfg.models.agent, vault_id="temp", memory_id="temp", max_tool_calls_per_turn=cfg.params.max_tool_calls_per_turn, provider_type="openai", debug=cfg.params.debug)
     # Silence MemoryManager prints in terminal during vault resolution
     memory_mgr = MemoryManager(temp_agent._mcp, debug=False)
     vault_id = memory_mgr.ensure_vault(cfg.vault_title, cfg.vault_id)
@@ -142,7 +142,7 @@ def main() -> None:
 
     print(f"[benchmarker] starting run with {len(ds)} question(s), workers={cfg.params.workers}")
 
-    from worker_manager import WorkerManager
+    from src.worker_manager import WorkerManager
     wm = WorkerManager(workers=cfg.params.workers, debug=cfg.params.debug)
     sqr = SingleQuestionRunner(cfg)
 

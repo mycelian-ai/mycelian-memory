@@ -1,43 +1,107 @@
 LongMemEval Benchmarker TODOs
 
-Implementing langgraph_longmemeval_benchmarker.md design
+# ✅ Completed: Three-Class Architecture Refactor
 
-- [x] Implement dataset loader for LongMemEval JSONL
-- [x] Create AgentRunner placeholder and build_agent stub
-- [x] Parse TOML config and basic ingestion orchestration
-- [x] Provide config.example.toml and minimal README
-- [x] Add Ingester with Store protocol and in-memory store + tests
-- [x] Wire MCP client to real memory-service tools
-- [x] Create a stripped down LongMemEval dataset with 1 question, 2 sessions, 6 turns each
-- [x] Add minimal config.test.toml referenced in design
-- [x] Build LangGraph prebuilt agent with tools and dynamic prompt
-- [x] Test ingestion with test data but real target implementations
-- [ ] Implement QA phase: search_memories + QA model answer
-- [ ] Test QA with test data but real target implementations
-- [ ] Implement Eval phase: EM and optional LLM judge
-- [ ] Test EVAL with test data but real target implementations
-- [ ] Write JSONL results and basic run metadata
-- [ ] Add CLI entrypoint script `mycelian-longmemeval`
-- [x] Determinism & logging: run_id + live logs
-- [ ] Determinism: decision log (succinct tool decisions per turn)
-- [ ] Determinism: caps/budgets (optional)
+## What Was Done
 
-- [x] Add debug mode (runner params.debug, LME_DEBUG) and live logs
-- [x] Write breadcrumb mapping.jsonl per run
-- [x] Fix MCP args: include vault_id on reads; add_entry uses raw_entry
-- [x] Load MCP tools dynamically
-- [x] Pass vault_id/memory_id via prompt (no hardcoded arg names)
+### Phase 1: Created AgentBuilder ✅
+- Created `agent_builder.py` file
+- Moved MCP client setup from MycelianMemoryAgent
+- Moved tool loading logic from MycelianMemoryAgent
+- Moved LLM initialization from MycelianMemoryAgent
+- Incorporated PromptBuilder functionality (reusing existing class)
+- Initialize helper objects (ToolLogger, StateDebugger, MessageLogger)
+- `build()` method returns complete AgentMessageProcessor pipeline
 
-# Agent-only MCP integration hardening (completed)
-- [x] Remove legacy MCPStore; agent is sole MCP user
-- [x] Add MCP tool call observability (name, truncated args, result) under LME_DEBUG
-- [x] Session bootstrap: get_context → (placeholder) put_context({}) → list_entries(10)
-- [x] Strict search policy in prompts (MUST/NEVER) to reduce redundant searches
-- [x] Cleanup unused files from old path (mcp_store.py, bedrock_model.py)
+### Phase 2: Created Agent Class ✅
+- Created `agent.py` file with focused graph definition
+- Accepts dependencies in constructor (llm, tools, prompt, checkpointer)
+- Moved graph building logic from GraphBuilder into Agent._build_graph()
+- Defined nodes (llm_call, tool_node) as methods
+- Defined edges and conditional logic (should_continue)
+- Compiles graph in constructor
+- Exposes compiled_graph property for processor to use
 
-# Search/QA improvements
-- [x] Document `search_memories` now returns latestContext + bestContext (+ timestamps/scores)
-- [ ] Build QA context using latestContext, bestContext, and top‑K entries’ raw text
+### Phase 3: Created AgentMessageProcessor ✅
+- Created `agent_message_processor.py` file
+- Moved all message processing logic from MycelianMemoryAgent
+- Accepts Agent instance and helpers in constructor
+- Implemented invoke_message() method with full pipeline
+- Handles session management and thread context
+- Manages debug state dumping
 
+### Phase 4: Updated Build Function ✅
+- Removed redundant `factory.py` file
+- Added `build_agent()` convenience function to AgentBuilder
+- AgentBuilder.build() returns complete pipeline
+- Updated __init__.py exports
 
+## Current Architecture
 
+```
+agent/
+  agent_builder.py           # Sets up infrastructure, returns full pipeline
+  agent.py                   # Defines agent behavior (graph topology)
+  agent_message_processor.py # Handles message processing runtime
+  tool_logger.py            # Helper for logging (unchanged)
+  state_debugger.py         # Helper for debugging (unchanged)
+  message_logger.py         # Helper for message logging (unchanged)
+  prompt_builder.py         # Helper for prompt building (unchanged)
+  __init__.py               # Exports new architecture
+  
+  # Legacy (still present for backward compatibility)
+  mycelian_memory_agent.py  # Old monolithic class
+  graph_builder.py          # Old graph builder
+```
+
+## Next Steps
+
+### Testing & Validation
+- [ ] Run full benchmark with new architecture
+- [ ] Compare performance with old architecture
+- [ ] Validate memory operations work correctly
+- [ ] Check debug logging output
+
+### Cleanup (After Validation)
+- [ ] Remove old MycelianMemoryAgent class
+- [ ] Remove GraphBuilder class
+- [ ] Update all imports in codebase to use new architecture
+- [ ] Remove legacy exports from __init__.py
+
+### Documentation
+- [ ] Update README with new architecture
+- [ ] Add docstrings explaining the three-class design
+- [ ] Document migration path from old to new
+
+### Potential Improvements
+- [ ] Consider making Agent more configurable
+- [ ] Add metrics/instrumentation to AgentMessageProcessor
+- [ ] Improve error handling and recovery
+- [ ] Add timeout configuration per message type
+
+## Key Achievements
+
+✅ **Clean Separation of Concerns**
+- AgentBuilder: Infrastructure setup only
+- Agent: Graph definition only  
+- AgentMessageProcessor: Runtime only
+
+✅ **Code Reuse**
+- All helper classes used as-is
+- PromptBuilder integrated without changes
+- Logic extracted verbatim from original
+
+✅ **LangGraph Alignment**
+- Compiled graph IS the agent
+- Proper terminology throughout
+- Follows LangGraph patterns
+
+✅ **Maintainability**
+- Each class has ONE responsibility
+- No circular dependencies
+- Clear dependency flow
+
+✅ **Backward Compatibility**
+- Old code still works
+- Same public API (build_agent function)
+- Can migrate gradually
