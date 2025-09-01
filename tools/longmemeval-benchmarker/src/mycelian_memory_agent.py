@@ -118,13 +118,141 @@ class MycelianMemoryAgent:
         try:
             cfg = {"configurable": {"thread_id": thread_id}}
             get_state = getattr(self._agent, "get_state", None)
+            agent_log = logging.getLogger("lme.agent")
             if callable(get_state):
                 state = self._agent.get_state(cfg)
-                msg_count = len(state.get("messages", [])) if isinstance(state, dict) else None
-                if msg_count:
-                    logging.getLogger("lme.agent").info(
-                        "STATE thread_id=%s messages=%d", thread_id, msg_count
-                    )
+
+                def _extract_messages(obj: Any):
+                    try:
+                        if isinstance(obj, dict):
+                            if isinstance(obj.get("messages"), list):
+                                return obj.get("messages")
+                            if isinstance(obj.get("values"), dict):
+                                return _extract_messages(obj.get("values"))
+                            if isinstance(obj.get("state"), dict):
+                                return _extract_messages(obj.get("state"))
+                        for attr in ("messages", "values", "state"):
+                            if hasattr(obj, attr):
+                                val = getattr(obj, attr)
+                                if isinstance(val, list):
+                                    return val
+                                if isinstance(val, dict):
+                                    return _extract_messages(val)
+                    except Exception:
+                        return None
+                    return None
+
+                msgs = _extract_messages(state)
+                if isinstance(msgs, list):
+                    agent_log.info("STATE thread_id=%s messages=%d", thread_id, len(msgs))
+                    # Emit one line per message for audit in debug mode
+                    def _to_preview(content: Any, limit: int = 200) -> str:
+                        try:
+                            if isinstance(content, list):
+                                # Join text parts if present
+                                parts: list[str] = []
+                                for it in content:
+                                    if isinstance(it, dict):
+                                        txt = it.get("text") or it.get("content") or ""
+                                        if isinstance(txt, str):
+                                            parts.append(txt)
+                                    elif isinstance(it, str):
+                                        parts.append(it)
+                                s = "\n".join(p for p in parts if p)
+                            elif isinstance(content, dict):
+                                s = json.dumps(content, ensure_ascii=False)
+                            else:
+                                s = str(content)
+                        except Exception:
+                            s = str(content)
+                        s = (s or "").strip()
+                        if len(s) > limit:
+                            return s[: limit - 3] + "..."
+                        return s
+
+                    def _as_mapping(m: Any) -> Dict[str, Any]:
+                        if isinstance(m, dict):
+                            return m
+                        for attr in ("to_dict", "dict"):
+                            try:
+                                fn = getattr(m, attr, None)
+                                if callable(fn):
+                                    d = fn()
+                                    if isinstance(d, dict):
+                                        return d
+                            except Exception:
+                                pass
+                        out: Dict[str, Any] = {}
+                        for k in ("type", "role", "content", "name", "additional_kwargs", "tool_calls", "tool"):
+                            if hasattr(m, k):
+                                try:
+                                    out[k] = getattr(m, k)
+                                except Exception:
+                                    pass
+                        if not out:
+                            out["repr"] = str(m)
+                        return out
+
+                    for idx, m in enumerate(msgs, start=1):
+                        dm = _as_mapping(m)
+                        mtype = dm.get("type") or type(m).__name__
+                        role = dm.get("role") or ("tool" if dm.get("tool") else "")
+                        # Tool calls summary (for AI messages)
+                        tc_names: list[str] = []
+                        try:
+                            tcs = None
+                            if isinstance(dm.get("tool_calls"), list):
+                                tcs = dm.get("tool_calls")
+                            elif isinstance(dm.get("additional_kwargs"), dict):
+                                ak = dm.get("additional_kwargs")
+                                if isinstance(ak.get("tool_calls"), list):
+                                    tcs = ak.get("tool_calls")
+                            if isinstance(tcs, list):
+                                for tc in tcs:
+                                    name = None
+                                    if isinstance(tc, dict):
+                                        if isinstance(tc.get("function"), dict):
+                                            name = tc.get("function", {}).get("name")
+                                        name = name or tc.get("name") or tc.get("type")
+                                    else:
+                                        # Fallback to string form
+                                        name = str(tc)
+                                    if name:
+                                        tc_names.append(str(name))
+                        except Exception:
+                            pass
+
+                        preview = _to_preview(dm.get("content"))
+                        if tc_names:
+                            agent_log.info(
+                                "STATE_MSG idx=%d type=%s role=%s tool_calls=%d[%s] content=%s",
+                                idx,
+                                str(mtype),
+                                str(role or ""),
+                                len(tc_names),
+                                ",".join(tc_names)[:120],
+                                preview,
+                            )
+                        else:
+                            agent_log.info(
+                                "STATE_MSG idx=%d type=%s role=%s content=%s",
+                                idx,
+                                str(mtype),
+                                str(role or ""),
+                                preview,
+                            )
+                else:
+                    stype = type(state).__name__
+                    if isinstance(state, dict):
+                        keys = list(state.keys())
+                        agent_log.info(
+                            "STATE thread_id=%s state_type=%s keys=%s",
+                            thread_id,
+                            stype,
+                            ",".join(keys)[:120],
+                        )
+                    else:
+                        agent_log.info("STATE thread_id=%s state_type=%s", thread_id, stype)
         except Exception:
             pass  # Silent failure for state dump
 
@@ -147,15 +275,16 @@ class MycelianMemoryAgent:
 
         # Use a checkpointer so we only send the latest message; state persists by thread_id
         self._checkpointer = InMemorySaver()
-        # Wrap tools to log generic tool calls (name + args) to lme.tool using StructuredTool
-        from langchain_core.tools import StructuredTool  # type: ignore
 
-        def _wrap_tool(t: Any) -> Any:
+        # In-place tool logging wrappers to avoid altering tool types
+        def _attach_logging_inplace(t: Any) -> None:
+            if getattr(t, "_lme_wrapped", False):
+                return
             name = getattr(t, "name", "tool")
-            description = getattr(t, "description", "")
-            args_schema = getattr(t, "args_schema", None)
+            orig_invoke = getattr(t, "invoke", None)
+            orig_ainvoke = getattr(t, "ainvoke", None)
 
-            def _log(args: Dict[str, Any]) -> None:
+            def _log_args(args: Dict[str, Any]) -> None:
                 try:
                     args_str = json.dumps(args, ensure_ascii=False)
                 except Exception:
@@ -172,45 +301,60 @@ class MycelianMemoryAgent:
                     args_str,
                 )
 
-            async def _acor(input: Dict[str, Any] | None = None, **kwargs):  # type: ignore[override]
-                args: Dict[str, Any] = dict(input or {})
-                args.update(kwargs or {})
+            if callable(orig_invoke):
+                def _wrapped_invoke(input: Any = None, **kwargs):  # type: ignore[override]
+                    args: Dict[str, Any] = {}
+                    if isinstance(input, dict):
+                        args.update(input)
+                    elif input is not None:
+                        args["_input"] = input
+                    if kwargs:
+                        args.update(kwargs)
+                    try:
+                        _log_args(args)
+                    except Exception:
+                        pass
+                    return orig_invoke(input, **kwargs)
                 try:
-                    _log(args)
+                    import types
+                    t.invoke = types.MethodType(_wrapped_invoke, t)  # type: ignore[attr-defined]
                 except Exception:
-                    pass
-                if hasattr(t, "ainvoke"):
-                    return await t.ainvoke(args)  # type: ignore[attr-defined]
-                return t.invoke(args)
+                    t.invoke = _wrapped_invoke  # type: ignore[attr-defined]
 
-            def _func(input: Dict[str, Any] | None = None, **kwargs):  # type: ignore[override]
-                args: Dict[str, Any] = dict(input or {})
-                args.update(kwargs or {})
+            if callable(orig_ainvoke):
+                async def _wrapped_ainvoke(input: Any = None, **kwargs):  # type: ignore[override]
+                    args: Dict[str, Any] = {}
+                    if isinstance(input, dict):
+                        args.update(input)
+                    elif input is not None:
+                        args["_input"] = input
+                    if kwargs:
+                        args.update(kwargs)
+                    try:
+                        _log_args(args)
+                    except Exception:
+                        pass
+                    return await orig_ainvoke(input, **kwargs)
                 try:
-                    _log(args)
+                    import types
+                    t.ainvoke = types.MethodType(_wrapped_ainvoke, t)  # type: ignore[attr-defined]
                 except Exception:
-                    pass
-                if hasattr(t, "invoke"):
-                    return t.invoke(args)
-                return asyncio.run(t.ainvoke(args))  # type: ignore[attr-defined]
+                    t.ainvoke = _wrapped_ainvoke  # type: ignore[attr-defined]
 
             try:
-                if args_schema is not None:
-                    return StructuredTool(
-                        name=name,
-                        description=description,
-                        args_schema=args_schema,
-                        func=_func,
-                        coroutine=_acor,
-                    )
+                setattr(t, "_lme_wrapped", True)
             except Exception:
                 pass
-            return t
 
-        wrapped_tools = [_wrap_tool(t) for t in self._agent_tools]
+        for _t in self._agent_tools:
+            try:
+                _attach_logging_inplace(_t)
+            except Exception:
+                pass
+
         self._agent = create_react_agent(
             model=self._llm,
-            tools=wrapped_tools,
+            tools=self._agent_tools,
             prompt=prompt_with_ids,
             checkpointer=self._checkpointer,
         )
@@ -281,9 +425,9 @@ class MycelianMemoryAgent:
         except Exception:
             pass
 
-        # Invoke agent with retry logic; surface retry notes in debug mode
+        # Invoke agent asynchronously so tools run via coroutine paths
         result = invoke_with_backoff(
-            lambda: self._agent.invoke(payload, config),
+            lambda: asyncio.run(self._agent.ainvoke(payload, config)),
             debug=self._debug,
             log=lambda m: logging.getLogger("lme.agent").info(str(m)),
         )
@@ -300,6 +444,12 @@ class MycelianMemoryAgent:
         except Exception:
             pass
         
+        # Dump full agent state snapshot after each message in debug mode
+        try:
+            self._dump_agent_state(thread_id)
+        except Exception:
+            pass
+
         return result
 
 
