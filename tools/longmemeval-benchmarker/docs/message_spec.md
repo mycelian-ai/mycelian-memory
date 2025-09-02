@@ -10,6 +10,7 @@ This document defines the exact schema for messages sent from the benchmarker ru
 - Exactly one message is sent per memory agent invocation.
 - Agent state (conversation history) is maintained by the LangGraph checkpointer via `thread_id`.
 - System control messages mark session boundaries; conversation messages carry the dialogue.
+- The agent processes the last message in its state as the "current" message.
 
 ## Message Object (JSON)
 
@@ -51,6 +52,79 @@ For each dataset session:
    - i = 1..N (monotonic, contiguous)
 3) Send system end
    - { type: "system", content: "SESSION_END" }
+
+## Agent Internal Processing
+
+### Message Types in LangChain/LangGraph
+
+The agent internally converts messages to LangChain types with metadata:
+
+1. **System messages** → `SystemMessage(content=content, message_type="control")`
+   - Control messages trigger specific actions
+   - Not persisted to checkpointer state
+
+2. **Conversation messages** → `ChatMessage(role=role, content=content, idx=msg_idx)`
+   - Include `idx` field for tracking message position
+   - Persisted to checkpointer state
+
+3. **Tool interactions** (agent-generated):
+   - `AIMessage(tool_calls=[...])` - Agent's tool invocation decisions
+   - `ToolMessage(content="...")` - Tool execution results
+   - Both persisted to checkpointer state
+
+### State Management
+
+**Checkpointer stores:**
+- ChatMessage instances (conversation with idx)
+- AIMessage instances with tool_calls
+- ToolMessage instances (results from get_context, list_entries, add_entry, etc.)
+
+**Checkpointer does NOT store:**
+- SystemMessage instances (control commands)
+- Prompt/instruction messages
+
+### Message Flow to LLM
+
+For each invocation, the LLM receives:
+
+```python
+[
+    # 1. Dynamic system prompt with current context
+    SystemMessage(content="""
+        You are the Mycelian Memory Agent...
+        CURRENT PROCESSING CONTEXT:
+        • Message type: {conversation|control}
+        • Message index: {idx or N/A}
+        • Required actions: {based on type and idx}
+    """, message_type="prompt"),
+    
+    # 2. Filtered state history (from checkpointer)
+    ChatMessage(role="user", content="...", idx=1),
+    AIMessage(tool_calls=[...]),
+    ToolMessage(content="..."),
+    ChatMessage(role="assistant", content="...", idx=2),
+    # ... more history ...
+    
+    # 3. Current message (last in array)
+    CurrentMessage  # The message being processed
+]
+```
+
+**Key principle:** The current message to process is always the last message in the array. No separate marker is needed.
+
+### Prompt Compliance Rules
+
+The agent determines actions based on:
+
+1. **For control messages (type="system")**:
+   - SESSION_START → Call get_context(), then list_entries()
+   - SESSION_END → No action required
+
+2. **For conversation messages (type="conversation")**:
+   - Always → Call add_entry() with summary
+   - When idx % 6 == 0 → Also call await_consistency(), then put_context()
+
+The `idx` field on ChatMessage enables the agent to detect flush conditions directly.
 
 ## Validation Rules
 
@@ -99,4 +173,24 @@ agent.invoke(payload, config={ "configurable": { "thread_id": thread_id } })
 
 Where `thread_id = "<vault_id>:<memory_id>:<session_index>"` uniquely identifies the session.
 
+## Implementation Notes
 
+### Message Filtering (_curate_for_model)
+
+The agent filters state messages before sending to LLM:
+- **Keeps:** ChatMessage, ToolMessage, AIMessage with tool_calls
+- **Removes:** SystemMessage, empty AIMessage instances
+
+### Dynamic Prompt Generation
+
+The system prompt is dynamically generated based on the current message:
+- Includes current msg_idx for conversation messages
+- Explicitly states if flush is required (idx % 6 == 0)
+- Provides specific action instructions based on message type
+
+### Position-Based Current Message
+
+The agent relies on message position to identify the current message:
+- The last message in the filtered array is always the current one
+- No separate marker or indicator is needed
+- This simplifies the message structure and reduces redundancy

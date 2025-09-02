@@ -1,7 +1,7 @@
 from typing import Any, Dict, TextIO
 import logging
 
-from src.agent import build_agent
+from src.agent import build_agent, create_mcp_client
 from src.memory_manager import MemoryManager
 
 
@@ -65,8 +65,9 @@ class SingleQuestionRunner:
     - No dataset or vault discovery (expects `vault_id` and `run_id` as inputs).
     - No global logging; writes to the provided `log` stream only.
     """
-    def __init__(self, cfg: Any):
+    def __init__(self, cfg: Any, mcp_client: Any = None):
         self.cfg = cfg
+        self.mcp_client = mcp_client
 
     def run_question(self, q: Dict[str, Any], vault_id: str, run_id: str, log: TextIO) -> Dict[str, Any]:
         qid = q.get("question_id", "unknown")
@@ -76,60 +77,51 @@ class SingleQuestionRunner:
         runner_log = logging.getLogger("lme.runner")
         runner_log.info("RUN qid=%s run_id=%s vault_id=%s agent=%s qa=%s", qid, run_id, vault_id, self.cfg.models.agent, self.cfg.models.qa)
 
-        # Build a temporary agent for MCP client reuse in vault resolution
+        # Use provided MCP client or create one
+        if self.mcp_client is None:
+            self.mcp_client = create_mcp_client()
+        
+        # Use MemoryManager to ensure memory exists
+        mm = MemoryManager(self.mcp_client, debug=self.cfg.params.debug)
+        memory_id = mm.ensure_memory(vault_id, mem_title, memory_type="NOTES")
+        runner_log.info("MEMORY_BOUND qid=%s memory_id=%s title=%s", qid, memory_id, mem_title)
+        
+        # Build agent with the correct vault and memory IDs, passing MCP client
         ag = build_agent(
             self.cfg.models.agent,
-            vault_id="temp",  # temporary values for setup
-            memory_id="temp",
+            vault_id=vault_id,
+            memory_id=memory_id,
             max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
             provider_type="openai",
             debug=self.cfg.params.debug,
+            mcp_client=self.mcp_client  # Pass the shared MCP client
         )
+        
         try:
             # Route agent logs to the provided log stream if available
-            try:
-                ag.set_log_stream(log)  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
-            mm = MemoryManager(ag._mcp, debug=self.cfg.params.debug)
-            memory_id = mm.ensure_memory(vault_id, mem_title, memory_type="NOTES")
-            runner_log.info("MEMORY_BOUND qid=%s memory_id=%s title=%s", qid, memory_id, mem_title)
-            # Recreate agent with required IDs (graph compiled with ID-infused prompt)
-            try:
-                ag.close()
-            except Exception:
-                pass
-            ag = build_agent(
-                self.cfg.models.agent,
-                vault_id=vault_id,
-                memory_id=memory_id,
-                max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
-                provider_type="openai",
-                debug=self.cfg.params.debug,
-            )
-            try:
-                ag.set_log_stream(log)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            ag.set_log_stream(log)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        
+        try:
 
             for s_idx, s in enumerate(q.get("sessions", []), start=1):
                 thread_id = f"{memory_id}:s{s_idx}"
                 runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s", qid, s_idx, memory_id, thread_id)
-                ag.invoke_message(type="system", content="SESSION_START", thread_id=thread_id)
+                ag.invoke_message(message_type="system", content="SESSION_START", thread_id=thread_id)
                 for msg_idx, m in enumerate(s.get("messages", []), start=1):
                     role = (m.get("role") or "").strip().lower()
                     content = m.get("content") or ""
                     if role in ("user", "assistant") and isinstance(content, str) and content.strip():
                         runner_log.info("MSG qid=%s s=%d msg=%d role=%s memory_id=%s", qid, s_idx, msg_idx, role, memory_id)
                         ag.invoke_message(
-                            type="conversation",
+                            message_type="conversation",
                             role=role,
                             content=content,
                             thread_id=thread_id,
                             msg_idx=msg_idx,
                         )
-                ag.invoke_message(type="system", content="SESSION_END", thread_id=thread_id)
+                ag.invoke_message(message_type="system", content="SESSION_END", thread_id=thread_id)
                 runner_log.info("SESSION_END qid=%s s=%d memory_id=%s thread_id=%s", qid, s_idx, memory_id, thread_id)
                 # Optional in-memory state dump at session end
                 try:

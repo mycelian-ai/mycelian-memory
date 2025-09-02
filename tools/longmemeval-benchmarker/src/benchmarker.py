@@ -22,7 +22,7 @@ import logging
 from typing import Any, Dict, List
 
 from src.dataset_loader import load_longmemeval_file
-from src.agent import build_agent
+from src.agent import build_agent, create_mcp_client
 from src.memory_manager import MemoryManager
 from src.single_question_runner import SingleQuestionRunner
 
@@ -121,15 +121,12 @@ def main() -> None:
         print("[benchmarker] no questions found – ensure dataset files are present")
         return
 
-    # Resolve vault once
-    temp_agent = build_agent(cfg.models.agent, vault_id="temp", memory_id="temp", max_tool_calls_per_turn=cfg.params.max_tool_calls_per_turn, provider_type="openai", debug=cfg.params.debug)
-    # Silence MemoryManager prints in terminal during vault resolution
-    memory_mgr = MemoryManager(temp_agent._mcp, debug=False)
+    # Create shared MCP client for administrative operations
+    mcp_client = create_mcp_client()
+    
+    # Resolve vault once using MemoryManager
+    memory_mgr = MemoryManager(mcp_client, debug=False)
     vault_id = memory_mgr.ensure_vault(cfg.vault_title, cfg.vault_id)
-    try:
-        temp_agent.close()
-    except Exception:
-        pass
 
     # Directories
     out_dir = _compute_out_dir(cfg.run_id)
@@ -144,7 +141,7 @@ def main() -> None:
 
     from src.worker_manager import WorkerManager
     wm = WorkerManager(workers=cfg.params.workers, debug=cfg.params.debug)
-    sqr = SingleQuestionRunner(cfg)
+    sqr = SingleQuestionRunner(cfg, mcp_client=mcp_client)
 
     def make_log_path(i: int) -> str:
         return os.path.join(logs_dir, f"question_{i:05d}.log")
