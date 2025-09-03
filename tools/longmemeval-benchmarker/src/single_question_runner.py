@@ -1,7 +1,10 @@
+"""SingleQuestionRunner using the clean agent implementation."""
+
 from typing import Any, Dict, TextIO
 import logging
 
-from src.agent import build_agent, create_mcp_client
+from src.mycelian_memory_agent.build import build_agent_with_invoker
+from src.mycelian_memory_agent.mcp_utils import create_mcp_client
 from src.memory_manager import MemoryManager
 
 
@@ -36,7 +39,7 @@ def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:
-    from langchain.chat_models import init_chat_model  # type: ignore
+    from langchain.chat_models import init_chat_model
 
     prompt = (
         "You are a helpful assistant. Answer the question using the provided memory context.\n\n"
@@ -44,27 +47,20 @@ def _run_qa(model_id: str, question_text: str, context: str) -> str:
         + "Question: "
         + (question_text or "")
     )
-    llm = init_chat_model(model_id)  # type: ignore
-    ans = llm.invoke(prompt)  # type: ignore
+    llm = init_chat_model(model_id)
+    ans = llm.invoke(prompt)
     return (getattr(ans, "content", str(ans)) or "").strip()
 
 
 class SingleQuestionRunner:
-    """Run a single LongMemEval question end-to-end.
+    """Run a single LongMemEval question using the clean agent implementation.
 
-    Responsibilities:
-    - Build an agent and bind it to a specific `vault_id`/memory via `MemoryManager`.
-    - For each session: send system control messages (SESSION_START/SESSION_END).
-    - For each conversation message: validate role/content and invoke the agent with
-      `type=conversation`, including a strictly increasing `msg_idx` per session.
-    - Perform a memory search to construct QA context and invoke the QA model.
-    - Return a minimal result object: {"question_id", "hypothesis"}.
-
-    Non-responsibilities:
-    - No concurrency or worker orchestration.
-    - No dataset or vault discovery (expects `vault_id` and `run_id` as inputs).
-    - No global logging; writes to the provided `log` stream only.
+    This version uses:
+    - MycelianMemoryAgent with clean control-based protocol
+    - MycelianAgentInvoker for message counting and flush logic
+    - Simplified message processing without complex type checking
     """
+    
     def __init__(self, cfg: Any, mcp_client: Any = None):
         self.cfg = cfg
         self.mcp_client = mcp_client
@@ -75,73 +71,89 @@ class SingleQuestionRunner:
             question_id=qid, run_id=run_id
         )
         runner_log = logging.getLogger("lme.runner")
-        runner_log.info("RUN qid=%s run_id=%s vault_id=%s agent=%s qa=%s", qid, run_id, vault_id, self.cfg.models.agent, self.cfg.models.qa)
+        runner_log.info("RUN qid=%s run_id=%s vault_id=%s agent=%s qa=%s", 
+                        qid, run_id, vault_id, self.cfg.models.agent, self.cfg.models.qa)
 
         # Use provided MCP client or create one
         if self.mcp_client is None:
             self.mcp_client = create_mcp_client()
         
         # Use MemoryManager to ensure memory exists
-        mm = MemoryManager(self.mcp_client, debug=self.cfg.params.debug)
+        mm = MemoryManager(self.mcp_client, debug=False)
         memory_id = mm.ensure_memory(vault_id, mem_title, memory_type="NOTES")
         runner_log.info("MEMORY_BOUND qid=%s memory_id=%s title=%s", qid, memory_id, mem_title)
         
-        # Build agent with the correct vault and memory IDs, passing MCP client
-        ag = build_agent(
-            self.cfg.models.agent,
+        # Build agent with clean implementation
+        invoker = build_agent_with_invoker(
+            model_id=self.cfg.models.agent,
             vault_id=vault_id,
             memory_id=memory_id,
-            max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
-            provider_type="openai",
-            debug=self.cfg.params.debug,
-            mcp_client=self.mcp_client  # Pass the shared MCP client
+            mcp_client=self.mcp_client,
+            max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn
         )
         
+        # Optionally set log stream (for compatibility)
         try:
-            # Route agent logs to the provided log stream if available
-            ag.set_log_stream(log)  # type: ignore[attr-defined]
+            if hasattr(invoker, 'set_log_stream'):
+                invoker.set_log_stream(log)
         except Exception:
             pass
         
         try:
-
+            # Process all sessions
             for s_idx, s in enumerate(q.get("sessions", []), start=1):
                 thread_id = f"{memory_id}:s{s_idx}"
-                runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s", qid, s_idx, memory_id, thread_id)
-                ag.invoke_message(message_type="system", content="SESSION_START", thread_id=thread_id)
+                runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s", 
+                              qid, s_idx, memory_id, thread_id)
+                
+                # Start session (retrieves context and recent entries)
+                invoker.start_session(thread_id)
+                
+                # Process all messages in the session
                 for msg_idx, m in enumerate(s.get("messages", []), start=1):
                     role = (m.get("role") or "").strip().lower()
                     content = m.get("content") or ""
+                    
+                    # Only process user and assistant messages with content
                     if role in ("user", "assistant") and isinstance(content, str) and content.strip():
-                        runner_log.info("MSG qid=%s s=%d msg=%d role=%s memory_id=%s", qid, s_idx, msg_idx, role, memory_id)
-                        ag.invoke_message(
-                            message_type="conversation",
+                        runner_log.info("MSG qid=%s s=%d msg=%d role=%s memory_id=%s", 
+                                      qid, s_idx, msg_idx, role, memory_id)
+                        
+                        # Process the message (handles flush every 6 messages automatically)
+                        invoker.process_conversation_message(
                             role=role,
                             content=content,
-                            thread_id=thread_id,
-                            msg_idx=msg_idx,
+                            thread_id=thread_id
                         )
-                ag.invoke_message(message_type="system", content="SESSION_END", thread_id=thread_id)
-                runner_log.info("SESSION_END qid=%s s=%d memory_id=%s thread_id=%s", qid, s_idx, memory_id, thread_id)
-                # Optional in-memory state dump at session end
+                
+                # End session (ensures consistency and saves context)
+                invoker.end_session(thread_id)
+                runner_log.info("SESSION_END qid=%s s=%d memory_id=%s thread_id=%s", 
+                              qid, s_idx, memory_id, thread_id)
+                
+                # Optional state dump for debugging
                 try:
-                    if getattr(self.cfg.params, "dump_state", False):
-                        ag._dump_agent_state(thread_id)  # type: ignore[attr-defined]
+                    if getattr(self.cfg.params, "dump_state", False) and hasattr(invoker, '_dump_agent_state'):
+                        invoker._dump_agent_state(thread_id)
                 except Exception:
                     pass
 
             # Build QA and return hypothesis
             qtext = q.get("question") or _derive_question_from_sessions(q)
-            sr = MemoryManager(ag._mcp, debug=self.cfg.params.debug).search_memories(
+            
+            # Use the MCP client from the invoker for search
+            sr = MemoryManager(invoker._mcp, debug=False).search_memories(
                 memory_id, query=str(qtext or mem_title), top_k=self.cfg.params.top_k
             )
             ctx = _build_qa_context(sr, self.cfg.params.top_k)
             predicted = _run_qa(self.cfg.models.qa, qtext or mem_title, ctx)
+            
             return {"question_id": qid, "hypothesis": predicted}
+            
         finally:
+            # Clean up if needed
             try:
-                ag.close()
+                if hasattr(invoker, 'close'):
+                    invoker.close()
             except Exception:
                 pass
-
-

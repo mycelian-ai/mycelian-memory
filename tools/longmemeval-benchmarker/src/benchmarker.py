@@ -22,7 +22,8 @@ import logging
 from typing import Any, Dict, List
 
 from src.dataset_loader import load_longmemeval_file
-from src.agent import build_agent, create_mcp_client
+from src.mycelian_memory_agent import create_mcp_client
+from src.mycelian_memory_agent.build import build_agent_with_invoker
 from src.memory_manager import MemoryManager
 from src.single_question_runner import SingleQuestionRunner
 
@@ -54,8 +55,7 @@ class _SimpleConfig:
                 "workers": params_raw.get("workers", 1),
                 "max_sessions_per_question": params_raw.get("max_sessions_per_question"),
                 "max_turns_per_session": params_raw.get("max_turns_per_session"),
-                "dump_state": params_raw.get("dump_state", False),
-                # debug is controlled only by CLI --debug flag, not config
+                "dump_state": params_raw.get("dump_state", False)
             },
         )()
 
@@ -92,7 +92,6 @@ def main() -> None:
     parser.add_argument("config", help="Path to TOML config")
     parser.add_argument("--num-questions", type=int, default=None, help="Number of questions to process (overrides params.question_limit)")
     parser.add_argument("--workers", type=int, default=None, help="Number of parallel workers (overrides params.workers)")
-    parser.add_argument("--debug", action="store_true", help="Enable all debug logging")
     args = parser.parse_args()
 
     with open(args.config, "rb") as f:
@@ -103,9 +102,7 @@ def main() -> None:
         cfg.params.question_limit = max(0, int(args.num_questions))
     if args.workers is not None:
         cfg.params.workers = max(1, int(args.workers))
-    # CLI --debug overrides everything
-    debug_enabled = args.debug
-    cfg.params.debug = debug_enabled
+    # Logging is always enabled (debug flag removed)
 
     # Configure root logging for terminal: keep quiet by default; per-question logs handled separately
     logging.basicConfig(
@@ -140,7 +137,7 @@ def main() -> None:
     print(f"[benchmarker] starting run with {len(ds)} question(s), workers={cfg.params.workers}")
 
     from src.worker_manager import WorkerManager
-    wm = WorkerManager(workers=cfg.params.workers, debug=cfg.params.debug)
+    wm = WorkerManager(workers=cfg.params.workers, debug=False)
     sqr = SingleQuestionRunner(cfg, mcp_client=mcp_client)
 
     def make_log_path(i: int) -> str:
@@ -153,12 +150,11 @@ def main() -> None:
         target_loggers = [
             logging.getLogger("lme.runner"),
             logging.getLogger("lme.agent"),
-            logging.getLogger("lme.tool"),
         ]
         prev = []
         for lg in target_loggers:
             prev.append((lg, list(lg.handlers), lg.propagate, lg.level))
-            lg.setLevel(logging.DEBUG if cfg.params.debug else logging.INFO)
+            lg.setLevel(logging.INFO)  # Always log at INFO level
             lg.addHandler(qhandler)
             # Prevent console/root propagation; keep logs isolated per question file
             lg.propagate = False  # keep specifics in question log, not global
