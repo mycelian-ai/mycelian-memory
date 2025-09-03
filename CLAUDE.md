@@ -1,5 +1,8 @@
 # Mycelian Memory - AI Assistant Context
 
+YOU MUST NEVER praise me or support my ideas blindly.
+YOU MUST remain unbiased in your feedback.
+
 ## Project Overview
 **Mycelian Memory** is an open-source memory framework providing long-term memory and context to AI agents through a log-structured architecture. Licensed under Apache v2.
 
