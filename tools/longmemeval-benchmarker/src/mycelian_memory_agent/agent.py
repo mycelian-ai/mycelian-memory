@@ -158,6 +158,15 @@ class MycelianMemoryAgent:
             for msg in reversed(tool_history):
                 if isinstance(msg, ToolMessage):
                     last_tool = msg.name
+                    # Check for tool errors
+                    if msg.content and "Error:" in msg.content:
+                        logger.error(json.dumps({
+                            "event": "tool_error",
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "tool": msg.name,
+                            "error": msg.content
+                        }))
+                        raise ValueError(f"Tool {msg.name} failed: {msg.content}")
                     break
         
         # If not found, check messages (where ToolNode puts results)
@@ -167,6 +176,15 @@ class MycelianMemoryAgent:
                 for msg in reversed(messages):
                     if isinstance(msg, ToolMessage):
                         last_tool = msg.name
+                        # Check for tool errors
+                        if msg.content and "Error:" in msg.content:
+                            logger.error(json.dumps({
+                                "event": "tool_error",
+                                "timestamp": datetime.utcnow().isoformat(),
+                                "tool": msg.name,
+                                "error": msg.content
+                            }))
+                            raise ValueError(f"Tool {msg.name} failed: {msg.content}")
                         break
         
         # START_SESSION: Create tool calls for ToolNode to execute
@@ -282,7 +300,10 @@ class MycelianMemoryAgent:
                         "message_preview": to_process[0].content[:200] if to_process[0].content else None
                     }))
                 
-                prompt = build_add_entry_prompt(conversation_history, to_process[0], self.prompts)
+                prompt = build_add_entry_prompt(
+                    conversation_history, to_process[0], self.prompts, 
+                    self.vault_id, self.memory_id
+                )
                 response = self._invoke_llm_with_retry([
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
@@ -320,7 +341,10 @@ class MycelianMemoryAgent:
                         "message_preview": to_process[0].content[:200] if to_process[0].content else None
                     }))
                     
-                prompt = build_add_entry_prompt(conversation_history, to_process[0], self.prompts)
+                prompt = build_add_entry_prompt(
+                    conversation_history, to_process[0], self.prompts, 
+                    self.vault_id, self.memory_id
+                )
                 response = self._invoke_llm_with_retry([
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
@@ -368,7 +392,10 @@ class MycelianMemoryAgent:
                         "conversation_count": len(conversation_history)
                     }))
                 
-                prompt = build_put_context_prompt(conversation_history, self.prompts)
+                prompt = build_put_context_prompt(
+                    conversation_history, self.prompts,
+                    self.vault_id, self.memory_id
+                )
                 response = self._invoke_llm_with_retry([
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
@@ -429,7 +456,10 @@ class MycelianMemoryAgent:
                         "conversation_count": len(conversation_history)
                     }))
                 
-                prompt = build_put_context_prompt(conversation_history, self.prompts)
+                prompt = build_put_context_prompt(
+                    conversation_history, self.prompts,
+                    self.vault_id, self.memory_id
+                )
                 response = self._invoke_llm_with_retry([
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
@@ -543,7 +573,11 @@ class MycelianMemoryAgent:
             initial_state["conversation_history"] = []
         
         # Invoke the graph with the initial state and config
-        result = self.graph.invoke(initial_state, config)
+        # Single async bridge point
+        async def _run_graph():
+            return await self.graph.ainvoke(initial_state, config)
+        
+        result = asyncio.run(_run_graph())
         
         logger.info(json.dumps({
                 "event": "agent_complete",
@@ -570,13 +604,17 @@ def format_messages(messages: Sequence[ChatMessage]) -> str:
 
 def build_add_entry_prompt(conversation_history: Sequence[ChatMessage], 
                           to_process: ChatMessage,
-                          prompts: Dict[str, str]) -> str:
+                          prompts: Dict[str, str],
+                          vault_id: str,
+                          memory_id: str) -> str:
     """Build prompt for add_entry tool call.
     
     Args:
         conversation_history: Full conversation including retrieved context
         to_process: Current message to process
         prompts: Dictionary containing MCP prompt templates
+        vault_id: The vault ID to use
+        memory_id: The memory ID to use
         
     Returns:
         Formatted prompt for LLM to generate add_entry tool call
@@ -600,6 +638,8 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
     prompt = f"""{AGENT_PREFIX}
 
 Current Operation: PROCESS_MESSAGE
+Vault ID: {vault_id}
+Memory ID: {memory_id}
 
 Previous conversation context (including retrieved context from previous sessions):
 {context}
@@ -609,6 +649,7 @@ Role: {to_process.role}
 Content: {to_process.content}
 
 INSTRUCTION: Call the add_entry tool for this single message following the rules below.
+Use vault_id="{vault_id}" and memory_id="{memory_id}" when calling the tool.
 
 ---
 ENTRY CAPTURE RULES:
@@ -622,7 +663,9 @@ SUMMARY GENERATION RULES:
 
 
 def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
-                            prompts: Dict[str, str]) -> str:
+                            prompts: Dict[str, str],
+                            vault_id: str,
+                            memory_id: str) -> str:
     """Build prompt for put_context tool call.
     
     Args:
@@ -645,11 +688,14 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
     prompt = f"""{AGENT_PREFIX}
 
 Current Operation: CONTEXT_SYNTHESIS
+Vault ID: {vault_id}
+Memory ID: {memory_id}
 
 Full conversation to synthesize into context:
 {full_conversation}
 
 INSTRUCTION: Call the put_context tool to save a synthesized context document following the rules below.
+Use vault_id="{vault_id}" and memory_id="{memory_id}" when calling the tool.
 
 ---
 CONTEXT MAINTENANCE RULES:

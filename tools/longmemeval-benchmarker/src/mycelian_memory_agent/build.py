@@ -60,7 +60,7 @@ def build_agent_with_invoker(
     # Create the agent (logging is always enabled)
     agent = MycelianMemoryAgent(
         llm=llm,
-        tools=tools,
+        tools=tools,  # Use MCP tools directly with async execution
         prompts=prompts,
         vault_id=vault_id,
         memory_id=memory_id
