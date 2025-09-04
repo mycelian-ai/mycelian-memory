@@ -1,4 +1,4 @@
-dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/out/longmemeval_5s.json"
+dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_5s.json"
 vault_title = "longmemeval-5s"
 
 [provider]

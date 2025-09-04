@@ -39,7 +39,8 @@ ALLOWED_TOOLS = {
     },
     ControlState.END_SESSION: {
         None: ["await_consistency"],        # No tool executed yet -> await_consistency
-        "await_consistency": ["put_context"]  # After await_consistency -> put_context (LLM call)
+        "await_consistency": ["put_context"],  # After await_consistency -> put_context (LLM call)
+        "put_context": []                   # After put_context -> done
     }
 }
 
