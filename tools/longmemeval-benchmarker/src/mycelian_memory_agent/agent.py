@@ -21,6 +21,28 @@ from ..tenacious_agent_invoker import invoke_with_backoff
 # Using "lme.agent" to integrate with benchmarker's logging system
 logger = logging.getLogger("lme.agent")
 
+# Define allowed tools for each control state and last tool combination
+ALLOWED_TOOLS = {
+    ControlState.START_SESSION: {
+        None: ["get_context"],              # No tool executed yet -> get_context
+        "get_context": ["list_entries"],    # After get_context -> list_entries  
+        "list_entries": []                  # After list_entries -> done
+    },
+    ControlState.PROCESS_MESSAGE: {
+        None: ["add_entry"],                # No tool executed yet -> add_entry (LLM call)
+        "add_entry": []                     # After add_entry -> done
+    },
+    ControlState.FLUSH: {
+        None: ["await_consistency"],        # No tool executed yet -> await_consistency
+        "await_consistency": ["put_context"], # After await_consistency -> put_context (LLM call)
+        "put_context": []                   # After put_context -> done
+    },
+    ControlState.END_SESSION: {
+        None: ["await_consistency"],        # No tool executed yet -> await_consistency
+        "await_consistency": ["put_context"]  # After await_consistency -> put_context (LLM call)
+    }
+}
+
 
 class AgentState(TypedDict):
     """State structure for the agent."""
@@ -135,6 +157,48 @@ class MycelianMemoryAgent:
         response = invoke_with_backoff(call_fn, log=log_retry)
         # Log tool calls with invocation ID
         self._log_llm_tool_calls(response, invocation_id)
+        return response
+    
+    def _filter_tool_calls(self, response: AIMessage, control: ControlState, last_tool: Optional[str]) -> AIMessage:
+        """Filter tool calls to only allowed ones for current state.
+        
+        Logs compliance violations when unexpected tools are filtered.
+        """
+        if not response.tool_calls:
+            return response
+        
+        # Get allowed tools for current state and last tool
+        allowed = ALLOWED_TOOLS.get(control, {}).get(last_tool, [])
+        
+        # Filter tool calls
+        original_calls = response.tool_calls[:]
+        filtered_calls = []
+        removed_tools = []
+        
+        for call in original_calls:
+            # Handle both dict and object forms of tool_calls
+            tool_name = call.get('name') if isinstance(call, dict) else getattr(call, 'name', None)
+            if tool_name in allowed:
+                filtered_calls.append(call)
+            else:
+                removed_tools.append(tool_name)
+        
+        # Log compliance violation if tools were filtered
+        if removed_tools:
+            logger.warning(json.dumps({
+                "event": "compliance_violation",
+                "timestamp": datetime.utcnow().isoformat(),
+                "violation_type": "unexpected_tool_calls",
+                "control": control.value,
+                "last_tool": last_tool,
+                "allowed_tools": allowed,
+                "removed_tools": removed_tools,
+                "kept_tools": [call.get('name') if isinstance(call, dict) else getattr(call, 'name', None) 
+                               for call in filtered_calls]
+            }))
+        
+        # Update response with filtered calls
+        response.tool_calls = filtered_calls
         return response
     
     def _check_put_context_called(self, tool_history: List[BaseMessage]) -> bool:
@@ -323,6 +387,8 @@ class MycelianMemoryAgent:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
                 ])
+                # Filter tool calls to only allowed ones
+                response = self._filter_tool_calls(response, control, last_tool)
                 # Also add to messages for ToolNode
                 # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
@@ -388,6 +454,8 @@ class MycelianMemoryAgent:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
                 ])
+                # Filter tool calls to only allowed ones
+                response = self._filter_tool_calls(response, control, last_tool)
                 # Also add to messages for ToolNode
                 # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
@@ -452,6 +520,8 @@ class MycelianMemoryAgent:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
                 ])
+                # Filter tool calls to only allowed ones
+                response = self._filter_tool_calls(response, control, last_tool)
                 # Also add to messages for ToolNode
                 # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
