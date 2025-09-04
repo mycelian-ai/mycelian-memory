@@ -68,28 +68,37 @@ class MycelianAgentInvoker:
         # Build message internally
         message = ChatMessage(role=role, content=content)
         
-        # Determine control internally - flush every 6 messages
-        if self.msg_count % 6 == 0:
-            control = ControlState.PROCESS_MESSAGE_AND_FLUSH
-        else:
-            control = ControlState.PROCESS_MESSAGE
-        
+        # Always process the message first
         logger.info(json.dumps({
                 "event": "invoker_process_message",
                 "timestamp": datetime.utcnow().isoformat(),
                 "thread_id": thread_id,
                 "msg_count": self.msg_count,
-                "control": control.value,
+                "control": ControlState.PROCESS_MESSAGE.value,
                 "role": role,
-                "content_preview": content[:200] if content else None,
-                "will_flush": control == ControlState.PROCESS_MESSAGE_AND_FLUSH
+                "content_preview": content[:200] if content else None
             }))
         
         result = self.agent.invoke(
-            control=control,
+            control=ControlState.PROCESS_MESSAGE,
             thread_id=thread_id,
             to_process=message
         )
+        
+        # Then flush if needed (every 6 messages)
+        if self.msg_count % 6 == 0:
+            logger.info(json.dumps({
+                    "event": "invoker_flush",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "thread_id": thread_id,
+                    "msg_count": self.msg_count
+                }))
+            
+            result = self.agent.invoke(
+                control=ControlState.FLUSH,
+                thread_id=thread_id
+            )
+        
         return result
     
     def end_session(self, thread_id: str) -> None:

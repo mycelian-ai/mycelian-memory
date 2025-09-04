@@ -3,8 +3,9 @@
 import asyncio
 import json
 import logging
+import uuid
 from datetime import datetime
-from typing import TypedDict, Annotated, Sequence, Optional, Union, Dict, Any
+from typing import TypedDict, Annotated, Sequence, Optional, Union, Dict, Any, List
 from typing_extensions import TypedDict
 
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage, ChatMessage
@@ -27,7 +28,7 @@ class AgentState(TypedDict):
     to_process: Sequence[ChatMessage]  # Current ChatMessage to process (replaced each invocation)
     tool_history: Sequence[Union[AIMessage, ToolMessage]]  # Tool flow for current invocation (not checkpointed)
     control: ControlState  # Control state driving execution
-    messages: Annotated[Sequence[BaseMessage], add_messages]  # For ToolNode compatibility
+    messages: Sequence[BaseMessage]  # Tool I/O buffer for ToolNode (per-invocation only, no accumulation)
 
 
 class MycelianMemoryAgent:
@@ -117,6 +118,9 @@ class MycelianMemoryAgent:
         Uses exponential backoff with jitter for rate limits and transient failures.
         Configurable via LME_LLM_BACKOFF_SCHEDULE environment variable.
         """
+        # Generate unique invocation ID for tracking
+        invocation_id = str(uuid.uuid4())[:8]
+        
         def call_fn():
             return self.llm_with_tools.invoke(messages)
         
@@ -124,10 +128,34 @@ class MycelianMemoryAgent:
             logger.info(json.dumps({
                 "event": "llm_retry",
                 "timestamp": datetime.utcnow().isoformat(),
+                "invocation_id": invocation_id,
                 "message": msg
             }))
         
-        return invoke_with_backoff(call_fn, log=log_retry)
+        response = invoke_with_backoff(call_fn, log=log_retry)
+        # Log tool calls with invocation ID
+        self._log_llm_tool_calls(response, invocation_id)
+        return response
+    
+    def _check_put_context_called(self, tool_history: List[BaseMessage]) -> bool:
+        """Check if put_context was already called in recent tool history.
+        
+        Args:
+            tool_history: The tool history to check
+            
+        Returns:
+            True if put_context was found, False otherwise
+        """
+        for msg in reversed(tool_history):
+            if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls'):
+                for tool_call in (msg.tool_calls or []):
+                    tool_name = tool_call.get('name') if isinstance(tool_call, dict) else getattr(tool_call, 'name', None)
+                    if tool_name == 'put_context':
+                        return True
+            # Stop at the first await_consistency ToolMessage (our checkpoint)
+            if isinstance(msg, ToolMessage) and msg.name == 'await_consistency':
+                break
+        return False
     
     def observe(self, state: AgentState) -> Dict[str, Any]:
         """Main observation node that determines next action based on control state.
@@ -135,11 +163,17 @@ class MycelianMemoryAgent:
         This method implements the control-based routing logic for different
         operation sequences.
         """
-        tool_history = state.get("tool_history", [])
+        tool_history = list(state.get("tool_history", []))
         control = state.get("control")
         conversation_history = state.get("conversation_history", [])
         to_process = state.get("to_process", [])
+        messages = state.get("messages", [])
         
+        # Copy any new ToolMessages from messages to tool_history
+        # ToolNode adds results to messages, we need them in tool_history for tracking
+        for msg in messages:
+            if isinstance(msg, ToolMessage) and msg not in tool_history:
+                tool_history.append(msg)
         
         logger.info(json.dumps({
                 "event": "observe_start",
@@ -150,10 +184,11 @@ class MycelianMemoryAgent:
                 "to_process_count": len(to_process)
             }))
         
-        # Determine last tool executed by checking both tool_history and messages
+        # Determine last tool executed by checking tool_history ONLY
+        # tool_history accumulates within this invocation and resets between invocations
+        # We do NOT check messages to avoid cross-invocation pollution
         last_tool = None
         
-        # Check tool_history first (accumulates within this invocation)
         if tool_history:
             for msg in reversed(tool_history):
                 if isinstance(msg, ToolMessage):
@@ -168,24 +203,6 @@ class MycelianMemoryAgent:
                         }))
                         raise ValueError(f"Tool {msg.name} failed: {msg.content}")
                     break
-        
-        # If not found, check messages (where ToolNode puts results)
-        if not last_tool:
-            messages = state.get("messages", [])
-            if messages:
-                for msg in reversed(messages):
-                    if isinstance(msg, ToolMessage):
-                        last_tool = msg.name
-                        # Check for tool errors
-                        if msg.content and "Error:" in msg.content:
-                            logger.error(json.dumps({
-                                "event": "tool_error",
-                                "timestamp": datetime.utcnow().isoformat(),
-                                "tool": msg.name,
-                                "error": msg.content
-                            }))
-                            raise ValueError(f"Tool {msg.name} failed: {msg.content}")
-                        break
         
         # START_SESSION: Create tool calls for ToolNode to execute
         if control == ControlState.START_SESSION:
@@ -215,9 +232,8 @@ class MycelianMemoryAgent:
                     tool_calls=[tool_call]
                 )
                 
-                # Manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [ai_msg], "messages": [ai_msg]}
+                # Return with updated tool_history (includes copied ToolMessages)
+                return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
                 
             elif last_tool == "get_context":
                 # Second tool: list_entries
@@ -246,9 +262,8 @@ class MycelianMemoryAgent:
                     tool_calls=[tool_call]
                 )
                 
-                # Manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [ai_msg], "messages": [ai_msg]}
+                # Return with updated tool_history (includes copied ToolMessages)
+                return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
                 
             elif last_tool == "list_entries":
                 # Both tools completed, extract results and finish
@@ -276,8 +291,8 @@ class MycelianMemoryAgent:
                 # Mark complete and update conversation history
                 return {
                     "conversation_history": [context_msg, entries_msg],
-                    # Manually accumulate tool_history (should be empty for START_SESSION)
-                    "tool_history": list(state.get("tool_history", [])) + [AIMessage(content="Session started.")]
+                    # Return with updated tool_history
+                    "tool_history": tool_history + [AIMessage(content="Session started.")]
                 }
         
         # PROCESS_MESSAGE sequence: add_entry only
@@ -308,8 +323,6 @@ class MycelianMemoryAgent:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
                 ])
-                
-                self._log_llm_tool_calls(response)
                 # Also add to messages for ToolNode
                 # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
@@ -317,47 +330,23 @@ class MycelianMemoryAgent:
                 
             elif last_tool == "add_entry":
                 # Complete
-                # Complete - manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [AIMessage(content="Message processed.")]}
+                # Complete - return with updated tool_history  
+                return {"tool_history": tool_history + [AIMessage(content="Message processed.")]}
         
-        # PROCESS_MESSAGE_AND_FLUSH sequence: add_entry → await_consistency → put_context  
-        elif control == ControlState.PROCESS_MESSAGE_AND_FLUSH:
+        # FLUSH sequence: await_consistency → put_context  
+        elif control == ControlState.FLUSH:
+            # Check if put_context was already called in this flush
+            # This handles the case where LLM returns multiple tools including put_context
+            if self._check_put_context_called(tool_history):
+                return {"tool_history": tool_history + [AIMessage(content="Flushed to context.")]}
+            
             # Only relevant tools for this state
-            if last_tool not in [None, "add_entry", "await_consistency", "put_context"]:
+            if last_tool not in [None, "await_consistency", "put_context"]:
                 # Ignore tools from other control states, treat as starting fresh
                 last_tool = None
                 
             if last_tool is None:
-                # First tool: add_entry (needs LLM for summary)
-                if not to_process:
-                    raise ValueError("No message to process in PROCESS_MESSAGE_AND_FLUSH state")
-                
-                logger.info(json.dumps({
-                        "event": "llm_call",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "add_entry_with_flush",
-                        "message_role": to_process[0].role,
-                        "message_preview": to_process[0].content[:200] if to_process[0].content else None
-                    }))
-                    
-                prompt = build_add_entry_prompt(
-                    conversation_history, to_process[0], self.prompts, 
-                    self.vault_id, self.memory_id
-                )
-                response = self._invoke_llm_with_retry([
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": "Execute the required operation."}
-                ])
-                
-                self._log_llm_tool_calls(response)
-                # Also add to messages for ToolNode
-                # Manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [response], "messages": [response]}
-                
-            elif last_tool == "add_entry":
-                # Second tool: await_consistency
+                # First tool: await_consistency
                 args = {"memory_id": self.memory_id}
                 
                 logger.info(json.dumps({
@@ -379,12 +368,11 @@ class MycelianMemoryAgent:
                     tool_calls=[tool_call]
                 )
                 
-                # Manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [ai_msg], "messages": [ai_msg]}
+                # Return with updated tool_history
+                return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
                 
             elif last_tool == "await_consistency":
-                # Third tool: put_context (needs LLM for synthesis)
+                # Second tool: put_context (needs LLM for synthesis)
                 logger.info(json.dumps({
                         "event": "llm_call",
                         "timestamp": datetime.utcnow().isoformat(),
@@ -400,21 +388,22 @@ class MycelianMemoryAgent:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
                 ])
-                
-                self._log_llm_tool_calls(response)
                 # Also add to messages for ToolNode
                 # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
                 return {"tool_history": current_history + [response], "messages": [response]}
                 
-            elif last_tool == "put_context":
-                # Complete
-                # Complete - manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [AIMessage(content="Flushed to context.")]}
+            # This case is now handled at the beginning of FLUSH section
+            # elif last_tool == "put_context":
+            #     return {"tool_history": tool_history + [AIMessage(content="Flushed to context.")]}
         
         # END_SESSION sequence: await_consistency → put_context
         elif control == ControlState.END_SESSION:
+            # Check if put_context was already called in this end session
+            # This handles the case where LLM returns multiple tools including put_context
+            if self._check_put_context_called(tool_history):
+                return {"tool_history": tool_history + [AIMessage(content="Session ended.")]}
+            
             # Only relevant tools for this state
             if last_tool not in [None, "await_consistency", "put_context"]:
                 # Ignore tools from other control states, treat as starting fresh
@@ -443,9 +432,8 @@ class MycelianMemoryAgent:
                     tool_calls=[tool_call]
                 )
                 
-                # Manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [ai_msg], "messages": [ai_msg]}
+                # Return with updated tool_history (includes copied ToolMessages)
+                return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
                 
             elif last_tool == "await_consistency":
                 # Second tool: put_context (needs LLM for synthesis)
@@ -464,18 +452,14 @@ class MycelianMemoryAgent:
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
                 ])
-                
-                self._log_llm_tool_calls(response)
                 # Also add to messages for ToolNode
                 # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
                 return {"tool_history": current_history + [response], "messages": [response]}
                 
-            elif last_tool == "put_context":
-                # Complete
-                # Complete - manually accumulate tool_history
-                current_history = list(state.get("tool_history", []))
-                return {"tool_history": current_history + [AIMessage(content="Session ended.")]}
+            # This case is now handled at the beginning of END_SESSION section
+            # elif last_tool == "put_context":
+            #     return {"tool_history": tool_history + [AIMessage(content="Session ended.")]}
         
         # Should not reach here
         raise ValueError(f"Unexpected state: control={control}, last_tool={last_tool}")
@@ -519,13 +503,21 @@ class MycelianMemoryAgent:
         # Default to ending
         return "end"
     
-    def _log_llm_tool_calls(self, response) -> None:
-        """Helper to log LLM tool calls from response."""
+    def _log_llm_tool_calls(self, response, invocation_id: str) -> None:
+        """Helper to log LLM tool calls from response.
+        
+        Args:
+            response: The LLM response with tool calls
+            invocation_id: Unique ID for this LLM invocation
+        """
         if hasattr(response, 'tool_calls') and response.tool_calls:
-            for call in response.tool_calls:
+            for idx, call in enumerate(response.tool_calls):
                 logger.info(json.dumps({
                     "event": "llm_tool_call",
                     "timestamp": datetime.utcnow().isoformat(),
+                    "invocation_id": invocation_id,
+                    "tool_index": idx,
+                    "tool_count": len(response.tool_calls),
                     "tool": call.get('name', 'unknown') if isinstance(call, dict) else getattr(call, 'name', 'unknown'),
                     "args": call.get('args', {}) if isinstance(call, dict) else getattr(call, 'args', {})
                 }))
@@ -633,7 +625,20 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
     
     # Get prompts from MCP
     entry_capture_prompt = prompts.get("entry_capture_prompt", "")
-    summary_prompt = prompts.get("summary_prompt", "")
+    
+    # Load our enhanced summary prompt that uses conversation context
+    import os
+    enhanced_prompt_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "prompts", "chat", "summary_prompt_enhanced.md"
+    )
+    
+    if os.path.exists(enhanced_prompt_path):
+        with open(enhanced_prompt_path, 'r') as f:
+            summary_prompt = f.read()
+    else:
+        # Fallback to MCP prompt if enhanced version not found
+        summary_prompt = prompts.get("summary_prompt", "")
     
     prompt = f"""{AGENT_PREFIX}
 
@@ -650,6 +655,7 @@ Content: {to_process.content}
 
 INSTRUCTION: Call the add_entry tool for this single message following the rules below.
 Use vault_id="{vault_id}" and memory_id="{memory_id}" when calling the tool.
+USE THE CONVERSATION CONTEXT to resolve all pronouns and references when creating the summary.
 
 ---
 ENTRY CAPTURE RULES:
@@ -694,8 +700,10 @@ Memory ID: {memory_id}
 Full conversation to synthesize into context:
 {full_conversation}
 
-INSTRUCTION: Call the put_context tool to save a synthesized context document following the rules below.
-Use vault_id="{vault_id}" and memory_id="{memory_id}" when calling the tool.
+CRITICAL INSTRUCTION: You MUST call ONLY the put_context tool - no other tools.
+- Call put_context with vault_id="{vault_id}" and memory_id="{memory_id}"
+- Do NOT call add_entry, await_consistency, or any other tools
+- Return ONLY a single put_context tool call
 
 ---
 CONTEXT MAINTENANCE RULES:

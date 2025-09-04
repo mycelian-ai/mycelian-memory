@@ -10,5 +10,5 @@ class ControlState(Enum):
     """
     START_SESSION = "start_session"
     PROCESS_MESSAGE = "process_message"
-    PROCESS_MESSAGE_AND_FLUSH = "process_message_and_flush"
+    FLUSH = "flush"
     END_SESSION = "end_session"
