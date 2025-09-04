@@ -46,9 +46,14 @@ def is_retryable_openai_error(exc: Exception) -> bool:
     - OpenAI RateLimitError (from openai package)
     - HTTP status codes in error messages (429, 5xx)
     - Common error patterns (rate_limit, timeout, etc.)
+    - LangChain model provider inference errors (likely transient)
     """
     exc_type = type(exc).__name__
     exc_str = str(exc).lower()
+    
+    # Check for LangChain model provider inference error (likely transient/throttling)
+    if "unable to infer model provider" in exc_str:
+        return True
     
     # Check for OpenAI-specific exception types
     if "ratelimiterror" in exc_type.lower():

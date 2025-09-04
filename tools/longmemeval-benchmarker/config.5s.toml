@@ -1,26 +1,6 @@
+# Full 5-question benchmark run
 dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_5s.json"
-vault_title = "longmemeval-5s"
-
-[provider]
-type = "bedrock"
-
-[provider.bedrock]
-region = "us-west-2"
-
-# [provider]
-# type = "openai"
-
-# [provider.openai]
-# base_url = "https://api.openai.com/v1"
+vault_title = "longmemeval-benchmarks"
 
 [models]
-agent = "anthropic.claude-3-5-haiku-20241022-v1:0"
-qa    = "anthropic.claude-3-5-haiku-20241022-v1:0"
-
-[params]
-top_k = 10
-max_tool_calls_per_turn = 5
-# No limits - process all 5 questions with all sessions
-
-memory_title_template = "{question_id}__{run_id}"
-
+agent = "gpt-5-2025-08-07"

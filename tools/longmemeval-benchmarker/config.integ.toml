@@ -1,25 +1,6 @@
+# Integration test config - single question dataset for quick validation
 dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_integ.json"
-vault_title = "longmemeval-quick"
-
-[provider]
-type = "openai"
-
-[provider.openai]
-base_url = "https://api.openai.com/v1"
+vault_title = "longmemeval-benchmarks"
 
 [models]
-agent = "gpt-4o-mini"
-qa    = "gpt-4o-mini"
-eval  = "gpt-4o-mini"
-
-[params]
-top_k = 10
-max_tool_calls_per_turn = 5
-question_limit = 1
-workers = 1
-max_sessions_per_question = 2
-max_turns_per_session = 0
-# Limit sessions for quick behavior check
-
-memory_title_template = "{question_id}__{run_id}"
-
+agent = "gpt-5-2025-08-07"

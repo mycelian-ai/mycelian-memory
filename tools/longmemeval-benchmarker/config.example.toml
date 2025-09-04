@@ -1,0 +1,118 @@
+# ========================================
+# LongMemEval Benchmarker Configuration
+# ========================================
+# This is a complete example configuration with documentation.
+# Only dataset_file_path, vault_title, and models are required.
+#
+# IMPORTANT: Test scope is controlled by the dataset file, not config parameters.
+# Create specific dataset files with the desired number of questions/sessions.
+
+# ========================================
+# REQUIRED FIELDS
+# ========================================
+
+# Path to the LongMemEval dataset JSON file
+# The dataset file determines what gets processed:
+# - Use small dataset files for testing (e.g., 1 question)
+# - Use full dataset files for benchmarking (e.g., 50 questions)
+dataset_file_path = "/path/to/longmemeval-datasets/longmemeval_5s.json"
+
+# Vault title for organizing memories in Mycelian
+# This creates/uses a vault with this name to store all memories from this run
+vault_title = "my-experiment"
+
+# Model configuration (OPTIONAL - defaults to gpt-5-nano-2025-08-07)
+[models]
+# The LLM model to use for the memory agent
+# Default: "gpt-5-nano-2025-08-07"
+# Other examples: "gpt-5-2025-08-07", "gpt-4o-mini"
+
+
+# The LLM model to use for QA (answering questions based on retrieved context)
+# If omitted, defaults to the same model as agent
+# Uncomment to use a different model for QA:
+# qa = "gpt-3.5-turbo"
+
+# ========================================
+# OPTIONAL PERFORMANCE SETTINGS
+# ========================================
+
+[params]
+# Number of parallel workers for processing questions
+# Default: 1 (sequential processing)
+# Increase for faster processing of multiple questions (uses more API calls concurrently)
+# workers = 4
+
+# ========================================
+# FIXED DEFAULTS (Cannot be changed via config)
+# ========================================
+# These values are now hardcoded for simplicity:
+#
+# Provider Configuration:
+#   - Always uses OpenAI API
+#   - Base URL: https://api.openai.com/v1
+#   - Authentication via OPENAI_API_KEY environment variable
+#
+# Memory Configuration:
+#   - memory_title_template: "{question_id}__{run_id}"
+#   - vault_id: Auto-generated from vault_title
+#
+# Search Configuration:
+#   - top_k: 10 (number of search results to retrieve)
+#
+# Processing Scope:
+#   - Always processes ALL questions in the dataset
+#   - Always processes ALL sessions per question
+#   - Always processes ALL turns per session
+#   - Control test scope by using appropriate dataset files
+
+# ========================================
+# DATASET FILE ORGANIZATION
+# ========================================
+# Recommended dataset file naming convention:
+#   - longmemeval_integ.json    - 1 question for integration testing
+#   - longmemeval_1q.json       - Single question with full sessions
+#   - longmemeval_5s.json       - 5 questions for small benchmarks
+#   - longmemeval_50q.json      - 50 questions for full benchmarks
+#   - longmemeval_custom.json   - Custom subset for specific testing
+
+# ========================================
+# EXAMPLE CONFIGURATIONS
+# ========================================
+
+# Example 1: Quick integration test
+# ---------------------------------------------------
+# dataset_file_path = "longmemeval-datasets/longmemeval_integ.json"
+# vault_title = "quick-test"
+# [models]
+# agent = "gpt-4o-mini"
+
+# Example 2: Full benchmark with parallel processing
+# ---------------------------------------------------
+# dataset_file_path = "longmemeval-datasets/longmemeval_50q.json"
+# vault_title = "full-benchmark"
+# [models]
+# agent = "gpt-4"
+# qa = "gpt-3.5-turbo"  # Use cheaper model for QA
+# [params]
+# workers = 8  # Process 8 questions in parallel
+
+# Example 3: Single question deep analysis
+# ---------------------------------------------------
+# dataset_file_path = "longmemeval-datasets/longmemeval_1q.json"
+# vault_title = "single-question-analysis"
+# [models]
+# agent = "gpt-4"
+
+# ========================================
+# ENVIRONMENT VARIABLES
+# ========================================
+# Required environment variables:
+#   - OPENAI_API_KEY: Your OpenAI API key
+#   - MEMORY_SERVER_HTTP_PORT: Mycelian server port (default: 11545)
+#   - MEMORY_SERVER_SEARCH_INDEX_URL: Weaviate URL (default: from docker-compose)
+#
+# Optional environment variables:
+#   - LME_LLM_BACKOFF_SCHEDULE: Comma-separated retry delays in seconds
+#     Default: "5,30,120,300,600" (5s, 30s, 2m, 5m, 10m)
+#     Example: export LME_LLM_BACKOFF_SCHEDULE="1,5,10,30,60"
