@@ -58,12 +58,13 @@ type MemoryContext struct {
 
 // SearchHit represents a search result from the index.
 type SearchHit struct {
-	EntryID  string  `json:"entryId"`
-	ActorID  string  `json:"actorId"`
-	MemoryID string  `json:"memoryId"`
-	Summary  string  `json:"summary"`
-	RawEntry string  `json:"rawEntry"`
-	Score    float64 `json:"score"`
+	EntryID      string    `json:"entryId"`
+	ActorID      string    `json:"actorId"`
+	MemoryID     string    `json:"memoryId"`
+	Summary      string    `json:"summary"`
+	RawEntry     string    `json:"rawEntry"`
+	Score        float64   `json:"score"`
+	CreationTime time.Time `json:"creationTime"`
 }
 
 // ContextHit represents a matching context shard result

@@ -22,12 +22,34 @@ func NewSearchHandler(c *client.Client) *SearchHandler {
 // RegisterTools registers the search_memories tool.
 func (sh *SearchHandler) RegisterTools(s *server.MCPServer) error {
 	searchTool := mcp.NewTool("search_memories",
-		mcp.WithDescription("Hybrid semantic + keyword search within a memory. Results include:\n • entries – entry hits (controlled by ke).\n • latestContext – the most recent consolidated context snapshot (string).\n • contexts – optional array of context shards when kc>0 (each has context, timestamp, score).\n\nParameters:\n • memory_id (required) – target memory.\n • query (required) – search text.\n • top_k (optional) – legacy combined top-k (1–100); retained for back-compat.\n • ke (optional) – top-k for entries (recommended 5).\n • kc (optional) – top-k for context shards (recommended 3)."),
+		mcp.WithDescription(`Performs hybrid semantic and keyword search within a memory.
+
+Parameters:
+• memory_id (required): Target memory UUID
+• query (required): Search query text
+• top_ke (optional): Number of entry results to return
+  - Default: 5
+  - Range: 0-10 (0 returns no entries, useful for context-only searches)
+• top_kc (optional): Number of context shard results to return
+  - Default: 2
+  - Range: 1-3 (must be at least 1)
+
+Returns:
+• entries: Array of matching entries (size: 0 to top_ke), each with:
+  - entryId, summary, rawEntry, score, creationTime
+• count: Number of entries returned
+• latestContext: The most recent context snapshot (always present)
+• latestContextTimestamp: Timestamp of the latest context (always present)
+• contexts: Array of semantically matching context shards (size: 0 to top_kc), each with:
+  - context: Text content
+  - timestamp: When this context was created
+  - score: Relevance score (0-1)
+
+The timestamps allow understanding temporal evolution of the memory. Context shards are sorted by relevance score descending. Entries are sorted by relevance score descending.`),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query text")),
-		mcp.WithNumber("top_k", mcp.Description("Legacy combined top-k (1–100); prefer ke/kc")),
-		mcp.WithNumber("ke", mcp.Description("Top-k for entries (recommended 5)")),
-		mcp.WithNumber("kc", mcp.Description("Top-k for context shards (recommended 3)")),
+		mcp.WithNumber("top_ke", mcp.Description("Top-k for entries (default: 5, range: 0-10)")),
+		mcp.WithNumber("top_kc", mcp.Description("Top-k for context shards (default: 2, range: 1-3)")),
 	)
 	s.AddTool(searchTool, sh.handleSearch)
 	return nil
@@ -37,36 +59,29 @@ func (sh *SearchHandler) handleSearch(ctx context.Context, req mcp.CallToolReque
 	memoryID, _ := req.RequireString("memory_id")
 	query, _ := req.RequireString("query")
 
-	topK := 10
-	if v, ok := req.GetArguments()["top_k"].(float64); ok {
-		if v >= 1 && v <= 100 {
-			topK = int(v)
+	// Handle top_ke parameter (default: 5, range: 0-10)
+	topKE := 5
+	if v, ok := req.GetArguments()["top_ke"].(float64); ok {
+		topKE = int(v)
+		if topKE < 0 || topKE > 10 {
+			return mcp.NewToolResultError("top_ke must be between 0 and 10"), nil
 		}
 	}
 
-	// Optional split top-k parameters (entries vs context shards)
-	ke := 0
-	if v, ok := req.GetArguments()["ke"].(float64); ok {
-		if v >= 1 && v <= 100 {
-			ke = int(v)
+	// Handle top_kc parameter (default: 2, range: 1-3)
+	topKC := 2
+	if v, ok := req.GetArguments()["top_kc"].(float64); ok {
+		topKC = int(v)
+		if topKC < 1 || topKC > 3 {
+			return mcp.NewToolResultError("top_kc must be between 1 and 3"), nil
 		}
-	}
-	kc := 0
-	if v, ok := req.GetArguments()["kc"].(float64); ok {
-		if v >= 1 && v <= 100 {
-			kc = int(v)
-		}
-	}
-	if ke <= 0 {
-		ke = topK
 	}
 
 	resp, err := sh.client.Search(ctx, client.SearchRequest{
 		MemoryID: memoryID,
 		Query:    query,
-		TopK:     ke,
-		KE:       ke,
-		KC:       kc,
+		TopKE:    &topKE,
+		TopKC:    &topKC,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil
@@ -74,13 +89,11 @@ func (sh *SearchHandler) handleSearch(ctx context.Context, req mcp.CallToolReque
 
 	// Build payload preserving raw JSON fields; use camelCase to match client/docs.
 	payload := map[string]interface{}{
-		"entries":          resp.Entries,
-		"count":            resp.Count,
-		"latestContext":    json.RawMessage(resp.LatestContext),
-		"contextTimestamp": resp.ContextTimestamp,
-	}
-	if len(resp.Contexts) > 0 {
-		payload["contexts"] = resp.Contexts
+		"entries":                resp.Entries,
+		"count":                  resp.Count,
+		"latestContext":          json.RawMessage(resp.LatestContext),
+		"latestContextTimestamp": resp.LatestContextTimestamp,
+		"contexts":               resp.Contexts,
 	}
 	b, _ := json.MarshalIndent(payload, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil

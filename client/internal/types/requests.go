@@ -42,7 +42,6 @@ type SearchRequest struct {
 	VaultID  string `json:"vaultId,omitempty"`
 	MemoryID string `json:"memoryId"`
 	Query    string `json:"query"`
-	TopK     int    `json:"topK,omitempty"`
-	KE       int    `json:"ke,omitempty"`
-	KC       int    `json:"kc,omitempty"`
+	TopKE    *int   `json:"top_ke,omitempty"`
+	TopKC    *int   `json:"top_kc,omitempty"`
 }

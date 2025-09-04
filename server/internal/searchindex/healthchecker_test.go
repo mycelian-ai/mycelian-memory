@@ -19,10 +19,6 @@ func (f fakeIndex) Search(context.Context, string, string, string, []float32, in
 func (f fakeIndex) LatestContext(context.Context, string, string) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f fakeIndex) BestContext(ctx context.Context, actorID, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
-	return "", time.Time{}, 0, nil
-}
-
 func (f fakeIndex) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
 	return []model.ContextHit{}, nil
 }
@@ -47,10 +43,6 @@ func (f fallbackIdx) Search(context.Context, string, string, string, []float32, 
 func (f fallbackIdx) LatestContext(context.Context, string, string) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f fallbackIdx) BestContext(ctx context.Context, actorID, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
-	return "", time.Time{}, 0, f.delErr
-}
-
 func (f fallbackIdx) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
 	return nil, f.delErr
 }

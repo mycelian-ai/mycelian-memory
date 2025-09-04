@@ -14,9 +14,8 @@ import (
 //
 //	memoryId – required, non-empty string
 //	query – required, non-empty string
-//	topK  – optional, 1-100 (defaults to 10; legacy combined top-k)
-//	ke    – optional, entries top-k (preferred over topK when provided)
-//	kc    – optional, context shards top-k (no default; recommended 3)
+//	top_ke – optional, entries top-k (default: 5, range: 0-10)
+//	top_kc – optional, context shards top-k (default: 2, range: 1-3)
 //
 // Validation is done via the Validate method.
 // User identification comes from API key authorization.
@@ -25,9 +24,8 @@ import (
 type SearchRequest struct {
 	MemoryID string `json:"memoryId"`
 	Query    string `json:"query"`
-	TopK     int    `json:"topK,omitempty"`
-	KE       int    `json:"ke,omitempty"`
-	KC       int    `json:"kc,omitempty"`
+	TopKE    *int   `json:"top_ke,omitempty"`
+	TopKC    *int   `json:"top_kc,omitempty"`
 }
 
 // Validate sanitises the struct and applies defaults.
@@ -40,13 +38,25 @@ func (r *SearchRequest) Validate() error {
 	if r.Query == "" {
 		return errors.New("query cannot be empty")
 	}
-	// Default legacy topK only if neither topK nor ke are specified
-	if r.TopK <= 0 && r.KE <= 0 {
-		r.TopK = 10
+
+	// Apply defaults if not set (nil pointer)
+	if r.TopKE == nil {
+		defaultKE := 5
+		r.TopKE = &defaultKE
 	}
-	if r.TopK > 100 {
-		r.TopK = 100
+	if r.TopKC == nil {
+		defaultKC := 2
+		r.TopKC = &defaultKC
 	}
+
+	// Validate ranges
+	if *r.TopKE < 0 || *r.TopKE > 10 {
+		return errors.New("top_ke must be between 0 and 10")
+	}
+	if *r.TopKC < 1 || *r.TopKC > 3 {
+		return errors.New("top_kc must be between 1 and 3")
+	}
+
 	return nil
 }
 

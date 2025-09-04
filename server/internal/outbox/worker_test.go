@@ -43,11 +43,6 @@ func (m *MockIndex) LatestContext(ctx context.Context, actorID, memoryID string)
 	return args.String(0), args.Get(1).(time.Time), args.Error(2)
 }
 
-func (m *MockIndex) BestContext(ctx context.Context, actorID, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
-	args := m.Called(ctx, actorID, memoryID, query, vec, alpha)
-	return args.String(0), args.Get(1).(time.Time), args.Get(2).(float64), args.Error(3)
-}
-
 func (m *MockIndex) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
 	args := m.Called(ctx, actorID, memoryID, query, vec, topK, alpha)
 	if args.Get(0) == nil {
@@ -92,7 +87,7 @@ func createTestWorker() (*Worker, *MockEmbedder, *MockIndex) {
 	mockIndex := &MockIndex{}
 	logger := zerolog.New(nil).With().Logger() // Silent logger for tests
 	cfg := Config{BatchSize: 10, Interval: 0}
-	
+
 	worker := &Worker{
 		db:       nil, // We're testing handle() which doesn't use db
 		log:      logger,
@@ -100,7 +95,7 @@ func createTestWorker() (*Worker, *MockEmbedder, *MockIndex) {
 		index:    mockIndex,
 		cfg:      cfg,
 	}
-	
+
 	return worker, mockEmbed, mockIndex
 }
 
@@ -111,7 +106,7 @@ func createTestWorker() (*Worker, *MockEmbedder, *MockIndex) {
 func TestHandleSkipsEmptyEntry_BothEmpty(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          1,
 		op:          OpUpsertEntry,
@@ -121,9 +116,9 @@ func TestHandleSkipsEmptyEntry_BothEmpty(t *testing.T) {
 			"rawEntry": "",
 		},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should succeed without calling embed or index
 	assert.NoError(t, err)
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -133,7 +128,7 @@ func TestHandleSkipsEmptyEntry_BothEmpty(t *testing.T) {
 func TestHandleSkipsEmptyEntry_EmptySummaryWhitespaceRawEntry(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          2,
 		op:          OpUpsertEntry,
@@ -143,9 +138,9 @@ func TestHandleSkipsEmptyEntry_EmptySummaryWhitespaceRawEntry(t *testing.T) {
 			"rawEntry": "   \t\n  ", // Various whitespace
 		},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should succeed without calling embed or index
 	assert.NoError(t, err)
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -155,7 +150,7 @@ func TestHandleSkipsEmptyEntry_EmptySummaryWhitespaceRawEntry(t *testing.T) {
 func TestHandleSkipsEmptyEntry_WhitespaceSummaryEmptyRawEntry(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          3,
 		op:          OpUpsertEntry,
@@ -165,9 +160,9 @@ func TestHandleSkipsEmptyEntry_WhitespaceSummaryEmptyRawEntry(t *testing.T) {
 			"rawEntry": "",
 		},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should succeed without calling embed or index
 	assert.NoError(t, err)
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -177,12 +172,12 @@ func TestHandleSkipsEmptyEntry_WhitespaceSummaryEmptyRawEntry(t *testing.T) {
 func TestHandleUsesPreferredText_BothPresent(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
 	for i := range expectedVector {
 		expectedVector[i] = float32(i) / 768.0
 	}
-	
+
 	job := job{
 		id:          4,
 		op:          OpUpsertEntry,
@@ -192,13 +187,13 @@ func TestHandleUsesPreferredText_BothPresent(t *testing.T) {
 			"rawEntry": "This is the raw entry",
 		},
 	}
-	
+
 	// Should use summary (preferred) not rawEntry
 	mockEmbed.On("Embed", ctx, "This is the summary").Return(expectedVector, nil)
 	mockIndex.On("UpsertEntry", ctx, "test-entry-id", expectedVector, job.payload).Return(nil)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	assert.NoError(t, err)
 	mockEmbed.AssertCalled(t, "Embed", ctx, "This is the summary")
 	mockIndex.AssertCalled(t, "UpsertEntry", ctx, "test-entry-id", expectedVector, job.payload)
@@ -211,9 +206,9 @@ func TestHandleUsesPreferredText_BothPresent(t *testing.T) {
 func TestHandleEmbeddingError_ReturnsError(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	embedError := errors.New("embedding service unavailable")
-	
+
 	job := job{
 		id:          5,
 		op:          OpUpsertEntry,
@@ -222,11 +217,11 @@ func TestHandleEmbeddingError_ReturnsError(t *testing.T) {
 			"summary": "Valid text to embed",
 		},
 	}
-	
+
 	mockEmbed.On("Embed", ctx, "Valid text to embed").Return(nil, embedError)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should return the embedding error
 	assert.Error(t, err)
 	assert.Equal(t, embedError, err)
@@ -236,9 +231,9 @@ func TestHandleEmbeddingError_ReturnsError(t *testing.T) {
 func TestHandleEmbeddingError_WrongDimension(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	wrongVector := []float32{0.5} // 1-dimensional instead of 768
-	
+
 	job := job{
 		id:          6,
 		op:          OpUpsertEntry,
@@ -247,13 +242,13 @@ func TestHandleEmbeddingError_WrongDimension(t *testing.T) {
 			"summary": "Text causing wrong dimension",
 		},
 	}
-	
+
 	mockEmbed.On("Embed", ctx, "Text causing wrong dimension").Return(wrongVector, nil)
 	indexError := errors.New("vector dimension mismatch: expected 768, got 1")
 	mockIndex.On("UpsertEntry", ctx, "test-entry-id", wrongVector, job.payload).Return(indexError)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should return the index error
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "dimension")
@@ -266,10 +261,10 @@ func TestHandleEmbeddingError_WrongDimension(t *testing.T) {
 func TestHandleIndexError_GenericError(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
 	indexError := errors.New("connection refused")
-	
+
 	job := job{
 		id:          7,
 		op:          OpUpsertEntry,
@@ -278,12 +273,12 @@ func TestHandleIndexError_GenericError(t *testing.T) {
 			"summary": "Valid text",
 		},
 	}
-	
+
 	mockEmbed.On("Embed", ctx, "Valid text").Return(expectedVector, nil)
 	mockIndex.On("UpsertEntry", ctx, "test-entry-id", expectedVector, job.payload).Return(indexError)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should return the index error
 	assert.Error(t, err)
 	assert.Equal(t, indexError, err)
@@ -292,10 +287,10 @@ func TestHandleIndexError_GenericError(t *testing.T) {
 func TestHandleIndexError_AlreadyExists(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
 	alreadyExistsError := errors.New("object already exists in index")
-	
+
 	job := job{
 		id:          8,
 		op:          OpUpsertEntry,
@@ -304,12 +299,12 @@ func TestHandleIndexError_AlreadyExists(t *testing.T) {
 			"summary": "Duplicate entry",
 		},
 	}
-	
+
 	mockEmbed.On("Embed", ctx, "Duplicate entry").Return(expectedVector, nil)
 	mockIndex.On("UpsertEntry", ctx, "existing-entry-id", expectedVector, job.payload).Return(alreadyExistsError)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should return nil (mark as done) for already exists
 	assert.NoError(t, err)
 }
@@ -317,10 +312,10 @@ func TestHandleIndexError_AlreadyExists(t *testing.T) {
 func TestHandleIndexError_Status422(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
 	status422Error := errors.New("status code: 422 unprocessable entity")
-	
+
 	job := job{
 		id:          9,
 		op:          OpUpsertEntry,
@@ -329,12 +324,12 @@ func TestHandleIndexError_Status422(t *testing.T) {
 			"summary": "Another duplicate",
 		},
 	}
-	
+
 	mockEmbed.On("Embed", ctx, "Another duplicate").Return(expectedVector, nil)
 	mockIndex.On("UpsertEntry", ctx, "duplicate-entry-id", expectedVector, job.payload).Return(status422Error)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should return nil (mark as done) for 422 status
 	assert.NoError(t, err)
 }
@@ -346,9 +341,9 @@ func TestHandleIndexError_Status422(t *testing.T) {
 func TestHandleBadPayload_MissingSummary(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
-	
+
 	job := job{
 		id:          10,
 		op:          OpUpsertEntry,
@@ -358,13 +353,13 @@ func TestHandleBadPayload_MissingSummary(t *testing.T) {
 			"rawEntry": "Fallback to raw entry",
 		},
 	}
-	
+
 	// Should use rawEntry when summary is missing
 	mockEmbed.On("Embed", ctx, "Fallback to raw entry").Return(expectedVector, nil)
 	mockIndex.On("UpsertEntry", ctx, "test-entry-id", expectedVector, job.payload).Return(nil)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	assert.NoError(t, err)
 	mockEmbed.AssertCalled(t, "Embed", ctx, "Fallback to raw entry")
 }
@@ -372,9 +367,9 @@ func TestHandleBadPayload_MissingSummary(t *testing.T) {
 func TestHandleBadPayload_MissingRawEntry(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
-	
+
 	job := job{
 		id:          11,
 		op:          OpUpsertEntry,
@@ -384,13 +379,13 @@ func TestHandleBadPayload_MissingRawEntry(t *testing.T) {
 			// rawEntry field missing
 		},
 	}
-	
+
 	// Should use summary when rawEntry is missing
 	mockEmbed.On("Embed", ctx, "Only summary present").Return(expectedVector, nil)
 	mockIndex.On("UpsertEntry", ctx, "test-entry-id", expectedVector, job.payload).Return(nil)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	assert.NoError(t, err)
 	mockEmbed.AssertCalled(t, "Embed", ctx, "Only summary present")
 }
@@ -398,7 +393,7 @@ func TestHandleBadPayload_MissingRawEntry(t *testing.T) {
 func TestHandleBadPayload_BothMissing(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          12,
 		op:          OpUpsertEntry,
@@ -408,9 +403,9 @@ func TestHandleBadPayload_BothMissing(t *testing.T) {
 			"otherField": "some value",
 		},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should succeed without calling embed or index
 	assert.NoError(t, err)
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -420,19 +415,19 @@ func TestHandleBadPayload_BothMissing(t *testing.T) {
 func TestHandleBadPayload_NonStringValues(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          13,
 		op:          OpUpsertEntry,
 		aggregateID: "test-entry-id",
 		payload: map[string]interface{}{
-			"summary":  123,        // Number instead of string
+			"summary":  123,                                // Number instead of string
 			"rawEntry": []string{"array", "of", "strings"}, // Array instead of string
 		},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should succeed without calling embed or index (treated as empty)
 	assert.NoError(t, err)
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -446,16 +441,16 @@ func TestHandleBadPayload_NonStringValues(t *testing.T) {
 func TestHandleUnknownOp_InvalidOp(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          14,
 		op:          "invalid_operation",
 		aggregateID: "test-id",
 		payload:     map[string]interface{}{},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown op")
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -465,16 +460,16 @@ func TestHandleUnknownOp_InvalidOp(t *testing.T) {
 func TestHandleUnknownOp_EmptyOp(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          15,
 		op:          "",
 		aggregateID: "test-id",
 		payload:     map[string]interface{}{},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown op")
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -488,7 +483,7 @@ func TestHandleUnknownOp_EmptyOp(t *testing.T) {
 func TestHandleSkipsEmptyContext(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	job := job{
 		id:          16,
 		op:          OpUpsertContext,
@@ -497,9 +492,9 @@ func TestHandleSkipsEmptyContext(t *testing.T) {
 			"context": "  \n\t  ", // Whitespace only
 		},
 	}
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	// Should succeed without calling embed or index
 	assert.NoError(t, err)
 	mockEmbed.AssertNotCalled(t, "Embed")
@@ -509,9 +504,9 @@ func TestHandleSkipsEmptyContext(t *testing.T) {
 func TestHandleContextWithValidText(t *testing.T) {
 	worker, mockEmbed, mockIndex := createTestWorker()
 	ctx := context.Background()
-	
+
 	expectedVector := make([]float32, 768)
-	
+
 	job := job{
 		id:          17,
 		op:          OpUpsertContext,
@@ -520,12 +515,12 @@ func TestHandleContextWithValidText(t *testing.T) {
 			"context": "Valid context text",
 		},
 	}
-	
+
 	mockEmbed.On("Embed", ctx, "Valid context text").Return(expectedVector, nil)
 	mockIndex.On("UpsertContext", ctx, "test-context-id", expectedVector, job.payload).Return(nil)
-	
+
 	err := worker.handle(ctx, job)
-	
+
 	assert.NoError(t, err)
 	mockEmbed.AssertCalled(t, "Embed", ctx, "Valid context text")
 	mockIndex.AssertCalled(t, "UpsertContext", ctx, "test-context-id", expectedVector, job.payload)
@@ -547,7 +542,7 @@ func TestIsAlreadyExists(t *testing.T) {
 		{"unrelated error", errors.New("connection refused"), false},
 		{"mixed case", errors.New("Already Exists in index"), false}, // strings.Contains is case-sensitive
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isAlreadyExists(tt.err)
@@ -588,7 +583,7 @@ func TestPreferredText(t *testing.T) {
 			expected: "text",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := preferredText(tt.payload, tt.keys...)

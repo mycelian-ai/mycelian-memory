@@ -22,7 +22,7 @@ func TestSearchMemoriesTool(t *testing.T) {
             "entries": [],
             "count": 0,
             "latestContext": "{}",
-            "contextTimestamp": "2025-07-27T00:00:00Z",
+            "latestContextTimestamp": "2025-07-27T00:00:00Z",
             "contexts": [
               {"context": "{\"summary\": \"test context\"}", "timestamp": "2025-07-27T01:00:00Z", "score": 0.85}
             ]
@@ -41,8 +41,8 @@ func TestSearchMemoriesTool(t *testing.T) {
 			Arguments: map[string]any{
 				"memory_id": "m1",
 				"query":     "hello",
-				"top_k":     5,
-				"kc":        1,
+				"top_ke":    5,
+				"top_kc":    1,
 			},
 		},
 	}

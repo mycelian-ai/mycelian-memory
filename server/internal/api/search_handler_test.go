@@ -31,15 +31,11 @@ func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32
 	if m.empty {
 		return []model.SearchHit{}, nil
 	}
-	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9}}, nil
+	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9, CreationTime: time.Now()}}, nil
 }
 
 func (m *mockSearch) LatestContext(ctx context.Context, uid, mid string) (string, time.Time, error) {
 	return "ctx", time.Now(), nil
-}
-
-func (m *mockSearch) BestContext(ctx context.Context, uid, mid, q string, v []float32, a float32) (string, time.Time, float64, error) {
-	return "bestctx", time.Now(), 0.9, nil
 }
 
 func (m *mockSearch) SearchContexts(ctx context.Context, uid, mid, q string, v []float32, k int, a float32) ([]model.ContextHit, error) {
@@ -83,7 +79,7 @@ func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hello","topK":3,"ke":2,"kc":1}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hello","top_ke":2,"top_kc":1}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
@@ -109,7 +105,7 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi"}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","top_ke":5,"top_kc":2}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
@@ -140,7 +136,7 @@ func TestHandleSearch_ContextsArray_KCLimit(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","kc":1}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","top_ke":5,"top_kc":1}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
@@ -150,8 +146,9 @@ func TestHandleSearch_ContextsArray_KCLimit(t *testing.T) {
 		t.Fatalf("expected 200")
 	}
 	var resp struct {
-		Contexts      []map[string]any `json:"contexts"`
-		LatestContext string           `json:"latestContext"`
+		Contexts               []map[string]any `json:"contexts"`
+		LatestContext          string           `json:"latestContext"`
+		LatestContextTimestamp string           `json:"latestContextTimestamp"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -170,7 +167,7 @@ func TestHandleSearch_NoResults(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi"}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","top_ke":5,"top_kc":2}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()

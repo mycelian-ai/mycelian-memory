@@ -62,6 +62,7 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 			gql.Field{Name: "memoryId"},
 			gql.Field{Name: "summary"},
 			gql.Field{Name: "rawEntry"},
+			gql.Field{Name: "creationTime"},
 			gql.Field{Name: "_additional", Fields: []gql.Field{{Name: "score"}}},
 		)
 
@@ -108,13 +109,20 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 				}
 			}
 		}
+		// Parse creation time
+		var creationTime time.Time
+		if ctStr := safeString(m["creationTime"]); ctStr != "" {
+			creationTime, _ = time.Parse(time.RFC3339, ctStr)
+		}
+
 		hit := model.SearchHit{
-			EntryID:  safeString(m["entryId"]),
-			ActorID:  safeString(m["actorId"]),
-			MemoryID: safeString(m["memoryId"]),
-			Summary:  safeString(m["summary"]),
-			RawEntry: safeString(m["rawEntry"]),
-			Score:    score,
+			EntryID:      safeString(m["entryId"]),
+			ActorID:      safeString(m["actorId"]),
+			MemoryID:     safeString(m["memoryId"]),
+			Summary:      safeString(m["summary"]),
+			RawEntry:     safeString(m["rawEntry"]),
+			Score:        score,
+			CreationTime: creationTime,
 		}
 		log.Debug().Str("entryId", hit.EntryID).Str("summary", hit.Summary).Float64("score", score).Msg("search hit")
 		out = append(out, hit)
@@ -166,60 +174,6 @@ func (w *weavNative) LatestContext(ctx context.Context, actorID string, memoryID
 		}
 	}
 	return ctxStr, ts, nil
-}
-
-func (w *weavNative) BestContext(ctx context.Context, actorID string, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
-	hy := (&gql.HybridArgumentBuilder{}).
-		WithQuery(query).
-		WithVector(vec).
-		WithAlpha(alpha).
-		WithProperties([]string{"context"})
-
-	where := filters.Where().WithPath([]string{"memoryId"}).WithOperator(filters.Equal).WithValueText(memoryID)
-	req := w.client.GraphQL().Get().
-		WithClassName("MemoryContext").
-		WithWhere(where).
-		WithHybrid(hy).
-		WithLimit(1).
-		WithFields(
-			gql.Field{Name: "context"},
-			gql.Field{Name: "creationTime"},
-			gql.Field{Name: "_additional", Fields: []gql.Field{{Name: "score"}}},
-		)
-	resp, err := req.Do(ctx)
-	if err != nil {
-		return "", time.Time{}, 0, err
-	}
-	if len(resp.Errors) > 0 {
-		return "", time.Time{}, 0, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
-	}
-	getData, ok := resp.Data["Get"].(map[string]interface{})
-	if !ok {
-		return "", time.Time{}, 0, nil
-	}
-	val := getData["MemoryContext"]
-	if val == nil {
-		return "", time.Time{}, 0, nil
-	}
-	arr, ok := val.([]interface{})
-	if !ok || len(arr) == 0 {
-		return "", time.Time{}, 0, nil
-	}
-	item := arr[0].(map[string]interface{})
-	ctxText, _ := item["context"].(string)
-	tsStr, _ := item["creationTime"].(string)
-	ts, _ := time.Parse(time.RFC3339, tsStr)
-	var score float64
-	if add, ok := item["_additional"].(map[string]interface{}); ok {
-		switch v := add["score"].(type) {
-		case float64:
-			score = v
-		case string:
-			f, _ := strconv.ParseFloat(v, 64)
-			score = f
-		}
-	}
-	return ctxText, ts, score, nil
 }
 
 // SearchContexts returns top-K matching context shards for a query.

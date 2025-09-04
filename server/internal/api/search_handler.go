@@ -10,6 +10,7 @@ import (
 	respond "github.com/mycelian/mycelian-memory/server/internal/api/respond"
 	"github.com/mycelian/mycelian-memory/server/internal/auth"
 	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
+	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 )
 
@@ -53,7 +54,7 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("topK", req.TopK).Int("ke", req.KE).Int("kc", req.KC).Str("actorId", actorInfo.ActorID).Msg("search request received")
+	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("top_ke", *req.TopKE).Int("top_kc", *req.TopKC).Str("actorId", actorInfo.ActorID).Msg("search request received")
 
 	vec, err := h.emb.Embed(r.Context(), req.Query)
 	if err != nil {
@@ -63,55 +64,51 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debug().Int("vectorLength", len(vec)).Msg("embedding generated")
 
-	// Entries search: prefer KE if provided, else legacy TopK
-	kEntries := req.TopK
-	if req.KE > 0 {
-		kEntries = req.KE
-	}
-	hits, err := h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, kEntries, h.alpha)
-	if err != nil {
-		log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
-		respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")
-		return
+	// Search for entries if top_ke > 0
+	var hits []model.SearchHit
+	if *req.TopKE > 0 {
+		hits, err = h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, *req.TopKE, h.alpha)
+		if err != nil {
+			log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
+			respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")
+			return
+		}
 	}
 	log.Info().Int("hitCount", len(hits)).Str("memoryId", req.MemoryID).Msg("search completed")
 
-	// Build response consistent with previous keys
-	resp := map[string]interface{}{
-		"entries": hits,
-		"count":   len(hits),
+	// Always fetch latest context
+	latestCtx, latestTs, err := h.idx.LatestContext(r.Context(), actorInfo.ActorID, req.MemoryID)
+	if err != nil {
+		log.Error().Err(err).Str("memoryId", req.MemoryID).Msg("latest context fetch failed")
+		respond.WriteError(w, http.StatusInternalServerError, "latest context unavailable")
+		return
 	}
 
-	if req.KC > 0 {
-		// Return top-K contexts (no special 'best' semantics)
-		ctxHits, err := h.idx.SearchContexts(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, req.KC, h.alpha)
-		if err != nil {
-			respond.WriteError(w, http.StatusInternalServerError, "context search unavailable")
-			return
-		}
-		contexts := make([]map[string]any, 0, len(ctxHits))
-		for _, ch := range ctxHits {
-			contexts = append(contexts, map[string]any{
-				"context":   ch.Context,
-				"timestamp": ch.Timestamp.Format(time.RFC3339),
-				"score":     ch.Score,
-			})
-		}
-		resp["contexts"] = contexts
-		if len(contexts) > 0 {
-			if c0, ok := contexts[0]["context"].(string); ok {
-				resp["latestContext"] = c0
-			}
-		}
-	} else {
-		// Legacy fields
-		ctxStr, ts, err := h.idx.LatestContext(r.Context(), actorInfo.ActorID, req.MemoryID)
-		if err != nil {
-			respond.WriteError(w, http.StatusInternalServerError, "latest context unavailable")
-			return
-		}
-		resp["latestContext"] = ctxStr
-		resp["contextTimestamp"] = ts.Format(time.RFC3339)
+	// Search for context shards (always, since minimum is 1)
+	ctxHits, err := h.idx.SearchContexts(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, *req.TopKC, h.alpha)
+	if err != nil {
+		log.Error().Err(err).Str("memoryId", req.MemoryID).Msg("context search failed")
+		respond.WriteError(w, http.StatusInternalServerError, "context search unavailable")
+		return
+	}
+
+	// Build contexts array
+	contexts := make([]map[string]any, 0, len(ctxHits))
+	for _, ch := range ctxHits {
+		contexts = append(contexts, map[string]any{
+			"context":   ch.Context,
+			"timestamp": ch.Timestamp.Format(time.RFC3339),
+			"score":     ch.Score,
+		})
+	}
+
+	// Build response with consistent structure
+	resp := map[string]interface{}{
+		"entries":                hits,
+		"count":                  len(hits),
+		"latestContext":          latestCtx,
+		"latestContextTimestamp": latestTs.Format(time.RFC3339),
+		"contexts":               contexts,
 	}
 
 	respond.WriteJSON(w, http.StatusOK, resp)

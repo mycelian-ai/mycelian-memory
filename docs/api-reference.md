@@ -484,17 +484,15 @@ DELETE /v0/users/{userId}/vaults/{vaultId}/memories/{memoryId}/contexts/{context
 POST /v0/search
 ```
 
+Performs hybrid semantic and keyword search within a memory.
+
 **Request Body**:
 ```json
 {
-  "userId": "string",
-  "memoryId": "string",
-  "query": "string",
-  "limit": 10,
-  "filters": {
-    "tags": ["string"],
-    "memoryType": "string"
-  }
+  "memoryId": "string",    // Required: Target memory UUID
+  "query": "string",        // Required: Search query text
+  "top_ke": 5,             // Optional: Number of entries to return (default: 5, range: 0-10)
+  "top_kc": 2              // Optional: Number of context shards to return (default: 2, range: 1-3)
 }
 ```
 
@@ -503,23 +501,33 @@ POST /v0/search
 {
   "entries": [
     {
-      "entry": {
-        "entryId": "entry123",
-        "userId": "user123",
-        "vaultId": "vault123",
-        "memoryId": "memory123",
-        "rawEntry": "Entry content",
-        "tags": ["tag1", "tag2"],
-        "creationTime": "2025-01-01T12:00:00Z"
-      },
+      "entryId": "entry123",
+      "actorId": "user123",
+      "memoryId": "memory123",
+      "summary": "Entry summary",
+      "rawEntry": "Full entry content",
       "score": 0.95,
-      "snippet": "Highlighted content snippet"
+      "creationTime": "2025-01-01T12:00:00Z"
     }
   ],
   "count": 1,
-  "processingTimeMs": 45
+  "latestContext": "Latest context text...",
+  "latestContextTimestamp": "2025-01-01T12:30:00Z",
+  "contexts": [
+    {
+      "context": "Context shard text...",
+      "timestamp": "2025-01-01T11:00:00Z",
+      "score": 0.92
+    }
+  ]
 }
 ```
+
+**Notes**:
+- `top_ke=0` returns no entries (useful for context-only searches)
+- Timestamps enable understanding temporal evolution
+- Contexts are sorted by relevance score (descending)
+- Authorization via Bearer token in header
 
 ## Data Types
 
@@ -588,3 +596,42 @@ No rate limiting is currently implemented.
 ## Versioning
 
 The API is versioned using URL prefixes. Current version is `v0`. Future versions will increment (e.g., `v1`, `v2`).
+
+
+## Migration Guide
+
+### Search API Breaking Changes (v0)
+
+**Old Parameters (Deprecated)**:
+- `topK`: Legacy combined top-k parameter
+- `ke`: Entries top-k
+- `kc`: Context shards top-k
+
+**New Parameters**:
+- `top_ke`: Number of entries (default: 5, range: 0-10)
+- `top_kc`: Number of context shards (default: 2, range: 1-3)
+
+**Response Changes**:
+- `contextTimestamp` → `latestContextTimestamp`
+- `contexts` array is now always present (can be empty)
+- Entries now include `creationTime` field
+
+**Migration Example**:
+```json
+// Old request
+{
+  "memoryId": "m1",
+  "query": "search text",
+  "topK": 10,
+  "ke": 5,
+  "kc": 3
+}
+
+// New request
+{
+  "memoryId": "m1",
+  "query": "search text",
+  "top_ke": 5,
+  "top_kc": 3
+}
+```

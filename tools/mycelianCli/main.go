@@ -496,12 +496,22 @@ func newSearchCmd() *cobra.Command {
 			defer cancel()
 
 			start := time.Now()
+			// Convert int to pointer values for the request
+			topKEPtr := &ke
+			if ke == 0 {
+				topKEPtr = &topK // Use topK as default if ke not set
+			}
+			topKCPtr := &kc
+			if kc == 0 {
+				defaultKC := 2
+				topKCPtr = &defaultKC
+			}
+
 			resp, err := c.Search(ctx, client.SearchRequest{
 				MemoryID: memoryID,
 				Query:    query,
-				TopK:     topK,
-				KE:       ke,
-				KC:       kc,
+				TopKE:    topKEPtr,
+				TopKC:    topKCPtr,
 			})
 			elapsed := time.Since(start)
 

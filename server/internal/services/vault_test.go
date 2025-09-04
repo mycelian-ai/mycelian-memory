@@ -25,9 +25,6 @@ func (f *fakeIndex) Search(ctx context.Context, userID, memoryID, query string, 
 func (f *fakeIndex) LatestContext(ctx context.Context, userID, memoryID string) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f *fakeIndex) BestContext(ctx context.Context, userID, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
-	return "", time.Now(), 0.0, nil
-}
 
 func (f *fakeIndex) SearchContexts(ctx context.Context, userID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
 	return []model.ContextHit{}, nil

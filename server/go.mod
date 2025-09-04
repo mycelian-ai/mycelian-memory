@@ -2,7 +2,10 @@ module github.com/mycelian/mycelian-memory/server
 
 go 1.24.6
 
-require github.com/mycelian/mycelian-memory/pkg/devauth v0.0.0
+require (
+	github.com/mycelian/mycelian-memory/pkg/devauth v0.0.0
+	github.com/stretchr/testify v1.10.0
+)
 
 replace github.com/mycelian/mycelian-memory/pkg/devauth => ../pkg/devauth
 
@@ -53,9 +56,12 @@ require (
 )
 
 require (
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
 )
