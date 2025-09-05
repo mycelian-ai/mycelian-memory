@@ -241,9 +241,28 @@ class MemoryManager:
         
         raise RuntimeError(f"Could not create or find memory '{title}' in vault {vault_id}")
     
-    def search_memories(self, memory_id: str, query: str, top_k: int = 10) -> Dict[str, Any]:
-        """Search memories and normalize the response."""
-        args: Dict[str, Any] = {"memory_id": memory_id, "query": query, "top_k": int(top_k)}
+    def search_memories(self, memory_id: str, query: str, top_ke: int = 5, top_kc: int = 2, top_k: Optional[int] = None) -> Dict[str, Any]:
+        """Search memories and normalize the response.
+        
+        Args:
+            memory_id: The UUID of the memory
+            query: Search query text  
+            top_ke: Number of entry results (0-10, default 5)
+            top_kc: Number of context shard results (1-3, default 2)
+            top_k: Legacy parameter for backward compatibility (deprecated)
+        """
+        # For backward compatibility, if top_k is provided but not ke/kc, use it
+        if top_k is not None and top_ke == 5 and top_kc == 2:
+            # Map old top_k to reasonable ke/kc values
+            top_ke = min(top_k, 10)  # Cap at 10 for entries
+            top_kc = min(3, max(1, top_k // 3))  # 1-3 for context
+        
+        args: Dict[str, Any] = {
+            "memory_id": memory_id, 
+            "query": query, 
+            "top_ke": int(top_ke),
+            "top_kc": int(top_kc)
+        }
         out = self._call_tool("search_memories", args)
         
         # Parse response if it's a JSON string

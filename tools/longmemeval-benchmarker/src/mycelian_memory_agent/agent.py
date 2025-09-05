@@ -15,7 +15,6 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
 from .control_state import ControlState
-from ..tenacious_agent_invoker import invoke_with_backoff
 
 # Setup logger for audit trail
 # Using "lme.agent" to integrate with benchmarker's logging system
@@ -138,24 +137,14 @@ class MycelianMemoryAgent:
     def _invoke_llm_with_retry(self, messages):
         """Invoke LLM with automatic retry on transient errors.
         
-        Uses exponential backoff with jitter for rate limits and transient failures.
-        Configurable via LME_LLM_BACKOFF_SCHEDULE environment variable.
+        LangChain's built-in retry handles rate limits and transient failures.
         """
         # Generate unique invocation ID for tracking
         invocation_id = str(uuid.uuid4())[:8]
         
-        def call_fn():
-            return self.llm_with_tools.invoke(messages)
+        # LangChain handles retry internally with max_retries parameter
+        response = self.llm_with_tools.invoke(messages)
         
-        def log_retry(msg: str):
-            logger.info(json.dumps({
-                "event": "llm_retry",
-                "timestamp": datetime.utcnow().isoformat(),
-                "invocation_id": invocation_id,
-                "message": msg
-            }))
-        
-        response = invoke_with_backoff(call_fn, log=log_retry)
         # Log tool calls with invocation ID
         self._log_llm_tool_calls(response, invocation_id)
         return response

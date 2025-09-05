@@ -23,6 +23,7 @@ Policy: ADRs are immutable once Accepted. Future changes must be recorded in a n
 | 015 | Minimal LangGraph Benchmarker (refined design) | Accepted | Pending | 2025-08-28 |
 | 016 | LongMemEval Three-Class Agent Architecture | Proposed | Pending | 2025-01-01 |
 | 017 | Search API Parameter Standardization | Accepted | Implemented | 2025-01-04 |
+| 018 | LongMemEval Resumable Benchmarker | Proposed | Pending | 2025-01-05 |
 
 Notes
 - ADRs are immutable artifacts once Accepted; do not edit historical decisions. Create a new ADR to change direction and reference the old one via Superseded by.

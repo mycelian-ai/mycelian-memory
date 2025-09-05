@@ -3,4 +3,12 @@ dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/long
 vault_title = "longmemeval-benchmarks"
 
 [models]
-agent = "gpt-5-2025-08-07"
+# Ingest model for processing conversation sessions
+ingest = "openrouter:openai/gpt-5-nano-2025-08-07"
+# QA model for answering questions based on retrieved context
+qa = "openrouter:openai/gpt-5-2025-08-07"
+#ingest = "vertex-ai:gemini-2.5-flash-lite"
+
+[search]
+# Enable two-pass search for better retrieval
+use_two_pass = true

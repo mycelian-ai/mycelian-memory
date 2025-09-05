@@ -6,6 +6,10 @@ langchain>=0.3.0
 langchain-openai>=0.2.0
 langchain-aws>=0.1.0
 
+# Vertex AI Support
+langchain-google-vertexai>=0.2.0
+google-cloud-aiplatform>=1.38.0
+
 # MCP Integration
 langchain-mcp-adapters>=0.1.0
 

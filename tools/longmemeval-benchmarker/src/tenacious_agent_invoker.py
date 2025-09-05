@@ -1,3 +1,24 @@
+"""
+DEPRECATED: This module is currently unused in favor of LangChain's built-in retry mechanisms.
+
+We are using LangChain's built-in retry handling (max_retries parameter) which is configured
+on all model initializations. We will evaluate if this default handling is sufficient for our
+needs. If we encounter issues with rate limiting or need more sophisticated retry logic 
+(exponential backoff, custom error detection, retry logging), we may reactivate and use this
+module based on our results.
+
+This module provides:
+- Custom exponential backoff with jitter
+- Configurable retry schedules via environment variables
+- Detailed retry logging
+- Support for both OpenAI and Vertex AI error patterns
+
+To reactivate if needed:
+1. Import invoke_with_backoff from this module
+2. Wrap model calls with invoke_with_backoff
+3. Configure LME_LLM_BACKOFF_SCHEDULE environment variable for custom schedules
+"""
+
 from __future__ import annotations
 
 from typing import Callable, List, Optional, Any
@@ -9,8 +30,9 @@ import random as _random
 DEFAULT_BACKOFF_SCHEDULE: List[float] = [5.0, 30.0, 120.0, 300.0, 600.0]
 
 
-# OpenAI retryable error patterns
-RETRYABLE_OPENAI_PATTERNS = {
+# LLM retryable error patterns (OpenAI and Vertex AI)
+RETRYABLE_LLM_PATTERNS = {
+    # OpenAI patterns
     "rate_limit",
     "429",
     "500",
@@ -24,6 +46,13 @@ RETRYABLE_OPENAI_PATTERNS = {
     "bad_gateway",
     "service_unavailable",
     "gateway_timeout",
+    # Vertex AI/Google patterns
+    "resource_exhausted",
+    "resource has been exhausted",
+    "quota exceeded",
+    "deadline exceeded",
+    "unavailable",
+    "aborted",
     # Note: insufficient_quota is typically not quickly recoverable; handle separately below
 }
 
@@ -39,11 +68,12 @@ def backoff_schedule_from_env(env_key: str = "LME_LLM_BACKOFF_SCHEDULE") -> List
         return list(DEFAULT_BACKOFF_SCHEDULE)
 
 
-def is_retryable_openai_error(exc: Exception) -> bool:
-    """Check if an exception is a retryable OpenAI error.
+def is_retryable_llm_error(exc: Exception) -> bool:
+    """Check if an exception is a retryable LLM error (OpenAI or Vertex AI).
     
     Checks for:
     - OpenAI RateLimitError (from openai package)
+    - Google/Vertex AI exceptions (ResourceExhausted, ServiceUnavailable, etc.)
     - HTTP status codes in error messages (429, 5xx)
     - Common error patterns (rate_limit, timeout, etc.)
     - LangChain model provider inference errors (likely transient)
@@ -53,6 +83,18 @@ def is_retryable_openai_error(exc: Exception) -> bool:
     
     # Check for LangChain model provider inference error (likely transient/throttling)
     if "unable to infer model provider" in exc_str:
+        return True
+    
+    # Check for Google/Vertex AI exception types
+    google_retryable_types = [
+        "ResourceExhausted",  # 429 equivalent
+        "ServiceUnavailable",  # 503 equivalent
+        "DeadlineExceeded",  # timeout
+        "Internal",  # 500 equivalent
+        "Aborted",  # transient error
+        "Unavailable"  # service unavailable
+    ]
+    if any(err_type in exc_type for err_type in google_retryable_types):
         return True
     
     # Check for OpenAI-specific exception types
@@ -72,7 +114,7 @@ def is_retryable_openai_error(exc: Exception) -> bool:
         return True
     
     # Check for common error patterns (excluding insufficient_quota here)
-    for pattern in RETRYABLE_OPENAI_PATTERNS:
+    for pattern in RETRYABLE_LLM_PATTERNS:
         if pattern in exc_str:
             return True
     # Treat insufficient_quota as non-retryable (or handle with one-off long delay in caller)
@@ -100,10 +142,13 @@ def is_retryable_openai_error(exc: Exception) -> bool:
 
 
 def invoke_with_backoff(call_fn: Callable[[], Any], debug: bool = False, log: Optional[Callable[[str], None]] = None) -> Any:
-    """Invoke call_fn with OpenAI-aware backoff.
+    """DEPRECATED: Invoke call_fn with LLM-aware backoff (OpenAI and Vertex AI).
+    
+    This function is currently unused. We're using LangChain's built-in retry via max_retries.
+    Keeping this for potential future use if we need more sophisticated retry logic.
 
     Schedule: from LME_LLM_BACKOFF_SCHEDULE (CSV, seconds) or DEFAULT_BACKOFF_SCHEDULE.
-    Retries only for transient OpenAI errors (rate limits, server errors, timeouts).
+    Retries only for transient LLM errors (rate limits, server errors, timeouts).
     """
     schedule = backoff_schedule_from_env()
     # attempts = 1 immediate + len(schedule) retries with sleeps
@@ -111,7 +156,7 @@ def invoke_with_backoff(call_fn: Callable[[], Any], debug: bool = False, log: Op
         try:
             return call_fn()
         except Exception as e:
-            if not is_retryable_openai_error(e) or attempt > len(schedule):
+            if not is_retryable_llm_error(e) or attempt > len(schedule):
                 raise
             
             base_wait = schedule[attempt - 1]

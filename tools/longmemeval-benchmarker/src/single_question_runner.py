@@ -41,23 +41,142 @@ def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:
-    from langchain.chat_models import init_chat_model
-    from src.tenacious_agent_invoker import invoke_with_backoff
-
+    from src.model_providers import get_chat_model
+    
     prompt = (
-        "You are a helpful assistant. Answer the question using the provided memory context.\n\n"
+        "You are a helpful assistant. Answer the question using the provided memory context.\n"
+        "Before answering, carefully consider what the question is asking for.\n"
+        "Evaluate each piece of relevant information in the context to determine if it should be part of your answer.\n\n"
         + ("Context:\n" + context + "\n\n" if context else "")
         + "Question: "
         + (question_text or "")
     )
     
-    def _qa_call():
-        llm = init_chat_model(model_id, model_provider="openai")
-        return llm.invoke(prompt)
-    
-    # Use retry logic for QA calls
-    ans = invoke_with_backoff(_qa_call)
+    # Use provider-agnostic model with built-in retry
+    llm = get_chat_model(model_id)  # max_retries=6 is default
+    ans = llm.invoke(prompt)
     return (getattr(ans, "content", str(ans)) or "").strip()
+
+
+def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: str, 
+                     model_id: str, logger: Optional[logging.Logger] = None) -> Dict[str, Any]:
+    """Two-pass search algorithm for better retrieval.
+    
+    First pass: Search with original question using hybrid search on summaries and context.
+    Analysis: Check if results contain relevant information or need refinement.
+    Second pass (optional): Refined search based on first pass analysis.
+    """
+    from src.model_providers import get_chat_model
+    
+    if logger is None:
+        logger = logging.getLogger("lme.runner")
+    
+    # First pass: Search with original question
+    logger.info("TWO_PASS_SEARCH pass=1 query='%s'", question[:100])
+    
+    # Use higher limits for first pass to get broader results
+    first_results = memory_manager.search_memories(
+        memory_id, 
+        query=question, 
+        top_ke=10,  # Get more entries for analysis
+        top_kc=3    # Get more context shards
+    )
+    
+    # Analyze first pass results
+    entries = first_results.get("entries", [])
+    contexts = first_results.get("contexts", [])
+    
+    # Log what we found
+    logger.info("TWO_PASS_SEARCH pass=1 found entries=%d contexts=%d", 
+                len(entries), len(contexts))
+    
+    # Build summary of what we found for analysis
+    summaries_text = "\n".join([
+        f"- {e.get('summary', '')}" 
+        for e in entries[:10] 
+        if e.get('summary')
+    ])
+    
+    # Check if we need a second pass
+    if not summaries_text and not contexts:
+        logger.info("TWO_PASS_SEARCH no_content_found, returning first results")
+        return first_results
+    
+    # Use LLM to analyze if we need refinement
+    analysis_prompt = f"""Analyze these search results for the question: "{question}"
+
+Found summaries:
+{summaries_text[:2000]}
+
+Based on these search results, determine if a refined search would help find additional relevant information.
+If the results seem comprehensive, respond with "SUFFICIENT".
+If a refined search could help, respond with "REFINE: <refined query>"."""
+    
+    llm = get_chat_model(model_id)
+    analysis = llm.invoke(analysis_prompt)
+    analysis_text = (getattr(analysis, "content", str(analysis)) or "").strip()
+    
+    logger.info("TWO_PASS_SEARCH analysis='%s'", analysis_text[:200])
+    
+    # Check if second pass is needed
+    if not analysis_text.startswith("REFINE:"):
+        logger.info("TWO_PASS_SEARCH no_refinement_needed")
+        return first_results
+    
+    # Extract refined query
+    refined_query = analysis_text[7:].strip()
+    if not refined_query:
+        logger.info("TWO_PASS_SEARCH empty_refinement, using first results")
+        return first_results
+    
+    # Second pass with refined query
+    logger.info("TWO_PASS_SEARCH pass=2 refined_query='%s'", refined_query[:100])
+    
+    second_results = memory_manager.search_memories(
+        memory_id,
+        query=refined_query,
+        top_ke=5,  # Focused search
+        top_kc=2   # Focused context
+    )
+    
+    # Merge results: combine unique entries and contexts from both passes
+    merged = {
+        "entries": [],
+        "contexts": [],
+        "latestContext": first_results.get("latestContext") or first_results.get("latest_context"),
+        "bestContext": first_results.get("bestContext") or first_results.get("best_context")
+    }
+    
+    # Track seen entry IDs to avoid duplicates
+    seen_entry_ids = set()
+    
+    # Add first pass entries
+    for entry in first_results.get("entries", []):
+        entry_id = entry.get("id") or entry.get("entryId")
+        if entry_id and entry_id not in seen_entry_ids:
+            merged["entries"].append(entry)
+            seen_entry_ids.add(entry_id)
+    
+    # Add second pass entries if unique
+    for entry in second_results.get("entries", []):
+        entry_id = entry.get("id") or entry.get("entryId")
+        if entry_id and entry_id not in seen_entry_ids:
+            merged["entries"].append(entry)
+            seen_entry_ids.add(entry_id)
+    
+    # Combine contexts (these don't have IDs so check by content)
+    seen_contexts = set()
+    for ctx in first_results.get("contexts", []) + second_results.get("contexts", []):
+        if isinstance(ctx, dict):
+            ctx_text = ctx.get("context", "")
+            if ctx_text and ctx_text not in seen_contexts:
+                merged["contexts"].append(ctx)
+                seen_contexts.add(ctx_text)
+    
+    logger.info("TWO_PASS_SEARCH merged entries=%d contexts=%d", 
+                len(merged["entries"]), len(merged["contexts"]))
+    
+    return merged
 
 
 class SingleQuestionRunner:
@@ -81,8 +200,8 @@ class SingleQuestionRunner:
             question_id=qid, run_id=run_id
         )
         runner_log = logging.getLogger("lme.runner")
-        runner_log.info("RUN qid=%s run_id=%s vault_id=%s agent=%s qa=%s", 
-                        qid, run_id, vault_id, self.cfg.models.agent, self.cfg.models.qa)
+        runner_log.info("RUN qid=%s run_id=%s vault_id=%s ingest=%s qa=%s", 
+                        qid, run_id, vault_id, self.cfg.models.ingest, self.cfg.models.qa)
 
         # Use provided MCP client or create one
         if self.mcp_client is None:
@@ -96,7 +215,7 @@ class SingleQuestionRunner:
             
             # Create a minimal invoker just for MCP client access
             invoker = build_agent_with_invoker(
-                model_id=self.cfg.models.agent,
+                model_id=self.cfg.models.ingest,
                 vault_id=vault_id,
                 memory_id=memory_id,
                 mcp_client=self.mcp_client,
@@ -110,7 +229,7 @@ class SingleQuestionRunner:
             
             # Build agent with clean implementation
             invoker = build_agent_with_invoker(
-                model_id=self.cfg.models.agent,
+                model_id=self.cfg.models.ingest,
                 vault_id=vault_id,
                 memory_id=memory_id,
                 mcp_client=self.mcp_client,
@@ -177,12 +296,26 @@ class SingleQuestionRunner:
             
             # Use the MCP client from the invoker for search
             query_text = str(qtext or mem_title)
-            runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s query='%s' top_k=%d", 
-                          qid, memory_id, query_text[:100], self.cfg.params.top_k)
             
-            sr = MemoryManager(invoker._mcp, debug=False).search_memories(
-                memory_id, query=query_text, top_k=self.cfg.params.top_k
-            )
+            # Check if two-pass search is enabled (via config or default)
+            use_two_pass = getattr(self.cfg.params, "use_two_pass_search", True)
+            
+            if use_two_pass:
+                runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=two_pass query='%s'", 
+                              qid, memory_id, query_text[:100])
+                sr = _two_pass_search(
+                    MemoryManager(invoker._mcp, debug=False),
+                    memory_id,
+                    query_text,
+                    self.cfg.models.qa,
+                    runner_log
+                )
+            else:
+                runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=single query='%s' top_k=%d", 
+                              qid, memory_id, query_text[:100], self.cfg.params.top_k)
+                sr = MemoryManager(invoker._mcp, debug=False).search_memories(
+                    memory_id, query=query_text, top_k=self.cfg.params.top_k
+                )
             
             # Log search results
             entries_count = len(sr.get("entries", []) if isinstance(sr, dict) else [])

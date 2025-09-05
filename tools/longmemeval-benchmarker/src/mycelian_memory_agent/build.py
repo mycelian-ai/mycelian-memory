@@ -2,7 +2,7 @@
 
 import asyncio
 from typing import Optional
-from langchain.chat_models import init_chat_model
+from ..model_providers import get_chat_model
 from .agent import MycelianMemoryAgent
 from .agent_invoker import MycelianAgentInvoker
 from .mcp_utils import create_mcp_client
@@ -53,9 +53,8 @@ def build_agent_with_invoker(
     except:
         pass
     
-    # Initialize LLM
-    resolved_model = model_id if str(model_id).startswith("openai:") else f"openai:{model_id}"
-    llm = init_chat_model(resolved_model)
+    # Initialize LLM with built-in retry (supports multiple providers)
+    llm = get_chat_model(model_id)  # max_retries=6 is default
     
     # Create the agent (logging is always enabled)
     agent = MycelianMemoryAgent(

@@ -26,7 +26,6 @@ from src.mycelian_memory_agent import create_mcp_client
 from src.mycelian_memory_agent.build import build_agent_with_invoker
 from src.memory_manager import MemoryManager
 from src.single_question_runner import SingleQuestionRunner
-from src.tenacious_agent_invoker import invoke_with_backoff
 
 # Minimal helpers (replacing the deleted runner module)
 
@@ -40,22 +39,14 @@ def run_model_healthcheck(model_id: str, model_type: str = "agent") -> None:
     Raises:
         Exception: If the model is not accessible
     """
-    from langchain.chat_models import init_chat_model
+    from src.model_providers import get_chat_model
     
     print(f"[benchmarker] running healthcheck for {model_type} model: {model_id}")
     
-    def _test_model():
-        llm = init_chat_model(model_id, model_provider="openai")
-        response = llm.invoke("Hi, please respond with 'OK' if you're working.")
-        return response
-    
     try:
-        # Use the same retry logic as the agent
-        result = invoke_with_backoff(
-            _test_model, 
-            debug=True,
-            log=lambda msg: print(f"[healthcheck] {msg}")
-        )
+        # Use provider-agnostic model with LangChain's built-in retry
+        llm = get_chat_model(model_id)  # max_retries=6 is default
+        result = llm.invoke("Hi, please respond with 'OK' if you're working.")
         print(f"[benchmarker] {model_type} model healthcheck passed")
     except Exception as e:
         print(f"[benchmarker] ERROR: {model_type} model healthcheck failed: {e}")
@@ -67,34 +58,43 @@ class _SimpleConfig:
         self.dataset_file_path = raw_cfg["dataset_file_path"]
         self.vault_title = raw_cfg["vault_title"]
         
-        # Models configuration - optional with defaults
+        # Models configuration - both ingest and qa are mandatory
         models_cfg = raw_cfg.get("models", {})
+        if not models_cfg:
+            # If no models section, use defaults
+            models_cfg = {}
+        
+        # Ingest and QA models with defaults
+        ingest_model = models_cfg.get("ingest", "openai:gpt-5-nano-2025-08-07")
+        qa_model = models_cfg.get("qa", "openai:gpt-5-2025-08-07")
+        
         self.models = type("Models", (), {
-            "agent": models_cfg.get("agent", "gpt-5-nano-2025-08-07"),  # Default to gpt-5-nano
-            "qa": models_cfg.get("qa", models_cfg.get("agent", "gpt-5-nano-2025-08-07"))  # Default QA to agent model
+            "ingest": ingest_model,
+            "qa": qa_model
         })()
+        
+        # Search configuration - optional with defaults
+        search_cfg = raw_cfg.get("search", {})
+        self.use_two_pass_search = search_cfg.get("use_two_pass", True)  # Default to True
         
         # Auto-generated fields
         self.run_id = str(int(time.time()))
         
         # Fixed defaults (removed from config)
-        self.provider = {"type": "openai"}  # Always OpenAI
+        self.provider = {"type": "model-provider"}  # Supports OpenAI and Vertex AI
         self.vault_id = None  # Always auto-generated from vault_title
         self.memory_title_template = "{question_id}__{run_id}"  # Standard format
         
-        # Optional params with smart defaults
-        params_raw = raw_cfg.get("params", {})
+        # Fixed internal params (not exposed in config)
         self.params = type(
             "Params",
             (),
             {
-                # Performance (optional)
-                "workers": params_raw.get("workers", 1),  # Default: sequential processing
-                
-                # Fixed internal defaults (not exposed in config)
+                # Fixed internal defaults
                 "top_k": 10,  # Search results limit
                 "max_tool_calls_per_turn": 5,  # Legacy, unused
                 "dump_state": False,  # Debug feature, removed
+                "use_two_pass_search": self.use_two_pass_search,  # From config or default True
                 
                 # Removed limits - control via dataset file instead
                 "question_limit": None,  # Always process all questions
@@ -122,9 +122,9 @@ def build_memory_title(template: str, question_id: str, run_id: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run LongMemEval benchmarker")
     parser.add_argument("config", help="Path to TOML config")
-    parser.add_argument("--workers", type=int, default=None, help="Number of parallel workers (overrides params.workers)")
-    parser.add_argument("--mode", choices=["ingestion", "qa", "all"], default="all", 
-                       help="Execution mode: ingestion (sessions only), qa (QA only), all (both)")
+    parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers (default: 1)")
+    parser.add_argument("--mode", choices=["ingestion", "qa", "full"], default="full", 
+                       help="Execution mode: ingestion (sessions only), qa (QA only), full (both)")
     parser.add_argument("--memory-id", help="Memory ID for QA-only mode (skips memory creation)")
     parser.add_argument("--vault-id", help="Vault ID for QA-only mode (skips vault resolution)")
     args = parser.parse_args()
@@ -133,8 +133,7 @@ def main() -> None:
         raw_cfg: dict[str, Any] = tomllib.load(f)
 
     cfg = parse_config(raw_cfg)
-    if args.workers is not None:
-        cfg.params.workers = max(1, int(args.workers))
+    workers = max(1, args.workers)  # Use CLI workers directly
     # Logging is always enabled (debug flag removed)
 
     # Configure root logging for terminal: keep quiet by default; per-question logs handled separately
@@ -144,8 +143,8 @@ def main() -> None:
     )
     
     # Run model healthchecks before proceeding
-    run_model_healthcheck(cfg.models.agent, "agent")
-    if cfg.models.qa != cfg.models.agent:
+    run_model_healthcheck(cfg.models.ingest, "ingest")
+    if cfg.models.qa != cfg.models.ingest:
         run_model_healthcheck(cfg.models.qa, "qa")
 
     # Load dataset - always process all questions in the file
@@ -174,10 +173,10 @@ def main() -> None:
     os.makedirs(logs_dir, exist_ok=True)
     hyp_path = os.path.join(out_dir, "hypotheses.jsonl")
 
-    print(f"[benchmarker] starting run with {len(ds)} question(s), workers={cfg.params.workers}")
+    print(f"[benchmarker] starting run with {len(ds)} question(s), workers={workers}")
 
     from src.worker_manager import WorkerManager
-    wm = WorkerManager(workers=cfg.params.workers, debug=False)
+    wm = WorkerManager(workers=workers, debug=False)
     sqr = SingleQuestionRunner(cfg, mcp_client=mcp_client, mode=args.mode)
 
     def make_log_path(i: int) -> str:

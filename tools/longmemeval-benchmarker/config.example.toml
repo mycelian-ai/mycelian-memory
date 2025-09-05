@@ -21,27 +21,59 @@ dataset_file_path = "/path/to/longmemeval-datasets/longmemeval_5s.json"
 # This creates/uses a vault with this name to store all memories from this run
 vault_title = "my-experiment"
 
-# Model configuration (OPTIONAL - defaults to gpt-5-nano-2025-08-07)
+# ========================================
+# MODEL CONFIGURATION (REQUIRED)
+# ========================================
+# Format: "provider:model_name"
+# Provider MUST be specified: openai, vertex-ai, or openrouter
+# 
+# Required Environment Variables by Provider:
+# - OpenAI: OPENAI_API_KEY
+# - Vertex AI: VERTEX_AI_PROJECT_ID + gcloud auth
+# - OpenRouter: OPENROUTER_API_KEY
+
 [models]
-# The LLM model to use for the memory agent
-# Default: "gpt-5-nano-2025-08-07"
-# Other examples: "gpt-5-2025-08-07", "gpt-4o-mini"
+# REQUIRED: Ingest model for processing conversation sessions
+# Default: "openai:gpt-5-nano-2025-08-07"
+ingest = "openai:gpt-5-nano-2025-08-07"
 
-
-# The LLM model to use for QA (answering questions based on retrieved context)
-# If omitted, defaults to the same model as agent
-# Uncomment to use a different model for QA:
-# qa = "gpt-3.5-turbo"
+# REQUIRED: QA model for answering questions based on retrieved context
+# Default: "openai:gpt-5-2025-08-07"
+qa = "openai:gpt-5-2025-08-07"
 
 # ========================================
-# OPTIONAL PERFORMANCE SETTINGS
+# SEARCH CONFIGURATION (OPTIONAL)
 # ========================================
 
-[params]
-# Number of parallel workers for processing questions
-# Default: 1 (sequential processing)
-# Increase for faster processing of multiple questions (uses more API calls concurrently)
-# workers = 4
+[search]
+# Enable two-pass search for better retrieval accuracy
+# Two-pass search performs an initial search, analyzes results,
+# and optionally does a refined second search for missing information
+# Default: true (recommended, especially for models like gpt-5-mini)
+use_two_pass = true
+
+# ========================================
+# PROVIDER EXAMPLES
+# ========================================
+
+# --- OpenAI Models ---
+# ingest = "openai:gpt-5-nano-2025-08-07"    # Most cost-effective
+# ingest = "openai:gpt-5-mini-2025-08-07"    # Small, fast model
+# qa = "openai:gpt-5-2025-08-07"             # More capable for QA
+# qa = "openai:gpt-4o"                       # Latest GPT-4 model
+
+# --- Vertex AI Models (Google Cloud) ---
+# ingest = "vertex-ai:gemini-2.5-flash-lite" # Fast and efficient
+# qa = "vertex-ai:gemini-pro-1.5"            # More capable
+
+# --- OpenRouter Models (Multi-provider gateway) ---
+# ingest = "openrouter:openai/gpt-5-nano-2025-08-07"     # OpenAI via OpenRouter
+# qa = "openrouter:anthropic/claude-3.5-sonnet"          # Claude via OpenRouter
+
+# --- Mixed Provider Configuration ---
+# Use different providers for ingest and QA phases:
+# ingest = "vertex-ai:gemini-2.5-flash-lite"             # Efficient for ingestion
+# qa = "openrouter:openai/gpt-5-2025-08-07"              # Accurate for QA
 
 # ========================================
 # FIXED DEFAULTS (Cannot be changed via config)
@@ -85,34 +117,34 @@ vault_title = "my-experiment"
 # dataset_file_path = "longmemeval-datasets/longmemeval_integ.json"
 # vault_title = "quick-test"
 # [models]
-# agent = "gpt-4o-mini"
+# ingest = "openai:gpt-4o-mini"
+# qa = "openai:gpt-4o-mini"
 
-# Example 2: Full benchmark with parallel processing
+# Example 2: Full benchmark run
 # ---------------------------------------------------
 # dataset_file_path = "longmemeval-datasets/longmemeval_50q.json"
 # vault_title = "full-benchmark"
 # [models]
-# agent = "gpt-4"
-# qa = "gpt-3.5-turbo"  # Use cheaper model for QA
-# [params]
-# workers = 8  # Process 8 questions in parallel
+# ingest = "openai:gpt-4o"
+# qa = "openai:gpt-3.5-turbo"  # Use cheaper model for QA
+# Note: Use --workers 8 CLI flag for parallel processing
 
 # Example 3: Single question deep analysis
 # ---------------------------------------------------
 # dataset_file_path = "longmemeval-datasets/longmemeval_1q.json"
 # vault_title = "single-question-analysis"
 # [models]
-# agent = "gpt-4"
+# ingest = "openai:gpt-4o"
+# qa = "openai:gpt-4o"
 
 # ========================================
 # ENVIRONMENT VARIABLES
 # ========================================
-# Required environment variables:
-#   - OPENAI_API_KEY: Your OpenAI API key
+# Model Provider Authentication (set based on providers you use):
+#   - OPENAI_API_KEY: OpenAI API key (for OpenAI provider)
+#   - VERTEX_AI_PROJECT_ID: Google Cloud project ID (for Vertex AI provider)
+#   - OPENROUTER_API_KEY: OpenRouter API key (for OpenRouter provider)
+#
+# Mycelian Service Configuration:
 #   - MEMORY_SERVER_HTTP_PORT: Mycelian server port (default: 11545)
 #   - MEMORY_SERVER_SEARCH_INDEX_URL: Weaviate URL (default: from docker-compose)
-#
-# Optional environment variables:
-#   - LME_LLM_BACKOFF_SCHEDULE: Comma-separated retry delays in seconds
-#     Default: "5,30,120,300,600" (5s, 30s, 2m, 5m, 10m)
-#     Example: export LME_LLM_BACKOFF_SCHEDULE="1,5,10,30,60"

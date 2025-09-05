@@ -1,87 +1,156 @@
 [
   {
-    "question_id": "test_001",
-    "question_type": "multi-session",
-    "question": "What is the name of Sarah's dog and what color is it?",
-    "answer": "Max, golden/golden retriever",
-    "question_date": "2024/01/15 (Mon) 18:30",
-    "haystack_dates": [
-      "2024/01/15 (Mon) 09:15",
-      "2024/01/15 (Mon) 14:45"
-    ],
-    "haystack_session_ids": [
-      "session_001",
-      "session_002"
-    ],
+    "question_id": "integ_001",
+    "question_type": "single-session-user",
+    "question": "What is my favorite programming language?",
+    "answer": "Python",
+    "question_date": "2024-01-03",
+    "haystack_session_ids": ["session_001"],
+    "haystack_dates": ["2024-01-01"],
     "haystack_sessions": [
       [
         {
           "role": "user",
-          "content": "I'm trying to help my friend Sarah plan a surprise birthday party for next month. She loves dogs and actually has a golden retriever named Max. Do you have any ideas for dog-themed party decorations?"
+          "content": "I'm working on a new project and I really love Python for its simplicity."
         },
         {
           "role": "assistant",
-          "content": "What a thoughtful friend you are! A dog-themed surprise party for Sarah sounds wonderful, especially since she has Max, her golden retriever. Here are some fun decoration ideas:\n\n**Decorations:**\n1. Paw print balloons and banners\n2. Dog bone-shaped garlands\n3. Photo booth with dog ear headbands and props\n4. A \"Paw-ty\" banner instead of \"Party\"\n5. Table centerpieces with miniature dog figurines\n6. A special photo display featuring pictures of Max\n\n**Color Scheme:**\nConsider using golden/yellow colors to match Max's coat, combined with classic party colors like blue or pink.\n\n**Special Touches:**\n- Custom napkins or cups with paw prints\n- A dog bone-shaped cake or cupcakes\n- Party favors in little doggy bags\n- A special dog-safe cake for Max so he can celebrate too!\n\nWould you like more specific ideas for food, activities, or invitations?"
+          "content": "Python is indeed a great choice for many projects due to its clean syntax and extensive libraries. What kind of project are you working on?",
+          "has_answer": true
         },
         {
           "role": "user",
-          "content": "These are great ideas! I especially like the idea of making a special cake for him too. Sarah mentioned she recently started training him to do some new tricks. Maybe we could incorporate that somehow into the party games?"
+          "content": "It's a data analysis tool. Python is definitely my favorite programming language because of libraries like pandas and numpy."
         },
         {
           "role": "assistant",
-          "content": "That's a fantastic idea! Incorporating Max's new tricks into the party would make it extra special and personal. Here are some game ideas that could feature him:\n\n**Max-Centered Activities:**\n1. **\"Max's Talent Show\"** - Have Max demonstrate his new tricks as entertainment, with Sarah as the proud trainer\n2. **\"Trick Teaching Station\"** - Guests can try teaching Max simple tricks with Sarah's guidance\n3. **\"Guess the Trick\"** - Show videos or photos of Max mid-trick and have guests guess what he's doing\n\n**Dog-Themed Party Games:**\n1. **\"Pin the Tail on Max\"** - Create a large poster of Max for this classic game\n2. **\"Dog Trick Charades\"** - Guests act out different dog tricks and behaviors\n3. **\"Paw Print Scavenger Hunt\"** - Hide paw print cutouts around the party area\n4. **\"Best Dog Impression Contest\"** - Guests compete doing their best dog sounds and movements\n\n**Interactive Ideas:**\n- Set up a \"trick demonstration schedule\" throughout the party\n- Create certificates for guests who successfully get Max to do a trick\n- Have a photo session where guests pose with Max doing his tricks\n\nYou could even make a special \"Max's Tricks\" video montage to play during the party showing his training progress. Would you like help planning the timeline for these activities?"
+          "content": "That's perfect! Python's data science ecosystem is one of its strongest features. Pandas and NumPy are excellent foundations for data analysis projects."
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_001"]
+  },
+  {
+    "question_id": "integ_002",
+    "question_type": "multi-session",
+    "question": "What are the names of my two cats?",
+    "answer": "Luna and Milo",
+    "question_date": "2024-01-05",
+    "haystack_session_ids": ["session_002", "session_003"],
+    "haystack_dates": ["2024-01-02", "2024-01-04"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "My cat Luna kept me up all night with her meowing."
+        },
+        {
+          "role": "assistant",
+          "content": "That can be frustrating! Luna might be trying to communicate something. Is she normally this vocal at night?",
+          "has_answer": true
         },
         {
           "role": "user",
-          "content": "Perfect! I'll definitely include some of these. By the way, do you think I should coordinate the party decorations with his color? I want everything to look cohesive but not too monochrome."
+          "content": "No, she's usually quiet. I think she misses playing with her brother."
         },
         {
           "role": "assistant",
-          "content": "Absolutely! Coordinating with Max's golden color is a lovely touch that Sarah will definitely appreciate. Here's how to create a cohesive look without it being too monochrome:\n\n**Primary Color Palette:**\n- **Main:** Golden/honey yellow (matching Max's coat)\n- **Accent 1:** Crisp white or cream\n- **Accent 2:** Sky blue or sage green for contrast\n- **Pops:** Small touches of bright red (like a collar) or pink\n\n**Decoration Balance:**\n1. **50% Golden tones** - Balloons, main banner, tablecloth\n2. **30% Neutral** - White plates, cream streamers, ivory napkins\n3. **20% Accent colors** - Blue or green ribbons, colored confetti\n\n**Layering Ideas:**\n- Golden balloons with white paw prints\n- White backdrop with golden garlands\n- Mix metallic gold with matte yellow/golden items\n- Use different textures in the same color family\n\n**Pattern Mixing:**\n- Combine solids with paw prints\n- Mix golden stripes with polka dots\n- Layer different shades of gold/yellow\n\n**Natural Elements:**\n- Fresh sunflowers or yellow roses\n- Wheat stalks or dried golden grasses\n- Natural wood accents to break up the color\n\nThis way, the party will have that thoughtful \"Max-inspired\" theme while still feeling festive and visually interesting. The variety will make for better photos too!"
+          "content": "Cats can definitely miss their companions. Maybe some extra playtime before bed would help Luna settle down better at night."
         }
       ],
       [
         {
           "role": "user",
-          "content": "Hi! I'm back with an update about the party planning. I went to the pet store yesterday to get some supplies for the party, and I found these adorable dog-themed plates and cups. They even had some in the perfect shade to match!"
+          "content": "Good news! I figured out why Luna was upset. Milo was accidentally locked in the garage!"
         },
         {
           "role": "assistant",
-          "content": "That's wonderful! It sounds like you found plates and cups in that golden shade to match Max! The pet store was a clever place to look for dog-themed party supplies. \n\nFinding items in the right color must have been exciting - it's really going to tie the whole theme together. Did you find any other fun dog-themed items while you were there? Sometimes pet stores have unexpected party-perfect items like:\n\n- Dog toy shaped stress balls as party favors\n- Bandanas that guests could wear\n- Treat jars that could hold human snacks\n- Cute dog-themed stickers for decorating\n\nHow are the other party preparations coming along? Have you started working on the surprise element - figuring out how to get Sarah to the party without suspecting anything?"
+          "content": "Oh my goodness! Poor Milo must have been scared being locked in the garage. I'm glad you found him. Luna was probably trying to alert you that her brother was missing!",
+          "has_answer": true
         },
         {
           "role": "user",
-          "content": "Yes! I actually got some bandanas in that same color for guests to wear. I'm thinking of having everyone put them on right before she arrives. Speaking of which, her sister is going to bring her over under the pretense of having lunch. She'll make sure to bring him along too since we want him to be part of the surprise!"
+          "content": "Exactly! Now both cats are happily napping together."
         },
         {
           "role": "assistant",
-          "content": "That's perfect planning! Having everyone put on golden bandanas right before Sarah arrives will create such a coordinated, festive look - she's going to be amazed! \n\nAnd having her sister handle getting her there is brilliant. Using lunch as the excuse is very natural and unsuspicious. The best part is that Max will be there for the surprise too! Sarah will love having him included in her special moment.\n\n**Quick last-minute coordination tips:**\n- Make sure her sister knows to text you when they're 5-10 minutes away\n- Have someone designated as the \"Max handler\" to keep him calm during the \"Surprise!\" moment\n- Consider having his favorite treats ready to keep him happy and well-behaved\n- Maybe have a special bandana or bow tie for Max so he matches everyone else!\n\n**For the surprise moment:**\n- Position people so Max and Sarah enter together\n- Have cameras ready - her reaction with Max will be priceless\n- Maybe have everyone do a \"woof\" instead of just \"surprise\"?\n\nAre you planning to do the trick demonstration right after the surprise, or save it for later in the party?"
-        },
-        {
-          "role": "user",
-          "content": "Oh, I love the idea of everyone woofing! That's hilarious and perfect for the theme. I think we'll save the trick demonstration for after lunch, when everyone's settled in. One question though - do you remember what kind of tricks I mentioned she was teaching? I want to make sure I prepare the right props or space for them."
-        },
-        {
-          "role": "assistant",
-          "content": "I actually don't recall you mentioning the specific tricks Sarah has been teaching Max. You mentioned that she recently started training him to do some new tricks and wanted to incorporate that into the party games, but you didn't specify which particular tricks he's learning.\n\nTo help you prepare the right setup, could you tell me what tricks Max has been working on? That way I can suggest the appropriate props and space arrangements. Common tricks might include:\n\n**Basic tricks** (need minimal space):\n- Sit, stay, shake hands\n- Roll over, play dead\n- Spin or turn around\n\n**Intermediate tricks** (might need props):\n- Jump through hoops\n- Weave between legs\n- Fetch specific items\n- Balance treats on nose\n\n**Advanced tricks** (need more space/setup):\n- Agility course elements\n- Dancing or walking on hind legs\n- Opening/closing doors\n- Complex sequences\n\nOnce you let me know what tricks Max has been learning, I can give you specific suggestions for the space setup and any props you might need to have ready!"
-        },
-        {
-          "role": "user",
-          "content": "Oh right, I didn't mention the specific tricks! She's been teaching him to shake hands, roll over, and she's particularly proud that he can now bring her specific toys by name. She has a collection of his toys that she's named - there's Mr. Bunny, Ball, and Rope. The toy fetching one would be really impressive to show off!"
-        },
-        {
-          "role": "assistant",
-          "content": "That's fantastic! The toy-fetching by name trick is really impressive and will definitely wow the party guests! Here's how to set up for Max's trick demonstration:\n\n**Space Setup:**\n- Clear an open area (maybe 10x10 feet) in the center where everyone can see\n- Have a designated \"toy zone\" where you'll place Mr. Bunny, Ball, and Rope\n- Ensure good lighting for photos/videos\n\n**Props Needed:**\n- **The three toys**: Mr. Bunny, Ball, and Rope (make sure Sarah's sister brings them!)\n- A basket or mat to place the toys on initially\n- Maybe label cards with the toy names for guests who might not hear clearly\n- Treats for rewarding Max after each trick\n\n**Demonstration Order (suggestion):**\n1. Start with \"shake hands\" - gets Max warmed up and comfortable\n2. \"Roll over\" - always gets laughs and aws\n3. Grand finale: The toy-fetching trick\n   - Have Sarah call out each toy name\n   - Maybe let a guest pick which toy to request\n   - Show how Max knows all three names\n\n**Extra Fun Ideas:**\n- Create a \"Max's Trick Menu\" sign listing his repertoire\n- Have party guests write down toy names on cards and Sarah can draw them randomly\n- Give a small prize to any guest Max shakes hands with\n\nThis will definitely be a highlight of the party!"
-        },
-        {
-          "role": "user",
-          "content": "This is all coming together perfectly! I'm so excited for the party. Thanks for all your help with planning this. Sarah and her golden boy are going to have such a special day!"
-        },
-        {
-          "role": "assistant",
-          "content": "You're so welcome! It's been a joy helping you plan this special surprise for Sarah and Max! Your attention to detail - from the golden color scheme matching his coat to including his tricks in the party activities - shows what a thoughtful friend you are.\n\nThe party sounds absolutely perfect:\n✨ Golden decorations and bandanas for everyone\n✨ The \"woof\" surprise moment\n✨ Max showing off his impressive tricks (especially that toy-fetching!)\n✨ A special cake for both Sarah AND Max\n✨ Her sister's perfect lunch excuse to get them there\n\nSarah is so lucky to have a friend who puts this much thought and love into celebrating her (and includes her furry best friend too)! The combination of surprise, personalization, and including Max will make this a birthday she'll never forget.\n\nBest of luck with the party! I'm sure it's going to be absolutely \"paw-some\"! 🐾 Take lots of pictures of their reactions - especially when everyone woofs! Have a wonderful time celebrating your friend and her golden boy!"
+          "content": "That's wonderful! Cats have such strong bonds with their siblings. Luna was being a good sister looking out for Milo."
         }
       ]
-    ]
+    ],
+    "answer_session_ids": ["session_002", "session_003"]
+  },
+  {
+    "question_id": "integ_003",
+    "question_type": "single-session-assistant",
+    "question": "What book did you recommend for learning web development?",
+    "answer": "Eloquent JavaScript",
+    "question_date": "2024-01-06",
+    "haystack_session_ids": ["session_004", "session_005", "session_006"],
+    "haystack_dates": ["2024-01-03", "2024-01-04", "2024-01-05"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I want to start learning web development. Where should I begin?"
+        },
+        {
+          "role": "assistant",
+          "content": "Great decision! For web development, I'd recommend starting with HTML and CSS basics, then moving to JavaScript. For JavaScript specifically, 'Eloquent JavaScript' by Marijn Haverbeke is an excellent free resource that's perfect for beginners.",
+          "has_answer": true
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "What about learning React?"
+        },
+        {
+          "role": "assistant",
+          "content": "React is a great next step after you're comfortable with JavaScript fundamentals. The official React documentation has an excellent tutorial to get you started."
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Should I learn TypeScript too?"
+        },
+        {
+          "role": "assistant",
+          "content": "TypeScript is valuable, especially for larger projects. However, I'd suggest getting comfortable with JavaScript first before adding TypeScript to your learning path."
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_004"]
+  },
+  {
+    "question_id": "integ_004_abs",
+    "question_type": "single-session-preference",
+    "question": "Do I prefer tea or coffee in the morning?",
+    "answer": "I don't have information about your morning beverage preference",
+    "question_date": "2024-01-07",
+    "haystack_session_ids": ["session_007"],
+    "haystack_dates": ["2024-01-06"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I'm trying to cut down on caffeine intake."
+        },
+        {
+          "role": "assistant",
+          "content": "That's a healthy choice! Reducing caffeine can improve sleep quality and reduce anxiety. Are you planning to cut down gradually or stop completely?"
+        },
+        {
+          "role": "user",
+          "content": "Just reducing it gradually. Maybe switching some of my drinks to decaf versions."
+        },
+        {
+          "role": "assistant",
+          "content": "That's a sensible approach. Gradual reduction helps avoid withdrawal symptoms like headaches. You might also consider herbal teas as alternatives."
+        }
+      ]
+    ],
+    "answer_session_ids": []
   }
 ]

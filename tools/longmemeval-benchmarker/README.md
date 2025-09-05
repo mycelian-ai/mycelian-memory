@@ -25,10 +25,63 @@ Note: Running many questions in parallel can hit provider rate limits. The sampl
    pip install -r requirements.txt
    ```
 
-3. **Provider credentials** (OpenAI only):
-   ```bash
-   export OPENAI_API_KEY=your-openai-key
-   ```
+3. **Provider credentials**: See Model Provider Setup section below for detailed instructions.
+
+## Model Provider Setup
+
+The benchmarker supports multiple LLM providers. Choose one or more providers and configure authentication:
+
+### OpenAI
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export OPENAI_API_KEY="sk-proj-..."
+```
+Get your API key from: https://platform.openai.com/api-keys
+
+### Vertex AI (Google Cloud)
+```bash
+# 1. Login to Google Cloud
+gcloud auth login
+
+# 2. Set your project
+gcloud config set project YOUR_PROJECT_ID
+
+# 3. Set up Application Default Credentials
+gcloud auth application-default login
+
+# 4. Add to ~/.zshrc or ~/.bashrc
+export VERTEX_AI_PROJECT_ID="your-project-id"
+```
+
+### OpenRouter
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export OPENROUTER_API_KEY="sk-or-v1-..."
+```
+Get your API key from: https://openrouter.ai/keys
+
+### Model Configuration Format
+
+In your config.toml, specify models using the format `provider:model_name`:
+
+```toml
+[models]
+# OpenAI models (default provider if no prefix)
+agent = "gpt-5-nano-2025-08-07"           # Defaults to OpenAI
+agent = "openai:gpt-5-nano-2025-08-07"    # Explicit OpenAI
+
+# Vertex AI models (requires prefix)
+agent = "vertex-ai:gemini-2.5-flash-lite"
+agent = "vertex-ai:gemini-1.5-pro"
+
+# OpenRouter models (requires prefix)
+agent = "openrouter:openai/gpt-5-nano-2025-08-07"
+agent = "openrouter:google/gemini-pro-1.5"
+
+# Mix providers for agent and QA
+agent = "vertex-ai:gemini-2.5-flash-lite"
+qa = "openrouter:openai/gpt-5-nano-2025-08-07"
+```
 
 ## Dataset Setup
 
@@ -80,7 +133,15 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
 2. **Run the benchmarker**:
    ```bash
    source venv/bin/activate
-   PYTHONPATH=src python -m src.benchmarker run.toml --num-questions 1
+   python -m src.benchmarker run.toml
+   
+   # Run with parallel workers (default is 1)
+   python -m src.benchmarker run.toml --workers 4
+   
+   # Run specific modes
+   python -m src.benchmarker run.toml --mode ingestion  # Only ingest sessions
+   python -m src.benchmarker run.toml --mode qa         # Only run QA (requires existing memory)
+   python -m src.benchmarker run.toml --mode full       # Run both (default)
    ```
 
 3. **Check results**:
@@ -123,11 +184,14 @@ The benchmarker uses TOML configuration files. Key settings:
 
 - `dataset_file_path`: Path to LongMemEval JSON file
 - `vault_title`: Vault name for storing memories
-- `provider.type`: "openai" (currently supported)
-- `models.agent`: Model for the memory agent
-- `models.qa`: Model for question answering
-- `params.question_limit`: Number of questions to process
-- `params.workers`: Parallel workers (keep at 1 for chronological consistency)
+- `models.agent`: Model for the memory agent (supports OpenAI, Vertex AI, OpenRouter)
+- `models.qa`: Model for question answering (defaults to agent model)
+
+CLI arguments:
+- `--workers`: Number of parallel workers (default: 1)
+- `--mode`: Execution mode - `ingestion`, `qa`, or `full` (default: full)
+- `--memory-id`: Memory ID for QA-only mode
+- `--vault-id`: Vault ID for QA-only mode
 
 ## How It Works
 
