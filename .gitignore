@@ -140,6 +140,12 @@ tools/longmemeval-benchmarker/huey_orchestrator.log
 tools/longmemeval-benchmarker/todo
 tools/longmemeval-benchmarker/logs/*/
 
+# Large dataset files (keep only small test datasets in git)
+tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
+tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
+tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_l.json
+tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_xl.json
+
 # Root level files that should be ignored
 huey_orchestrator.log
 
