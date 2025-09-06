@@ -67,7 +67,7 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	// Search for entries if top_ke > 0
 	var hits []model.SearchHit
 	if *req.TopKE > 0 {
-		hits, err = h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, *req.TopKE, h.alpha)
+		hits, err = h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, *req.TopKE, h.alpha, req.IncludeRawEntries)
 		if err != nil {
 			log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
 			respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")

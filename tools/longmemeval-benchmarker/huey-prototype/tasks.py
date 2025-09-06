@@ -8,13 +8,15 @@ import time
 import sqlite3
 from datetime import datetime
 from huey import SqliteHuey
+from pathlib import Path
 
-# Initialize Huey with SQLite backend
-# immediate=False means tasks are stored and executed by workers
-huey = SqliteHuey('huey_tasks.db', immediate=False)
+# Initialize Huey with SQLite backend anchored to benchmarker data/
+_DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+huey = SqliteHuey(str(_DATA_DIR / 'huey_tasks.db'), immediate=False)
 
 # Progress tracking database (separate from Huey's queue)
-PROGRESS_DB = 'progress.db'
+PROGRESS_DB = str(_DATA_DIR / 'progress.db')
 
 
 def init_progress_db():

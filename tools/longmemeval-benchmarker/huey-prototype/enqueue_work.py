@@ -9,7 +9,11 @@ import sqlite3
 import sys
 import os
 from datetime import datetime
-from tasks import huey, init_progress_db, process_question, simple_count_task
+from pathlib import Path
+from tasks import huey, init_progress_db, process_question, simple_count_task, PROGRESS_DB
+
+_DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
+HUEY_DB_PATH = str(_DATA_DIR / 'huey_tasks.db')
 
 def load_dataset(dataset_path):
     """Load the LongMemEval dataset."""
@@ -48,7 +52,7 @@ def enqueue_all_questions(dataset, limit=None):
     
     for question in dataset[:limit] if limit else dataset:
         # Check if already completed
-        with sqlite3.connect('progress.db') as conn:
+        with sqlite3.connect(PROGRESS_DB) as conn:
             cursor = conn.execute('''
                 SELECT status FROM question_progress 
                 WHERE question_id = ?
@@ -72,7 +76,7 @@ def show_queue_status():
     """Show current queue status."""
     # Query Huey's task queue (if it exists)
     try:
-        with sqlite3.connect('huey_tasks.db') as conn:
+        with sqlite3.connect(HUEY_DB_PATH) as conn:
             # Check if table exists
             cursor = conn.execute('''
                 SELECT name FROM sqlite_master 
@@ -99,7 +103,7 @@ def show_queue_status():
         print(f"\nQueue Status: Tasks enqueued (waiting for worker to start)")
     
     # Show progress status
-    with sqlite3.connect('progress.db') as conn:
+    with sqlite3.connect(PROGRESS_DB) as conn:
         cursor = conn.execute('''
             SELECT 
                 status, 

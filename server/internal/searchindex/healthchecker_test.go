@@ -13,7 +13,7 @@ import (
 // fakeIndex implements Index (and HealthPinger) for tests.
 type fakeIndex struct{ pingErr error }
 
-func (f fakeIndex) Search(context.Context, string, string, string, []float32, int, float32) ([]model.SearchHit, error) {
+func (f fakeIndex) Search(context.Context, string, string, string, []float32, int, float32, bool) ([]model.SearchHit, error) {
 	return nil, nil
 }
 func (f fakeIndex) LatestContext(context.Context, string, string) (string, time.Time, error) {
@@ -37,7 +37,7 @@ func (f fakeIndex) HealthPing(ctx context.Context) error                        
 // fallbackIdx implements Index WITHOUT HealthPinger.
 type fallbackIdx struct{ delErr error }
 
-func (f fallbackIdx) Search(context.Context, string, string, string, []float32, int, float32) ([]model.SearchHit, error) {
+func (f fallbackIdx) Search(context.Context, string, string, string, []float32, int, float32, bool) ([]model.SearchHit, error) {
 	return nil, nil
 }
 func (f fallbackIdx) LatestContext(context.Context, string, string) (string, time.Time, error) {

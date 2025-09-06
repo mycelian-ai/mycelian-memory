@@ -19,7 +19,7 @@ type fakeIndex struct {
 	deleteVaultArgs []struct{ userID, vaultID string }
 }
 
-func (f *fakeIndex) Search(ctx context.Context, userID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
+func (f *fakeIndex) Search(ctx context.Context, userID, memoryID, query string, vec []float32, topK int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
 	return nil, nil
 }
 func (f *fakeIndex) LatestContext(ctx context.Context, userID, memoryID string) (string, time.Time, error) {

@@ -4,10 +4,13 @@ from typing import Any, Dict, TextIO, Optional
 import logging
 import json
 import os
+import time
 
-from src.mycelian_memory_agent.build import build_agent_with_invoker
-from src.mycelian_memory_agent.mcp_utils import create_mcp_client
-from src.memory_manager import MemoryManager
+from mycelian_memory_agent.build import build_agent_with_invoker
+from mycelian_memory_agent.mcp_utils import create_mcp_client
+from memory_manager import MemoryManager
+from pathlib import Path
+import sqlite3
 
 
 def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
@@ -41,7 +44,7 @@ def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:
-    from src.model_providers import get_chat_model
+    from model_providers import get_chat_model
     
     prompt = (
         "You are a helpful assistant. Answer the question using the provided memory context.\n"
@@ -66,7 +69,7 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
     Analysis: Check if results contain relevant information or need refinement.
     Second pass (optional): Refined search based on first pass analysis.
     """
-    from src.model_providers import get_chat_model
+    from model_providers import get_chat_model
     
     if logger is None:
         logger = logging.getLogger("lme.runner")
@@ -203,6 +206,58 @@ class SingleQuestionRunner:
         runner_log.info("RUN qid=%s run_id=%s vault_id=%s ingest=%s qa=%s", 
                         qid, run_id, vault_id, self.cfg.models.ingest, self.cfg.models.qa)
 
+        start_ts = time.time()
+        messages_processed = 0
+        sessions_done = 0
+        # Progress DB path (runner updates directly for fine-grained progress)
+        # Use benchmarker root data/ directory (same as orchestrator)
+        default_db = Path(__file__).resolve().parents[1] / "data" / "progress.db"
+        progress_db_path = str(default_db)
+
+        def _ensure_progress_schema_once() -> None:
+            try:
+                with sqlite3.connect(progress_db_path) as _conn:
+                    cols = {row[1] for row in _conn.execute("PRAGMA table_info(question_progress)")}
+                    if 'ingested_messages' not in cols:
+                        _conn.execute("ALTER TABLE question_progress ADD COLUMN ingested_messages INTEGER DEFAULT 0")
+                    if 'total_messages' not in cols:
+                        _conn.execute("ALTER TABLE question_progress ADD COLUMN total_messages INTEGER DEFAULT 0")
+                    if 'last_progress_at' not in cols:
+                        _conn.execute("ALTER TABLE question_progress ADD COLUMN last_progress_at TIMESTAMP")
+                    _conn.commit()
+            except Exception:
+                pass
+
+        _ensure_progress_schema_once()
+
+        def _write_progress(msgs: int, sessions: int | None = None) -> None:
+            try:
+                with sqlite3.connect(progress_db_path) as _conn:
+                    if sessions is None:
+                        _conn.execute(
+                            """
+                            UPDATE question_progress
+                            SET ingested_messages = ?,
+                                last_progress_at = strftime('%Y-%m-%d %H:%M:%S','now')
+                            WHERE run_id = ? AND question_id = ?
+                            """,
+                            (msgs, run_id, qid),
+                        )
+                    else:
+                        _conn.execute(
+                            """
+                            UPDATE question_progress
+                            SET ingested_messages = ?,
+                                completed_sessions = ?,
+                                last_progress_at = strftime('%Y-%m-%d %H:%M:%S','now')
+                            WHERE run_id = ? AND question_id = ?
+                            """,
+                            (msgs, sessions, run_id, qid),
+                        )
+                    _conn.commit()
+            except Exception:
+                pass
+
         # Use provided MCP client or create one
         if self.mcp_client is None:
             self.mcp_client = create_mcp_client()
@@ -271,11 +326,17 @@ class SingleQuestionRunner:
                                 content=content,
                                 thread_id=thread_id
                             )
+                            messages_processed += 1
+                            # Periodically persist message-level progress (every 10 messages)
+                            _write_progress(messages_processed)
                     
                     # End session (ensures consistency and saves context)
                     invoker.end_session(thread_id)
                     runner_log.info("SESSION_END qid=%s s=%d memory_id=%s thread_id=%s", 
                                   qid, s_idx, memory_id, thread_id)
+                    sessions_done += 1
+                    # Flush any remaining message increments since last batch
+                    _write_progress(messages_processed, sessions_done)
                     
                     # Optional state dump for debugging
                     try:
@@ -286,8 +347,18 @@ class SingleQuestionRunner:
             
             # Skip QA for ingestion-only mode
             if self.mode == "ingestion":
-                runner_log.info("INGESTION_ONLY qid=%s skipping QA phase", qid)
-                return {"question_id": qid, "hypothesis": ""}  # Empty hypothesis for ingestion-only
+                runner_log.info(
+                    "INGESTION_ONLY_DONE qid=%s sessions_completed=%d messages_processed=%d duration_sec=%.2f",
+                    qid, sessions_done, messages_processed, time.time() - start_ts
+                )
+                return {
+                    "status": "success",
+                    "question_id": qid,
+                    "vault_id": vault_id,
+                    "memory_id": memory_id,
+                    "sessions_completed": sessions_done,
+                    "messages_processed": messages_processed
+                }
 
             # Build QA and return hypothesis
             qtext = q.get("question") or _derive_question_from_sessions(q)
@@ -336,7 +407,19 @@ class SingleQuestionRunner:
             runner_log.info("QA_RESPONSE qid=%s response_len=%d response='%s'", 
                           qid, len(predicted), predicted[:200] if predicted else "(empty)")
             
-            return {"question_id": qid, "hypothesis": predicted}
+            runner_log.info(
+                "QUESTION_DONE qid=%s sessions_completed=%d messages_processed=%d duration_sec=%.2f",
+                qid, sessions_done, messages_processed, time.time() - start_ts
+            )
+            return {
+                "status": "success",
+                "question_id": qid,
+                "vault_id": vault_id,
+                "memory_id": memory_id,
+                "sessions_completed": sessions_done,
+                "messages_processed": messages_processed,
+                "hypothesis": predicted
+            }
             
         finally:
             # Clean up if needed

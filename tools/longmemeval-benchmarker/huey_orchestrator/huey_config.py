@@ -4,24 +4,31 @@ Huey configuration for LongMemEval benchmarker orchestration.
 Uses SqliteHuey for persistent task queue with proper retry logic.
 """
 
-import os
 from huey import SqliteHuey
+from pathlib import Path
 
-# Get configuration from environment or use defaults
-HUEY_DB_PATH = os.environ.get('HUEY_DB_PATH', 'huey_tasks.db')
-HUEY_IMMEDIATE = os.environ.get('HUEY_IMMEDIATE', 'false').lower() == 'true'
+# Fixed configuration (no env- or CLI-driven toggles)
+_BASE_DIR = Path(__file__).resolve().parents[1]  # benchmarker root
+_DATA_DIR = _BASE_DIR / 'data'
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Create Huey instance with SqliteHuey backend
-huey = SqliteHuey(
-    filename=HUEY_DB_PATH,
-    immediate=HUEY_IMMEDIATE,  # Set to True for testing (runs tasks synchronously)
-)
+HUEY_DB_PATH = str(_DATA_DIR / 'huey_tasks.db')
+# Timeouts are configured in the benchmarker config file; provide sane defaults here.
+INGEST_TIMEOUT_SEC = 7200  # 2 hours per question
+QA_TIMEOUT_SEC = 900       # 15 minutes per QA
+
+# Logs directory (fixed default)
+LOGS_DIR = 'logs'
+
+# Create Huey instance for asynchronous execution only
+huey = SqliteHuey(filename=HUEY_DB_PATH, immediate=False)
 
 # Configuration constants
 DEFAULT_TASK_RETRIES = 3
 DEFAULT_RETRY_DELAY = 60  # seconds
 SESSION_PROCESSING_TIMEOUT = 300  # 5 minutes per session
-QUESTION_PROCESSING_TIMEOUT = 7200  # 2 hours per question
+# Backward-compat constant for tasks module
+QUESTION_PROCESSING_TIMEOUT = INGEST_TIMEOUT_SEC
 
 # Logging configuration
 LOGGING_CONFIG = {
@@ -39,7 +46,7 @@ LOGGING_CONFIG = {
         },
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'huey_orchestrator.log',
+            'filename': str(_BASE_DIR / 'huey_orchestrator.log'),
             'maxBytes': 10485760,  # 10MB
             'backupCount': 5,
             'formatter': 'standard'
@@ -48,7 +55,7 @@ LOGGING_CONFIG = {
     'loggers': {
         'huey': {
             'handlers': ['console', 'file'],
-            'level': 'INFO',
+            'level': 'WARNING',
         },
         'orchestrator': {
             'handlers': ['console', 'file'],

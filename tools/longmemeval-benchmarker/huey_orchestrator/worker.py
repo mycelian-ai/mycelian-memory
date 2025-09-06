@@ -7,11 +7,17 @@ Processes tasks from the queue.
 import sys
 import logging
 import signal
-from huey_config import huey, LOGGING_CONFIG
-from tasks import process_question, run_qa, check_run_health
+import argparse
+import os
+
+from .huey_config import huey, LOGGING_CONFIG
+
+# Import tasks to ensure they are registered with Huey
+from .tasks import process_question, run_qa, check_run_health  # noqa: F401
 
 # Configure logging
 import logging.config
+
 logging.config.dictConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger('orchestrator.worker')
@@ -23,21 +29,30 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def run_worker():
+def run_worker(workers: int = 1):
     """Run the Huey consumer to process tasks."""
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
-    logger.info("Starting Huey worker...")
-    
-    # Import huey consumer
+
+    logger.info("Starting Huey worker with %s consumer process(es)...", workers)
+
     from huey.consumer import Consumer
-    
-    # Create and run consumer
-    consumer = Consumer(huey, workers=1)
+
+    consumer = Consumer(huey, workers=workers)
     consumer.run()
 
 
+def main():
+    """CLI entry point for worker launcher."""
+    parser = argparse.ArgumentParser(description="Huey worker for LongMemEval orchestrator")
+    parser.add_argument('--workers', '-w', type=int, default=int(os.environ.get('HUEY_WORKERS', '1')),
+                        help='Number of consumer processes (default: 1 or $HUEY_WORKERS)')
+
+    args = parser.parse_args()
+
+    run_worker(workers=max(1, args.workers))
+
+
 if __name__ == '__main__':
-    run_worker()
+    main()

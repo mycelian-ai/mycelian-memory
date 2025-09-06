@@ -19,6 +19,21 @@ import os
 from typing import Optional
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
+from pathlib import Path
+
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    # Look for .env in the benchmarker directory
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        # Also try current working directory
+        load_dotenv()
+except ImportError:
+    # python-dotenv not installed, rely on system environment
+    pass
 
 
 def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:

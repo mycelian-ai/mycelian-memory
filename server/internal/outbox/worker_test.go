@@ -30,8 +30,8 @@ type MockIndex struct {
 	mock.Mock
 }
 
-func (m *MockIndex) Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
-	args := m.Called(ctx, actorID, memoryID, query, vec, topK, alpha)
+func (m *MockIndex) Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
+	args := m.Called(ctx, actorID, memoryID, query, vec, topK, alpha, includeRawEntries)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

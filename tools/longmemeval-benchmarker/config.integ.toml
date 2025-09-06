@@ -1,8 +1,0 @@
-# Integration test config - single question dataset for quick validation
-dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_integ.json"
-vault_title = "longmemeval-benchmarks"
-
-[models]
-#agent = "gpt-5-nano-2025-08-07"
-agent = "vertex-ai:gemini-2.5-flash-lite"
-#agent = "openrouter:openai/gpt-5-nano-2025-08-07"

@@ -38,10 +38,11 @@ type AddEntryRequest struct {
 
 // SearchRequest holds search parameters
 type SearchRequest struct {
-	UserID   string `json:"actorId"`
-	VaultID  string `json:"vaultId,omitempty"`
-	MemoryID string `json:"memoryId"`
-	Query    string `json:"query"`
-	TopKE    *int   `json:"top_ke,omitempty"`
-	TopKC    *int   `json:"top_kc,omitempty"`
+	UserID            string `json:"actorId"`
+	VaultID           string `json:"vaultId,omitempty"`
+	MemoryID          string `json:"memoryId"`
+	Query             string `json:"query"`
+	TopKE             *int   `json:"top_ke,omitempty"`
+	TopKC             *int   `json:"top_kc,omitempty"`
+	IncludeRawEntries bool   `json:"include_raw_entries,omitempty"`
 }

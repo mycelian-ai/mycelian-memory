@@ -457,6 +457,7 @@ func newSearchCmd() *cobra.Command {
 	var memoryID, query string
 	var topK int
 	var ke, kc int
+	var includeRawEntries bool
 
 	cmd := &cobra.Command{
 		Use:   "search",
@@ -472,11 +473,11 @@ func newSearchCmd() *cobra.Command {
 			if topK <= 0 || topK > 100 {
 				return fmt.Errorf("--top-k must be between 1 and 100")
 			}
-			if ke < 0 || ke > 100 {
-				return fmt.Errorf("--ke must be between 1 and 100 when provided")
+			if ke < 0 || ke > 25 {
+				return fmt.Errorf("--ke must be between 0 and 25")
 			}
-			if kc < 0 || kc > 100 {
-				return fmt.Errorf("--kc must be between 1 and 100 when provided")
+			if kc < 0 || kc > 10 {
+				return fmt.Errorf("--kc must be between 0 and 10")
 			}
 
 			log.Debug().
@@ -485,6 +486,7 @@ func newSearchCmd() *cobra.Command {
 				Int("top_k", topK).
 				Int("ke", ke).
 				Int("kc", kc).
+				Bool("include_raw_entries", includeRawEntries).
 				Str("service_url", serviceURL).
 				Msg("searching memories")
 
@@ -508,10 +510,11 @@ func newSearchCmd() *cobra.Command {
 			}
 
 			resp, err := c.Search(ctx, client.SearchRequest{
-				MemoryID: memoryID,
-				Query:    query,
-				TopKE:    topKEPtr,
-				TopKC:    topKCPtr,
+				MemoryID:          memoryID,
+				Query:             query,
+				TopKE:             topKEPtr,
+				TopKC:             topKCPtr,
+				IncludeRawEntries: includeRawEntries,
 			})
 			elapsed := time.Since(start)
 
@@ -539,8 +542,9 @@ func newSearchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&query, "query", "", "Search query (required)")
 	cmd.Flags().IntVar(&topK, "top-k", defaultTopK, "Legacy combined top-k (1-100); prefer --ke/--kc")
-	cmd.Flags().IntVar(&ke, "ke", 0, "Entries top-k (recommended 5; overrides --top-k when >0)")
-	cmd.Flags().IntVar(&kc, "kc", 0, "Context shards top-k (recommended 3)")
+	cmd.Flags().IntVar(&ke, "ke", 0, "Entries top-k (0-25, recommended 5; overrides --top-k when >0)")
+	cmd.Flags().IntVar(&kc, "kc", 0, "Context shards top-k (0-10, recommended 3)")
+	cmd.Flags().BoolVar(&includeRawEntries, "include-raw-entries", false, "Include raw entry content in results (default: false)")
 
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("query")

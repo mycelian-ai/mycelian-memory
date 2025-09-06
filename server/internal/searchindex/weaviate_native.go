@@ -34,7 +34,7 @@ func NewWeaviateNativeIndex(baseURL string) (Index, error) {
 	return &weavNative{client: cl, baseURL: baseURL}, nil
 }
 
-func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
+func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query string, vec []float32, topK int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
 	log.Info().Str("memoryId", memoryID).Str("query", query).Str("actorID", actorID).Int("topK", topK).Float32("alpha", alpha).Int("vectorLength", len(vec)).Msg("weaviate search starting")
 
 	// helper to safely extract strings
@@ -115,12 +115,18 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 			creationTime, _ = time.Parse(time.RFC3339, ctStr)
 		}
 
+		rawEntry := safeString(m["rawEntry"])
+		// Clear raw entry if not requested to save tokens
+		if !includeRawEntries {
+			rawEntry = ""
+		}
+		
 		hit := model.SearchHit{
 			EntryID:      safeString(m["entryId"]),
 			ActorID:      safeString(m["actorId"]),
 			MemoryID:     safeString(m["memoryId"]),
 			Summary:      safeString(m["summary"]),
-			RawEntry:     safeString(m["rawEntry"]),
+			RawEntry:     rawEntry,
 			Score:        score,
 			CreationTime: creationTime,
 		}

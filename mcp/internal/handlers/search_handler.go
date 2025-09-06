@@ -29,10 +29,13 @@ Parameters:
 • query (required): Search query text
 • top_ke (optional): Number of entry results to return
   - Default: 5
-  - Range: 0-10 (0 returns no entries, useful for context-only searches)
+  - Range: 0-25 (0 returns no entries, useful for context-only searches)
 • top_kc (optional): Number of context shard results to return
   - Default: 2
-  - Range: 1-3 (must be at least 1)
+  - Range: 1-10 (must be at least 1)
+• include_raw_entries (optional): Include raw entry content in results
+  - Default: false (raw entries excluded to save tokens)
+  - Set to true to include full raw entry content
 
 Returns:
 • entries: Array of matching entries (size: 0 to top_ke), each with:
@@ -48,8 +51,9 @@ Returns:
 The timestamps allow understanding temporal evolution of the memory. Context shards are sorted by relevance score descending. Entries are sorted by relevance score descending.`),
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query text")),
-		mcp.WithNumber("top_ke", mcp.Description("Top-k for entries (default: 5, range: 0-10)")),
-		mcp.WithNumber("top_kc", mcp.Description("Top-k for context shards (default: 2, range: 1-3)")),
+		mcp.WithNumber("top_ke", mcp.Description("Top-k for entries (default: 5, range: 0-25)")),
+		mcp.WithNumber("top_kc", mcp.Description("Top-k for context shards (default: 2, range: 1-10)")),
+		mcp.WithBoolean("include_raw_entries", mcp.Description("Include raw entry content in results (default: false)")),
 	)
 	s.AddTool(searchTool, sh.handleSearch)
 	return nil
@@ -59,29 +63,36 @@ func (sh *SearchHandler) handleSearch(ctx context.Context, req mcp.CallToolReque
 	memoryID, _ := req.RequireString("memory_id")
 	query, _ := req.RequireString("query")
 
-	// Handle top_ke parameter (default: 5, range: 0-10)
+	// Handle top_ke parameter (default: 5, range: 0-25)
 	topKE := 5
 	if v, ok := req.GetArguments()["top_ke"].(float64); ok {
 		topKE = int(v)
-		if topKE < 0 || topKE > 10 {
-			return mcp.NewToolResultError("top_ke must be between 0 and 10"), nil
+		if topKE < 0 || topKE > 25 {
+			return mcp.NewToolResultError("top_ke must be between 0 and 25"), nil
 		}
 	}
 
-	// Handle top_kc parameter (default: 2, range: 1-3)
+	// Handle top_kc parameter (default: 2, range: 1-10)
 	topKC := 2
 	if v, ok := req.GetArguments()["top_kc"].(float64); ok {
 		topKC = int(v)
-		if topKC < 1 || topKC > 3 {
-			return mcp.NewToolResultError("top_kc must be between 1 and 3"), nil
+		if topKC < 1 || topKC > 10 {
+			return mcp.NewToolResultError("top_kc must be between 1 and 10"), nil
 		}
 	}
 
+	// Handle include_raw_entries parameter (default: false)
+	includeRawEntries := false
+	if v, ok := req.GetArguments()["include_raw_entries"].(bool); ok {
+		includeRawEntries = v
+	}
+
 	resp, err := sh.client.Search(ctx, client.SearchRequest{
-		MemoryID: memoryID,
-		Query:    query,
-		TopKE:    &topKE,
-		TopKC:    &topKC,
+		MemoryID:          memoryID,
+		Query:             query,
+		TopKE:             &topKE,
+		TopKC:             &topKC,
+		IncludeRawEntries: includeRawEntries,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil

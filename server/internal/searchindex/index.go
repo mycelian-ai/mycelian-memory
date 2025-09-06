@@ -14,7 +14,7 @@ type Embeddings interface {
 
 // Index provides vector search and index maintenance.
 type Index interface {
-	Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error)
+	Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error)
 	LatestContext(ctx context.Context, actorID, memoryID string) (text string, ts time.Time, err error)
 
 	// SearchContexts returns top-K matching context shards for a query.

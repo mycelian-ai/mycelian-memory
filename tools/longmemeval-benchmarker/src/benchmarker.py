@@ -21,11 +21,11 @@ import time
 import logging
 from typing import Any, Dict, List
 
-from src.dataset_loader import load_longmemeval_file
-from src.mycelian_memory_agent import create_mcp_client
-from src.mycelian_memory_agent.build import build_agent_with_invoker
-from src.memory_manager import MemoryManager
-from src.single_question_runner import SingleQuestionRunner
+from dataset_loader import load_longmemeval_file
+from mycelian_memory_agent import create_mcp_client
+from mycelian_memory_agent.build import build_agent_with_invoker
+from memory_manager import MemoryManager
+from single_question_runner import SingleQuestionRunner
 
 # Minimal helpers (replacing the deleted runner module)
 
@@ -39,17 +39,32 @@ def run_model_healthcheck(model_id: str, model_type: str = "agent") -> None:
     Raises:
         Exception: If the model is not accessible
     """
-    from src.model_providers import get_chat_model
+    import time
+    from model_providers import get_chat_model
     
-    print(f"[benchmarker] running healthcheck for {model_type} model: {model_id}")
+    start_time = time.time()
+    print(f"[benchmarker] HEALTHCHECK START: {model_type} model: {model_id} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     try:
         # Use provider-agnostic model with LangChain's built-in retry
+        print(f"[benchmarker] Creating LLM instance for {model_id}...")
         llm = get_chat_model(model_id)  # max_retries=6 is default
+        print(f"[benchmarker] LLM instance created successfully")
+        
+        print(f"[benchmarker] Invoking healthcheck prompt for {model_id}...")
         result = llm.invoke("Hi, please respond with 'OK' if you're working.")
+        print(f"[benchmarker] Received response from model: {str(result)[:100]}...")
+        
+        elapsed = time.time() - start_time
+        print(f"[benchmarker] HEALTHCHECK SUCCESS: {model_type} model: {model_id} completed in {elapsed:.2f}s")
         print(f"[benchmarker] {model_type} model healthcheck passed")
     except Exception as e:
+        elapsed = time.time() - start_time
+        print(f"[benchmarker] HEALTHCHECK FAILED: {model_type} model: {model_id} after {elapsed:.2f}s")
         print(f"[benchmarker] ERROR: {model_type} model healthcheck failed: {e}")
+        print(f"[benchmarker] Exception type: {type(e).__name__}")
+        import traceback
+        print(f"[benchmarker] Stack trace:\n{traceback.format_exc()}")
         raise
 
 class _SimpleConfig:
@@ -109,6 +124,9 @@ def parse_config(raw_cfg: Dict[str, Any]) -> _SimpleConfig:
 
 
 def _compute_out_dir(run_id: str) -> str:
+    # If run_id already starts with "run_", don't add it again
+    if run_id.startswith("run_"):
+        return f"out/{run_id}"
     return f"out/run_{run_id}"
 
 
@@ -121,10 +139,16 @@ def build_memory_title(template: str, question_id: str, run_id: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run LongMemEval benchmarker")
-    parser.add_argument("config", help="Path to TOML config")
+    # All arguments are now options (no positional arguments)
+    parser.add_argument("--config", required=True, help="Path to TOML config")
+    parser.add_argument("--run-id", required=True, help="Run identifier for this benchmark execution")
     parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers (default: 1)")
     parser.add_argument("--mode", choices=["ingestion", "qa", "full"], default="full", 
                        help="Execution mode: ingestion (sessions only), qa (QA only), full (both)")
+    # Single-question flags for orchestrator integration
+    parser.add_argument("--question-id", help="Process only this question id (optional)")
+    parser.add_argument("--start-session", type=int, default=0,
+                       help="Start from this session index (for resume)")
     parser.add_argument("--memory-id", help="Memory ID for QA-only mode (skips memory creation)")
     parser.add_argument("--vault-id", help="Vault ID for QA-only mode (skips vault resolution)")
     args = parser.parse_args()
@@ -133,6 +157,8 @@ def main() -> None:
         raw_cfg: dict[str, Any] = tomllib.load(f)
 
     cfg = parse_config(raw_cfg)
+    # Override run_id from CLI argument
+    cfg.run_id = args.run_id
     workers = max(1, args.workers)  # Use CLI workers directly
     # Logging is always enabled (debug flag removed)
 
@@ -149,6 +175,22 @@ def main() -> None:
 
     # Load dataset - always process all questions in the file
     ds: List[Dict[str, Any]] = list(load_longmemeval_file(cfg.dataset_file_path))
+    # Filter to single question if requested
+    if args.question_id:
+        ds = [q for q in ds if q.get("question_id") == args.question_id]
+        if not ds:
+            print(f"[benchmarker] question_id {args.question_id} not found in dataset")
+            return
+        # Apply start-session slicing
+        if args.start_session > 0:
+            q0 = ds[0].copy()
+            start = args.start_session
+            q0["haystack_sessions"] = q0.get("haystack_sessions", [])[start:]
+            if "haystack_session_ids" in q0:
+                q0["haystack_session_ids"] = q0["haystack_session_ids"][start:]
+            if "haystack_dates" in q0:
+                q0["haystack_dates"] = q0["haystack_dates"][start:]
+            ds[0] = q0
     if not ds:
         print("[benchmarker] no questions found – ensure dataset files are present")
         return
@@ -156,13 +198,14 @@ def main() -> None:
     # Create shared MCP client for administrative operations
     mcp_client = create_mcp_client()
     
-    # Resolve vault once using MemoryManager (or use provided vault_id for QA-only mode)
-    if args.mode == "qa" and args.vault_id:
+    # Resolve vault - use provided vault_id if available, otherwise create/get from vault_title
+    if args.vault_id:
         vault_id = args.vault_id
-        print(f"[benchmarker] using provided vault_id for QA-only mode: {vault_id}")
+        print(f"[benchmarker] using provided vault_id: {vault_id}")
     else:
         memory_mgr = MemoryManager(mcp_client, debug=False)
         vault_id = memory_mgr.ensure_vault(cfg.vault_title, cfg.vault_id)
+        print(f"[benchmarker] resolved vault_id: {vault_id}")
 
     # Directories
     out_dir = _compute_out_dir(cfg.run_id)
@@ -175,7 +218,7 @@ def main() -> None:
 
     print(f"[benchmarker] starting run with {len(ds)} question(s), workers={workers}")
 
-    from src.worker_manager import WorkerManager
+    from worker_manager import WorkerManager
     wm = WorkerManager(workers=workers, debug=False)
     sqr = SingleQuestionRunner(cfg, mcp_client=mcp_client, mode=args.mode)
 
@@ -219,15 +262,31 @@ def main() -> None:
     items = list(enumerate(ds, start=1))
     results = wm.run(items, work_fn, make_log_path)
 
-    # Write parts and merge
-    wrote = 0
-    with open(hyp_path, "w", encoding="utf-8") as out_f:
-        for idx, res in enumerate(results, start=1):
-            if not isinstance(res, dict):
-                continue
-            out_f.write(json.dumps(res) + "\n")
-            wrote += 1
-    print(f"[benchmarker] wrote {wrote} lines to {hyp_path}")
+    # Write hypotheses only for QA or FULL modes
+    if args.mode != "ingestion":
+        wrote = 0
+        # For single-question QA runs, append to avoid clobbering previous results
+        open_mode = "a" if (args.mode == "qa" and args.question_id) else "w"
+        with open(hyp_path, open_mode, encoding="utf-8") as out_f:
+            for idx, res in enumerate(results, start=1):
+                if not isinstance(res, dict):
+                    continue
+                # Write only the deliverable fields expected for hypotheses.jsonl
+                if "hypothesis" in res:
+                    line = {
+                        "question_id": res.get("question_id"),
+                        "hypothesis": res.get("hypothesis", "")
+                    }
+                    out_f.write(json.dumps(line) + "\n")
+                    wrote += 1
+        print(f"[benchmarker] wrote {wrote} lines to {hyp_path}")
+
+    # If single-question mode, echo JSON result for orchestrator parsing
+    if args.question_id and results:
+        # results list preserves order; first element is our question
+        res0 = results[0]
+        if isinstance(res0, dict):
+            print(json.dumps(res0))
 
 
 if __name__ == "__main__":

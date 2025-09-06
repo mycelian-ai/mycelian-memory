@@ -79,11 +79,22 @@ Progress is tracked in SQLite with the following schema:
 - **Monitored** - Real-time progress tracking
 - **Robust** - Automatic retries on failure
 
-## TODO
+## Testing
 
-The actual subprocess calls in `tasks.py` need to be implemented once the single_question_runner is modified to:
-1. Accept a `start_session_index` parameter
-2. Return `vault_id` and `memory_id`
-3. Report progress periodically
+### Integration Test
+Run the comprehensive integration test that uses the mock runner:
+```bash
+python test_orchestrator_integration.py
+```
 
-For now, the tasks use mock implementations to demonstrate the architecture.
+This test validates:
+- Progress tracking initialization
+- Task processing with mock runner
+- Resume capability for partial completions
+- Concurrent task claiming prevention
+- Statistics tracking accuracy
+
+### Mock vs Real Runner
+- **Production**: `tasks.py` always uses the real `single_question_runner_cli.py`
+- **Testing**: `tasks_mock.py` uses `mock_runner.py` for fast testing
+- **Integration Test**: Uses `tasks_mock.py` to avoid Mycelian dependencies

@@ -26,7 +26,7 @@ type mockSearch struct {
 	empty bool
 }
 
-func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, k int, a float32) ([]model.SearchHit, error) {
+func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, k int, a float32, includeRawEntries bool) ([]model.SearchHit, error) {
 	m.calls++
 	if m.empty {
 		return []model.SearchHit{}, nil

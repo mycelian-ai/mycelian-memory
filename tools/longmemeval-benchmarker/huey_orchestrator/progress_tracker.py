@@ -5,8 +5,10 @@ Tracks question-level and session-level progress for resumability.
 """
 
 import sqlite3
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from contextlib import contextmanager
 
@@ -17,7 +19,13 @@ class ProgressTracker:
     """Track benchmark progress in SQLite database."""
     
     def __init__(self, db_path: str = "progress.db"):
-        self.db_path = db_path
+        # Anchor default DB under benchmarker root data/ to avoid CWD mismatches
+        if not db_path or db_path == "progress.db":
+            data_dir = Path(__file__).resolve().parents[1] / 'data'
+            data_dir.mkdir(parents=True, exist_ok=True)
+            self.db_path = str(data_dir / "progress.db")
+        else:
+            self.db_path = db_path
         self._init_database()
     
     @contextmanager
@@ -38,16 +46,29 @@ class ProgressTracker:
     def _init_database(self):
         """Initialize the progress tracking database."""
         with self._get_connection() as conn:
+            # Runs table stores high-level run metadata and paths
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS runs (
+                    run_id TEXT PRIMARY KEY,
+                    dataset_path TEXT,
+                    config_path TEXT,
+                    created_at TIMESTAMP
+                )
+            """)
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS question_progress (
                     run_id TEXT NOT NULL,
                     question_id TEXT NOT NULL,
                     question_type TEXT,
+                    question_json TEXT,
                     vault_id TEXT,
                     memory_id TEXT,
                     memory_title TEXT,  -- For debugging: {run_id}_{question_id}
                     total_sessions INTEGER,
                     completed_sessions INTEGER DEFAULT 0,
+                    total_messages INTEGER DEFAULT 0,
+                    ingested_messages INTEGER DEFAULT 0,
                     status TEXT DEFAULT 'pending',  -- pending/in_progress/completed/failed
                     ingestion_status TEXT DEFAULT 'pending',
                     qa_status TEXT DEFAULT 'pending',
@@ -55,6 +76,7 @@ class ProgressTracker:
                     ingestion_completed_at TIMESTAMP,
                     qa_started_at TIMESTAMP,
                     qa_completed_at TIMESTAMP,
+                    last_progress_at TIMESTAMP,
                     worker_id TEXT,
                     error_message TEXT,
                     retry_count INTEGER DEFAULT 0,
@@ -76,50 +98,90 @@ class ProgressTracker:
                 CREATE INDEX IF NOT EXISTS idx_qa_status 
                 ON question_progress(run_id, qa_status)
             """)
+
+            # Backfill schema changes: ensure new columns exist for older DBs
+            cols = conn.execute("PRAGMA table_info(question_progress)").fetchall()
+            col_names = {row[1] for row in cols}
+            if 'question_json' not in col_names:
+                conn.execute("ALTER TABLE question_progress ADD COLUMN question_json TEXT")
+            if 'total_messages' not in col_names:
+                conn.execute("ALTER TABLE question_progress ADD COLUMN total_messages INTEGER DEFAULT 0")
+            if 'ingested_messages' not in col_names:
+                conn.execute("ALTER TABLE question_progress ADD COLUMN ingested_messages INTEGER DEFAULT 0")
+            if 'last_progress_at' not in col_names:
+                conn.execute("ALTER TABLE question_progress ADD COLUMN last_progress_at TIMESTAMP")
     
-    def init_run(self, run_id: str, questions: List[Dict]) -> None:
-        """Initialize a new benchmark run with all questions."""
+    def init_run(self, run_id: str, questions: List[Dict], dataset_path: Optional[str] = None, config_path: Optional[str] = None) -> None:
+        """Initialize a new benchmark run with all questions and persist question JSON."""
         with self._get_connection() as conn:
+            # Optionally record run metadata
+            if dataset_path is not None or config_path is not None:
+                conn.execute("""
+                    INSERT OR IGNORE INTO runs (run_id, dataset_path, config_path, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, (run_id, dataset_path, config_path, datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')))
+
             for question in questions:
+                # Compute sessions and total_messages from either canonical 'sessions' or 'haystack_sessions'
+                sessions = question.get('sessions')
+                if not isinstance(sessions, list):
+                    sessions = question.get('haystack_sessions', [])
+                try:
+                    total_messages = 0
+                    if isinstance(sessions, list):
+                        for sess in sessions:
+                            # haystack_sessions: list of messages; sessions: dict with 'messages'
+                            if isinstance(sess, dict):
+                                msgs = sess.get('messages') or []
+                            else:
+                                msgs = sess if isinstance(sess, list) else []
+                            total_messages += sum(1 for m in msgs if isinstance(m, dict) and isinstance(m.get('content'), str) and (m.get('role') in ('user','assistant')) and m.get('content').strip())
+                except Exception:
+                    total_messages = 0
+
                 conn.execute("""
                     INSERT OR IGNORE INTO question_progress 
-                    (run_id, question_id, question_type, total_sessions, memory_title)
-                    VALUES (?, ?, ?, ?, ?)
+                    (run_id, question_id, question_type, question_json, total_sessions, memory_title, total_messages)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     run_id,
                     question['question_id'],
                     question.get('question_type', 'unknown'),
-                    len(question.get('haystack_sessions', [])),
-                    f"{run_id}_{question['question_id']}"
+                    json.dumps(question),
+                    len(sessions) if isinstance(sessions, list) else 0,
+                    f"{run_id}_{question['question_id']}",
+                    total_messages
                 ))
         logger.info(f"Initialized run {run_id} with {len(questions)} questions")
-    
-    def claim_question(self, run_id: str, worker_id: str) -> Optional[Dict]:
-        """
-        Atomically claim a pending question for processing.
-        Returns question details if claimed, None if no questions available.
-        """
+
+    def get_run_config(self, run_id: str) -> Optional[Dict]:
+        """Return dataset_path and config_path for a run, if recorded."""
         with self._get_connection() as conn:
-            # Use a transaction to atomically claim a question
-            result = conn.execute("""
-                UPDATE question_progress
-                SET status = 'in_progress',
-                    worker_id = ?,
-                    ingestion_started_at = ?
-                WHERE run_id = ?
-                  AND status = 'pending'
-                  AND rowid = (
-                    SELECT rowid FROM question_progress
-                    WHERE run_id = ? AND status = 'pending'
-                    LIMIT 1
-                  )
-                RETURNING question_id, question_type, total_sessions, memory_title
-            """, (worker_id, datetime.now().isoformat(), run_id, run_id))
-            
-            row = result.fetchone()
-            if row:
-                return dict(row)
-            return None
+            row = conn.execute(
+                "SELECT dataset_path, config_path, created_at FROM runs WHERE run_id = ?",
+                (run_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_question_json(self, run_id: str, question_id: str) -> Optional[Dict]:
+        """Return the stored question JSON for a given question in a run."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT question_json FROM question_progress
+                WHERE run_id = ? AND question_id = ?
+                """,
+                (run_id, question_id)
+            ).fetchone()
+            if not row:
+                return None
+            try:
+                return json.loads(row[0]) if row[0] else None
+            except Exception:
+                logger.warning("Failed to parse question_json for %s/%s", run_id, question_id)
+                return None
+    
+    # Pull-model claim removed for push-model async orchestrator
     
     def update_vault_memory(self, run_id: str, question_id: str, 
                            vault_id: str, memory_id: str) -> None:
@@ -147,9 +209,10 @@ class ProgressTracker:
             conn.execute("""
                 UPDATE question_progress
                 SET ingestion_status = 'completed',
-                    ingestion_completed_at = ?
+                    ingestion_completed_at = ?,
+                    status = CASE WHEN qa_status = 'completed' THEN 'completed' ELSE status END
                 WHERE run_id = ? AND question_id = ?
-            """, (datetime.now().isoformat(), run_id, question_id))
+            """, (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), run_id, question_id))
     
     def mark_qa_complete(self, run_id: str, question_id: str) -> None:
         """Mark QA as complete for a question."""
@@ -160,7 +223,29 @@ class ProgressTracker:
                     qa_completed_at = ?,
                     status = 'completed'
                 WHERE run_id = ? AND question_id = ?
-            """, (datetime.now().isoformat(), run_id, question_id))
+            """, (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), run_id, question_id))
+
+    def mark_ingestion_in_progress(self, run_id: str, question_id: str, worker_id: Optional[str]) -> None:
+        """Mark ingestion as in progress and set worker/timestamp."""
+        with self._get_connection() as conn:
+            conn.execute("""
+                UPDATE question_progress
+                SET status = 'in_progress',
+                    ingestion_status = 'in_progress',
+                    ingestion_started_at = ?,
+                    worker_id = ?
+                WHERE run_id = ? AND question_id = ?
+            """, (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), worker_id, run_id, question_id))
+
+    def mark_qa_in_progress(self, run_id: str, question_id: str) -> None:
+        """Mark QA as in progress and set timestamp."""
+        with self._get_connection() as conn:
+            conn.execute("""
+                UPDATE question_progress
+                SET qa_status = 'in_progress',
+                    qa_started_at = ?
+                WHERE run_id = ? AND question_id = ?
+            """, (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), run_id, question_id))
     
     def mark_failed(self, run_id: str, question_id: str, error_message: str) -> None:
         """Mark a question as failed with error message."""
@@ -172,6 +257,67 @@ class ProgressTracker:
                     retry_count = retry_count + 1
                 WHERE run_id = ? AND question_id = ?
             """, (error_message, run_id, question_id))
+
+    # --- New helpers -------------------------------------------------
+
+    def update_latest_progress_time(self, run_id: str, question_id: str) -> None:
+        """Update last_progress_at to UTC now for a question."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE question_progress
+                SET last_progress_at = ?
+                WHERE run_id = ? AND question_id = ?
+                """,
+                (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), run_id, question_id),
+            )
+
+    def increment_ingested_messages(self, run_id: str, question_id: str, increment: int) -> None:
+        """Increment ingested_messages and bump last_progress_at."""
+        if increment <= 0:
+            return
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE question_progress
+                SET ingested_messages = COALESCE(ingested_messages, 0) + ?,
+                    last_progress_at = ?
+                WHERE run_id = ? AND question_id = ?
+                """,
+                (increment, datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), run_id, question_id),
+            )
+
+    def mark_failed_ingestion(self, run_id: str, question_id: str, message: str) -> None:
+        """Failure during ingestion step."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE question_progress
+                SET status = 'failed',
+                    ingestion_status = 'failed',
+                    error_message = ?,
+                    retry_count = retry_count + 1
+                WHERE run_id = ? AND question_id = ?
+                """,
+                (message, run_id, question_id),
+            )
+
+    def mark_failed_qa(self, run_id: str, question_id: str, message: str) -> None:
+        """Failure during QA step."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE question_progress
+                SET status = 'failed',
+                    qa_status = 'failed',
+                    error_message = ?,
+                    retry_count = retry_count + 1
+                WHERE run_id = ? AND question_id = ?
+                """,
+                (message, run_id, question_id),
+            )
+
+    # ---------------------------------------------------------------
     
     def get_pending_questions(self, run_id: str) -> List[Dict]:
         """Get all pending questions for a run."""
@@ -209,7 +355,11 @@ class ProgressTracker:
                     SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
                     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
                     SUM(completed_sessions) as total_sessions_completed,
-                    SUM(total_sessions) as total_sessions_expected
+                    SUM(total_sessions) as total_sessions_expected,
+                    SUM(CASE WHEN ingestion_status = 'completed' THEN 1 ELSE 0 END) as ingested,
+                    SUM(CASE WHEN qa_status = 'completed' THEN 1 ELSE 0 END) as qa_done,
+                    SUM(COALESCE(ingested_messages, 0)) as total_messages_ingested,
+                    SUM(COALESCE(total_messages, 0)) as total_messages_expected
                 FROM question_progress
                 WHERE run_id = ?
             """, (run_id,))
@@ -224,3 +374,39 @@ class ProgressTracker:
             """, (run_id, question_id))
             row = result.fetchone()
             return dict(row) if row else None
+
+    def get_stuck_questions(self, run_id: str, minutes: int = 30) -> List[str]:
+        """Return question_ids that have been in_progress without update for > minutes."""
+        with self._get_connection() as conn:
+            result = conn.execute(
+                """
+                SELECT question_id FROM question_progress
+                WHERE run_id = ? AND status = 'in_progress'
+                  AND COALESCE(last_progress_at, ingestion_started_at) IS NOT NULL
+                  AND (julianday('now') - julianday(COALESCE(last_progress_at, ingestion_started_at))) * 24 * 60 > ?
+                LIMIT 20
+                """,
+                (run_id, minutes),
+            )
+            return [row[0] for row in result.fetchall()]
+
+    def get_in_progress_details(self, run_id: str, limit: int = 10) -> List[Dict]:
+        """Return compact details for in-progress questions ordered by latest progress."""
+        with self._get_connection() as conn:
+            result = conn.execute(
+                """
+                SELECT question_id, worker_id,
+                       COALESCE(completed_sessions, 0) AS s_done,
+                       COALESCE(total_sessions, 0)    AS s_total,
+                       COALESCE(ingested_messages, 0) AS m_done,
+                       COALESCE(total_messages, 0)    AS m_total,
+                       ingestion_status, qa_status,
+                       COALESCE(last_progress_at, ingestion_started_at) AS last_update
+                FROM question_progress
+                WHERE run_id = ? AND status = 'in_progress'
+                ORDER BY COALESCE(last_progress_at, ingestion_started_at) DESC
+                LIMIT ?
+                """,
+                (run_id, limit),
+            )
+            return [dict(row) for row in result.fetchall()]

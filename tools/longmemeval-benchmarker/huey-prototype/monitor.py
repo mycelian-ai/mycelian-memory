@@ -9,6 +9,11 @@ import time
 import sys
 import os
 from datetime import datetime
+from pathlib import Path
+
+_DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
+HUEY_DB_PATH = str(_DATA_DIR / 'huey_tasks.db')
+PROGRESS_DB_PATH = str(_DATA_DIR / 'progress.db')
 
 def clear_screen():
     """Clear the terminal screen."""
@@ -17,7 +22,7 @@ def clear_screen():
 def get_huey_stats():
     """Get statistics from Huey's task queue."""
     try:
-        with sqlite3.connect('huey_tasks.db') as conn:
+        with sqlite3.connect(HUEY_DB_PATH) as conn:
             # Pending tasks
             cursor = conn.execute('''
                 SELECT COUNT(*) FROM huey_task WHERE is_complete = 0
@@ -47,7 +52,7 @@ def get_huey_stats():
 def get_progress_stats():
     """Get statistics from our custom progress tracking."""
     try:
-        with sqlite3.connect('progress.db') as conn:
+        with sqlite3.connect(PROGRESS_DB_PATH) as conn:
             # Overall stats
             cursor = conn.execute('''
                 SELECT 
@@ -99,7 +104,7 @@ def get_progress_stats():
 def get_recent_completions():
     """Get recently completed questions."""
     try:
-        with sqlite3.connect('progress.db') as conn:
+        with sqlite3.connect(PROGRESS_DB_PATH) as conn:
             cursor = conn.execute('''
                 SELECT 
                     question_id,
