@@ -42,6 +42,13 @@ go.work.sum
 .vscode/
 *.iml
 
+# IntelliJ IDEA specific (from .idea/.gitignore)
+.idea/shelf/
+.idea/workspace.xml
+.idea/httpRequests/
+.idea/dataSources/
+.idea/dataSources.local.xml
+
 # Build output
 build/
 dist/
@@ -52,6 +59,9 @@ dist/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Process ID files
+*.pid
 
 # Temporary files
 *.tmp
@@ -71,8 +81,12 @@ clients/go/venv/
 __pycache__/
 *.py[cod]
 *.pyc
+*.pyo
 *$py.class
 *.so
+
+# Python test cache
+.pytest_cache/
 
 # Configuration files with secrets (keep example files)
 configs/config.local.yaml
@@ -97,6 +111,8 @@ credentials*.json
 
 # Local database files
 *.db
+*.db-shm
+*.db-wal
 memory.db
 .kiro/
 
@@ -110,9 +126,22 @@ config.local.yaml
 # Test coverage
 coverage.out
 coverage.html
+.coverage
 
 # Data
 data/
+
+# LongMemEval Benchmarker specific
+tools/longmemeval-benchmarker/out/
+tools/longmemeval-benchmarker/huey_orchestrator/out/
+tools/longmemeval-benchmarker/data/*.db*
+tools/longmemeval-benchmarker/huey_orchestrator/data/*.db*
+tools/longmemeval-benchmarker/huey_orchestrator.log
+tools/longmemeval-benchmarker/todo
+tools/longmemeval-benchmarker/logs/*/
+
+# Root level files that should be ignored
+huey_orchestrator.log
 
 memory-bank/
 .cursor/
