@@ -248,15 +248,8 @@ class MycelianMemoryAgent:
             for msg in reversed(tool_history):
                 if isinstance(msg, ToolMessage):
                     last_tool = msg.name
-                    # Check for tool errors
-                    if msg.content and "Error:" in msg.content:
-                        logger.error(json.dumps({
-                            "event": "tool_error",
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "tool": msg.name,
-                            "error": msg.content
-                        }))
-                        raise ValueError(f"Tool {msg.name} failed: {msg.content}")
+                    # Rely on MCP/ToolNode to raise on actual tool failures; do not
+                    # attempt to infer errors by scanning payload text.
                     break
 
         # START_SESSION: Create tool calls for ToolNode to execute
