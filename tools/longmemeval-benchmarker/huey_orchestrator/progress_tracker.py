@@ -319,6 +319,33 @@ class ProgressTracker:
 
     # ---------------------------------------------------------------
 
+    def reset_for_restart(self, run_id: str, question_id: str) -> None:
+        """Reset a question to restart ingestion from session 0.
+
+        Preserves vault_id but clears memory_id and resets statuses/counters.
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE question_progress
+                SET memory_id = NULL,
+                    completed_sessions = 0,
+                    ingested_messages = 0,
+                    status = 'pending',
+                    ingestion_status = 'pending',
+                    qa_status = 'pending',
+                    ingestion_started_at = NULL,
+                    ingestion_completed_at = NULL,
+                    qa_started_at = NULL,
+                    qa_completed_at = NULL,
+                    last_progress_at = NULL,
+                    worker_id = NULL,
+                    error_message = NULL
+                WHERE run_id = ? AND question_id = ?
+                """,
+                (run_id, question_id),
+            )
+
     def get_pending_questions(self, run_id: str) -> List[Dict]:
         """Get all pending questions for a run."""
         with self._get_connection() as conn:

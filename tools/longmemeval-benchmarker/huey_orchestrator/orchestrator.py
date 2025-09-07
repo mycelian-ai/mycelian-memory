@@ -372,15 +372,15 @@ def main(config_path: str, num_questions: Optional[int],
         logger.info(f"Found {len(pending)} pending questions")
         logger.info(f"Found {len(resumable)} resumable questions")
 
-        # Enqueue resumable questions with their progress
+        # For resumable questions, restart ingestion from session 0 with a fresh memory_id
         for q_progress in resumable:
             question_id = q_progress['question_id']
             # Find question data in dataset
             question_data = next((q for q in dataset if q['question_id'] == question_id), None)
             if question_data:
-                start_session = q_progress['completed_sessions']
-                logger.info(f"Resuming {question_id} from session {start_session}")
-                enqueue_question(question_data, run_id, config_path, start_session)
+                logger.info(f"Restarting {question_id} from session 0 (clearing memory_id; preserving vault_id)")
+                tracker.reset_for_restart(run_id, question_id)
+                enqueue_question(question_data, run_id, config_path, 0)
 
         # Enqueue pending questions
         for q_progress in pending:
