@@ -15,6 +15,10 @@ qa = "openrouter:openai/gpt-5-nano-2025-08-07"
 [search]
 use_two_pass = false  # Faster for smoke test
 
+# Agent configuration
+[agent]
+context_only = true  # Use context-only mode for faster processing (default)
+
 # Mycelian API configuration
 [mycelian]
 api_url = "http://localhost:11545/v0"

@@ -31,30 +31,30 @@ from single_question_runner import SingleQuestionRunner
 
 def run_model_healthcheck(model_id: str, model_type: str = "agent") -> None:
     """Run a simple healthcheck on the model to ensure it's accessible.
-    
+
     Args:
         model_id: The model identifier
         model_type: Type of model ("agent" or "qa")
-        
+
     Raises:
         Exception: If the model is not accessible
     """
     import time
     from model_providers import get_chat_model
-    
+
     start_time = time.time()
     print(f"[benchmarker] HEALTHCHECK START: {model_type} model: {model_id} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    
+
     try:
         # Use provider-agnostic model with LangChain's built-in retry
         print(f"[benchmarker] Creating LLM instance for {model_id}...")
         llm = get_chat_model(model_id)  # max_retries=6 is default
         print(f"[benchmarker] LLM instance created successfully")
-        
+
         print(f"[benchmarker] Invoking healthcheck prompt for {model_id}...")
         result = llm.invoke("Hi, please respond with 'OK' if you're working.")
         print(f"[benchmarker] Received response from model: {str(result)[:100]}...")
-        
+
         elapsed = time.time() - start_time
         print(f"[benchmarker] HEALTHCHECK SUCCESS: {model_type} model: {model_id} completed in {elapsed:.2f}s")
         print(f"[benchmarker] {model_type} model healthcheck passed")
@@ -72,34 +72,38 @@ class _SimpleConfig:
         # Required fields
         self.dataset_file_path = raw_cfg["dataset_file_path"]
         self.vault_title = raw_cfg["vault_title"]
-        
+
         # Models configuration - both ingest and qa are mandatory
         models_cfg = raw_cfg.get("models", {})
         if not models_cfg:
             # If no models section, use defaults
             models_cfg = {}
-        
+
         # Ingest and QA models with defaults
         ingest_model = models_cfg.get("ingest", "openai:gpt-5-nano-2025-08-07")
         qa_model = models_cfg.get("qa", "openai:gpt-5-2025-08-07")
-        
+
         self.models = type("Models", (), {
             "ingest": ingest_model,
             "qa": qa_model
         })()
-        
+
         # Search configuration - optional with defaults
         search_cfg = raw_cfg.get("search", {})
         self.use_two_pass_search = search_cfg.get("use_two_pass", True)  # Default to True
-        
+
+        # Agent configuration - optional with defaults
+        agent_cfg = raw_cfg.get("agent", {})
+        self.context_only = agent_cfg.get("context_only", True)  # Default to True for faster processing
+
         # Auto-generated fields
         self.run_id = str(int(time.time()))
-        
+
         # Fixed defaults (removed from config)
         self.provider = {"type": "model-provider"}  # Supports OpenAI and Vertex AI
         self.vault_id = None  # Always auto-generated from vault_title
         self.memory_title_template = "{question_id}__{run_id}"  # Standard format
-        
+
         # Fixed internal params (not exposed in config)
         self.params = type(
             "Params",
@@ -110,7 +114,7 @@ class _SimpleConfig:
                 "max_tool_calls_per_turn": 5,  # Legacy, unused
                 "dump_state": False,  # Debug feature, removed
                 "use_two_pass_search": self.use_two_pass_search,  # From config or default True
-                
+
                 # Removed limits - control via dataset file instead
                 "question_limit": None,  # Always process all questions
                 "max_sessions_per_question": None,  # Always process all sessions
@@ -143,7 +147,7 @@ def main() -> None:
     parser.add_argument("--config", required=True, help="Path to TOML config")
     parser.add_argument("--run-id", required=True, help="Run identifier for this benchmark execution")
     parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers (default: 1)")
-    parser.add_argument("--mode", choices=["ingestion", "qa", "full"], default="full", 
+    parser.add_argument("--mode", choices=["ingestion", "qa", "full"], default="full",
                        help="Execution mode: ingestion (sessions only), qa (QA only), full (both)")
     # Single-question flags for orchestrator integration
     parser.add_argument("--question-id", help="Process only this question id (optional)")
@@ -167,7 +171,7 @@ def main() -> None:
         level=logging.WARNING,
         format="%(asctime)s [%(filename)s:%(funcName)s] %(message)s",
     )
-    
+
     # Run model healthchecks before proceeding
     run_model_healthcheck(cfg.models.ingest, "ingest")
     if cfg.models.qa != cfg.models.ingest:
@@ -197,7 +201,7 @@ def main() -> None:
 
     # Create shared MCP client for administrative operations
     mcp_client = create_mcp_client()
-    
+
     # Resolve vault - use provided vault_id if available, otherwise create/get from vault_title
     if args.vault_id:
         vault_id = args.vault_id
@@ -243,7 +247,7 @@ def main() -> None:
         try:
             # Always process all sessions and turns in the question
             # Pass memory_id for QA-only mode if provided
-            return sqr.run_question(q, vault_id=vault_id, run_id=cfg.run_id, log=log, 
+            return sqr.run_question(q, vault_id=vault_id, run_id=cfg.run_id, log=log,
                                   memory_id=args.memory_id if args.mode == "qa" else None)
         finally:
             # Restore logger states and remove handler
@@ -291,5 +295,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

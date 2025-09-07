@@ -62,7 +62,7 @@ class MycelianMemoryAgent:
     """
 
     def __init__(self, llm, tools: list, prompts: Dict[str, str],
-                 vault_id: str, memory_id: str):
+                 vault_id: str, memory_id: str, context_only: bool = True):
         """Initialize the agent.
 
         Args:
@@ -71,18 +71,21 @@ class MycelianMemoryAgent:
             prompts: Dictionary of prompt templates from MCP
             vault_id: Vault identifier for memory storage
             memory_id: Memory identifier for this conversation
+            context_only: If True, skip add_entry and flush operations (default: True)
         """
         self.llm = llm
         self.tools = tools
         self.prompts = prompts
         self.vault_id = vault_id
         self.memory_id = memory_id
+        self.context_only = context_only
         try:
             logger.info(json.dumps({
                 "event": "agent_init",
                 "timestamp": datetime.utcnow().isoformat(),
                 "vault_id": vault_id,
                 "memory_id": memory_id,
+                "context_only": context_only,
                 "tools_available": [getattr(t, 'name', str(type(t).__name__)) for t in tools]
             }))
         except (TypeError, AttributeError):
@@ -255,7 +258,33 @@ class MycelianMemoryAgent:
         # START_SESSION: Create tool calls for ToolNode to execute
         if control == ControlState.START_SESSION:
             if last_tool is None:
-                # First tool: get_context
+                # First tool: await_consistency to ensure previous writes are complete
+                args = {"memory_id": self.memory_id}
+
+                logger.info(json.dumps({
+                        "event": "creating_tool_call",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "tool": "await_consistency",
+                        "args": args
+                    }))
+
+                # Create AIMessage with tool_calls for ToolNode to process
+                tool_call = {
+                    "id": "await_consistency_call_start",
+                    "name": "await_consistency",
+                    "args": args
+                }
+
+                ai_msg = AIMessage(
+                    content="Ensuring previous session's writes are complete.",
+                    tool_calls=[tool_call]
+                )
+
+                # Return with updated tool_history (includes copied ToolMessages)
+                return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
+
+            elif last_tool == "await_consistency":
+                # Second tool: get_context
                 args = {
                     "vault_id": self.vault_id,
                     "memory_id": self.memory_id
@@ -284,7 +313,7 @@ class MycelianMemoryAgent:
                 return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
 
             elif last_tool == "get_context":
-                # Second tool: list_entries
+                # Third tool: list_entries
                 args = {
                     "vault_id": self.vault_id,
                     "memory_id": self.memory_id,
@@ -314,7 +343,7 @@ class MycelianMemoryAgent:
                 return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
 
             elif last_tool == "list_entries":
-                # Both tools completed, extract results and finish
+                # All three tools completed, extract results and finish
                 # Find the context and entries from tool_history
                 context_text = ""
                 entries_text = ""
@@ -343,8 +372,27 @@ class MycelianMemoryAgent:
                     "tool_history": tool_history + [AIMessage(content="Session started.")]
                 }
 
-        # PROCESS_MESSAGE sequence: add_entry only
+        # PROCESS_MESSAGE sequence: add_entry only (or just accumulate if context_only)
         elif control == ControlState.PROCESS_MESSAGE:
+            # If context_only mode, just add to conversation history without calling add_entry
+            if self.context_only:
+                if not to_process:
+                    raise ValueError("No message to process in PROCESS_MESSAGE state")
+
+                logger.info(json.dumps({
+                    "event": "context_only_accumulate",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "message_role": to_process[0].role if to_process else None,
+                    "message_preview": to_process[0].content[:200] if to_process and to_process[0].content else None
+                }))
+
+                # Just add to conversation history and return
+                return {
+                    "conversation_history": to_process,
+                    "tool_history": tool_history + [AIMessage(content="Message accumulated (context-only).")]
+                }
+
+            # Normal mode: process with add_entry
             # Only relevant tool for this state is add_entry
             if last_tool not in [None, "add_entry"]:
                 # Ignore tools from other control states, treat as starting fresh
@@ -383,8 +431,17 @@ class MycelianMemoryAgent:
                 # Complete - return with updated tool_history
                 return {"tool_history": tool_history + [AIMessage(content="Message processed.")]}
 
-        # FLUSH sequence: await_consistency → put_context
+        # FLUSH sequence: await_consistency → put_context (skip if context_only)
         elif control == ControlState.FLUSH:
+            # Skip flush entirely in context_only mode
+            if self.context_only:
+                logger.info(json.dumps({
+                    "event": "flush_skipped",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "reason": "context_only_mode"
+                }))
+                return {"tool_history": tool_history + [AIMessage(content="Flush skipped (context-only).")]}
+
             # Check if put_context was already called in this flush
             # This handles the case where LLM returns multiple tools including put_context
             if self._check_put_context_called(tool_history):
@@ -684,7 +741,7 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
     import os
     enhanced_prompt_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "prompts", "chat", "summary_prompt_enhanced.md"
+        "prompts", "chat", "summary_prompt.md"
     )
 
     if os.path.exists(enhanced_prompt_path):

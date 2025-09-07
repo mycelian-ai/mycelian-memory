@@ -307,12 +307,15 @@ class SingleQuestionRunner:
             _write_vault_memory_ids(vault_id, memory_id)
 
             # Create a minimal invoker just for MCP client access
+            # Check if config has context_only setting
+            context_only = getattr(self.cfg, 'context_only', True)  # Default to True
             invoker = build_agent_with_invoker(
                 model_id=self.cfg.models.ingest,
                 vault_id=vault_id,
                 memory_id=memory_id,
                 mcp_client=self.mcp_client,
-                max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn
+                max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
+                context_only=context_only
             )
         else:
             # Use MemoryManager to ensure memory exists
@@ -323,12 +326,15 @@ class SingleQuestionRunner:
             _write_vault_memory_ids(vault_id, memory_id)
 
             # Build agent with clean implementation
+            # Check if config has context_only setting
+            context_only = getattr(self.cfg, 'context_only', True)  # Default to True
             invoker = build_agent_with_invoker(
                 model_id=self.cfg.models.ingest,
                 vault_id=vault_id,
                 memory_id=memory_id,
                 mcp_client=self.mcp_client,
-                max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn
+                max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
+                context_only=context_only
             )
 
             # Optionally set log stream (for compatibility)
@@ -411,6 +417,21 @@ class SingleQuestionRunner:
             runner_log.info("QA_START qid=%s memory_id=%s question='%s'",
                           qid, memory_id, qtext[:100] if qtext else "(derived)")
 
+            # Ensure all pending writes are complete before searching
+            runner_log.info("AWAIT_CONSISTENCY qid=%s memory_id=%s", qid, memory_id)
+            # Use MCP client directly to call await_consistency
+            import asyncio
+            from async_utils import run as run_async
+            async def await_consistency():
+                tools = await invoker._mcp.get_tools()
+                for tool in tools:
+                    if getattr(tool, "name", None) == "await_consistency":
+                        return await tool.ainvoke({"memory_id": memory_id})
+                raise RuntimeError("await_consistency tool not found")
+            run_async(await_consistency())
+
+            memory_manager = MemoryManager(invoker._mcp, debug=False)
+
             # Use the MCP client from the invoker for search
             query_text = str(qtext or mem_title)
 
@@ -421,7 +442,7 @@ class SingleQuestionRunner:
                 runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=two_pass query='%s'",
                               qid, memory_id, query_text[:100])
                 sr = _two_pass_search(
-                    MemoryManager(invoker._mcp, debug=False),
+                    memory_manager,
                     memory_id,
                     query_text,
                     self.cfg.models.qa,
@@ -430,7 +451,7 @@ class SingleQuestionRunner:
             else:
                 runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=single query='%s' top_k=%d",
                               qid, memory_id, query_text[:100], self.cfg.params.top_k)
-                sr = MemoryManager(invoker._mcp, debug=False).search_memories(
+                sr = memory_manager.search_memories(
                     memory_id, query=query_text, top_k=self.cfg.params.top_k
                 )
 

@@ -1,10 +1,21 @@
 # LongMemEval Benchmarker
 
-The benchmarker allows us to run the LongMemEval benchmark using Mycelian Memory as the backend. Please refer to the benchmarker [design doc](../../docs/designs/langgraph_longmemeval_benchmarker.md) to learn more. 
+The benchmarker allows us to run the LongMemEval benchmark using Mycelian Memory as the backend. Please refer to the benchmarker [design doc](../../docs/designs/langgraph_longmemeval_benchmarker.md) to learn more.
 
-LongMemEval is designed to test not just the performance of the memory system but also its scale. The large version contains 500 questions. Each question is composed of 500 sessions. Each session contains turns between a user and an assistant. To evaluate real world performance, we must store memories as a production agent will. This creates scaling challenges. Answering a single question of smaller dataset with ~50 sessions requires ~60 mins with Claude Haiku 3.5. Hence, the benchmarker supports sharding by questions and processing each question in parallel. **IMPORTANT**: we DO NOT parallelize sessions inside a question as the Memory Agent must build chronological context. 
+LongMemEval is designed to test not just the performance of the memory system but also its scale. The large version contains 500 questions. Each question is composed of 500 sessions. Each session contains turns between a user and an assistant. To evaluate real world performance, we must store memories as a production agent will. This creates scaling challenges. Answering a single question of smaller dataset with ~50 sessions requires ~60 mins with Claude Haiku 3.5. Hence, the benchmarker supports sharding by questions and processing each question in parallel. **IMPORTANT**: we DO NOT parallelize sessions inside a question as the Memory Agent must build chronological context.
 
 Note: Running many questions in parallel can hit provider rate limits. The sampler script allows extracting a representative subset from `longmemeval_{s/m}.json` files.
+
+## ⚠️ IMPORTANT: Use the Orchestrator
+
+**The Huey Orchestrator is the authoritative and recommended way to run the benchmark.** It provides:
+- Task queue management with automatic retries
+- Progress tracking and resumability
+- Parallel processing with multiple workers
+- Real-time monitoring with Rich UI
+- Crash recovery and session-level resume
+
+All other runner scripts are deprecated and should not be used.
 
 ## Prerequisites
 
@@ -12,7 +23,7 @@ Note: Running many questions in parallel can hit provider rate limits. The sampl
    ```bash
    # Start the backend memory service
    make start-dev-mycelian-server
-   
+
    # Start the MCP server for benchmarker communication
    make start-mcp-streamable-server
    ```
@@ -130,27 +141,45 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
    # Edit run.toml to set dataset_file_path, provider/models, vault_title
    ```
 
-2. **Run the benchmarker**:
+2. **Run the benchmark with the Orchestrator**:
    ```bash
    source venv/bin/activate
-   python -m src.benchmarker run.toml
-   
-   # Run with parallel workers (default is 1)
-   python -m src.benchmarker run.toml --workers 4
-   
-   # Run specific modes
-   python -m src.benchmarker run.toml --mode ingestion  # Only ingest sessions
-   python -m src.benchmarker run.toml --mode qa         # Only run QA (requires existing memory)
-   python -m src.benchmarker run.toml --mode full       # Run both (default)
+
+   # Auto mode (recommended): Start, monitor, and shutdown automatically
+   python -m huey_orchestrator.orchestrator run.toml --auto --workers 3
+
+   # Or run with custom run ID
+   python -m huey_orchestrator.orchestrator run.toml --auto --workers 3 --run-id my_benchmark_run
+
+   # Process only first N questions
+   python -m huey_orchestrator.orchestrator run.toml --auto --workers 3 --num-questions 10
    ```
 
-3. **Check results**:
+3. **Resume a failed/incomplete run**:
+   ```bash
+   # Resume from where it left off (default behavior)
+   python -m huey_orchestrator.orchestrator run.toml --resume --run-id my_benchmark_run
+
+   # Force retry failed questions
+   python -m huey_orchestrator.orchestrator run.toml --resume --run-id my_benchmark_run --force
+
+   # Restart questions from beginning (clears memory)
+   python -m huey_orchestrator.orchestrator run.toml --resume --run-id my_benchmark_run \
+     --resume-mode restart-from-first-session
+   ```
+
+4. **Monitor progress** (separate terminal):
+   ```bash
+   python -m huey_orchestrator.orchestrator run.toml --monitor --run-id my_benchmark_run
+   ```
+
+5. **Check results**:
    ```bash
    cat out/run_<RUN_ID>/hypotheses.jsonl
    ls out/run_<RUN_ID>/logs/  # Per-question logs
    ```
 
-4. **Evaluate with LongMemEval's official QA evaluator** (if using full dataset):
+6. **Evaluate with LongMemEval's official QA evaluator** (if using full dataset):
    ```bash
    cd /path/to/LongMemEval/src/evaluation
    python3 evaluate_qa.py gpt-4o \
@@ -162,18 +191,29 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
 
 ```
 tools/longmemeval-benchmarker/
+├── huey_orchestrator/              # 🎯 MAIN: Orchestration layer (USE THIS)
+│   ├── orchestrator.py             # Main CLI for running benchmarks
+│   ├── tasks.py                    # Task definitions
+│   ├── worker.py                   # Worker process
+│   ├── progress_tracker.py         # SQLite progress tracking
+│   └── huey_config.py              # Queue configuration
 ├── src/
-│   ├── benchmarker.py              # Main entrypoint: config/dataset/vault/dirs → workers
+│   ├── single_question_runner.py   # Core logic for processing questions
 │   ├── dataset_loader.py           # Load and parse LongMemEval JSON files
-│   ├── mycelian_memory_agent.py    # LangGraph agent with MCP tools for memory operations
+│   ├── mycelian_memory_agent/      # Agent implementation
+│   │   ├── agent.py                # LangGraph agent with MCP tools
+│   │   ├── build.py                # Agent factory
+│   │   └── mcp_utils.py            # MCP client utilities
 │   ├── memory_manager.py           # Vault/memory management via MCP
-│   ├── single_question_runner.py   # Process one question end-to-end (ingestion + QA)
-│   ├── worker_manager.py           # Sequential/parallel orchestration + logging
-│   ├── tenacious_agent_invoker.py  # Retry logic for agent calls
-│   └── lme_sampler.py              # Extract subsets from full datasets
-├── config.example.toml             # Example configuration
-├── config.1s.toml                  # Single question test config
-├── longmemeval_0a995998.json       # Sample dataset for testing
+│   └── model_providers.py          # LLM provider abstractions
+├── config/                         # Configuration files
+│   ├── config.example.toml         # Example configuration
+│   ├── config.smoke.toml           # Smoke test config
+│   └── config.5s.toml              # 5-question test config
+├── data/                           # Runtime databases
+│   ├── progress.db                 # Progress tracking
+│   └── huey_tasks.db               # Task queue
+├── debug_qa.py                     # QA debugging tool
 ├── requirements.txt                # Python dependencies
 └── README.md                       # This file
 ```
@@ -187,11 +227,18 @@ The benchmarker uses TOML configuration files. Key settings:
 - `models.agent`: Model for the memory agent (supports OpenAI, Vertex AI, OpenRouter)
 - `models.qa`: Model for question answering (defaults to agent model)
 
-CLI arguments:
-- `--workers`: Number of parallel workers (default: 1)
-- `--mode`: Execution mode - `ingestion`, `qa`, or `full` (default: full)
-- `--memory-id`: Memory ID for QA-only mode
-- `--vault-id`: Vault ID for QA-only mode
+### Orchestrator CLI Options
+
+- `--auto`: Automatically start worker, monitor progress, and shut down on completion
+- `--workers N`: Number of worker processes to use
+- `--num-questions N`: Process only first N questions
+- `--run-id ID`: Specify custom run ID (auto-generated if not provided)
+- `--resume`: Resume an existing run
+- `--resume-mode`: How to resume (`restart-from-first-session` or `resume-from-next-session`)
+- `--force`: Force retry failed questions during resume
+- `--monitor`: Monitor mode - show progress without enqueueing
+- `--stop`: Stop all running benchmarker processes
+- `--clear-state`: Delete all orchestrator state (databases)
 
 ## How It Works
 
@@ -202,7 +249,7 @@ For each question in the dataset, the benchmarker:
    - `add_entry`: Store individual messages
    - `put_context`: Save consolidated context
    - `await_consistency`: Ensure writes are committed
-3. **Question Answering**: 
+3. **Question Answering**:
    - `search_memories`: Retrieve relevant context
    - Call QA model with retrieved context
    - Append `{question_id, hypothesis}` to `out/run_<RUN_ID>/hypotheses.jsonl`
@@ -238,3 +285,20 @@ If you hit OpenAI rate limits, reduce `workers` or add delays in the retry logic
 - **No Go PATH needed**: The benchmarker is pure Python and connects via HTTP/MCP
 - **Chronological ordering**: Sessions within a question are processed sequentially to maintain temporal context
 - **Parallel processing**: Only questions can be parallelized, not sessions within a question
+
+## ⚠️ Deprecated Methods (DO NOT USE)
+
+The following runner scripts are deprecated and should not be used:
+
+### Deprecated Scripts
+- `python -m src.benchmarker` - Old direct benchmarker module
+- `./run_benchmark.py` - Legacy benchmark runner script
+- `run_qa_phase.py` - Standalone QA runner with hardcoded values
+- `simple_qa_test.py` - Simple test script
+- `src/single_question_runner_cli.py` - Direct single question CLI
+
+These scripts lack the robustness, monitoring, and resumability features of the orchestrator. They are kept only for historical reference and will be removed in a future version.
+
+### Still Supported Tools
+- `debug_qa.py` - Useful for debugging QA on specific memories
+- `validate_dataset.py` - Dataset validation utility
