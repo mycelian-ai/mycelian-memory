@@ -85,6 +85,71 @@ def _stop_worker_subprocess(proc: Optional[subprocess.Popen]) -> None:
         pass
 
 
+_KILL_PATTERNS = (
+    "python -m huey_orchestrator.worker",
+    "python -m huey_orchestrator.orchestrator",
+)
+
+
+def _ps_list() -> List[tuple[int, int, str]]:
+    """Return list of (pid, pgid, cmd)."""
+    out = subprocess.check_output(["ps", "-eo", "pid,pgid,command"], text=True)
+    rows: List[tuple[int, int, str]] = []
+    for line in out.splitlines()[1:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parts = line.split(None, 2)
+            if len(parts) < 3:
+                continue
+            pid = int(parts[0])
+            pgid = int(parts[1])
+            cmd = parts[2]
+            rows.append((pid, pgid, cmd))
+        except Exception:
+            continue
+    return rows
+
+
+def _find_benchmarker_procs() -> tuple[List[tuple[int, int, str]], List[int]]:
+    rows = _ps_list()
+    targets = [r for r in rows if any(pat in r[2] for pat in _KILL_PATTERNS)]
+    pgids = sorted({r[1] for r in targets})
+    return targets, pgids
+
+
+def _pgid_alive(pgid: int) -> bool:
+    try:
+        return any(r[1] == pgid for r in _ps_list())
+    except Exception:
+        return False
+
+
+def _kill_group(pgid: int, timeout: float = 5.0) -> str:
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return f"pgid {pgid}: already gone"
+    except Exception as e:
+        return f"pgid {pgid}: SIGTERM failed: {e}"
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _pgid_alive(pgid):
+            return f"pgid {pgid}: terminated"
+        time.sleep(0.2)
+
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return f"pgid {pgid}: terminated after SIGTERM"
+    except Exception as e:
+        return f"pgid {pgid}: SIGKILL failed: {e}"
+    time.sleep(0.2)
+    return f"pgid {pgid}: killed" if not _pgid_alive(pgid) else f"pgid {pgid}: WARNING still alive"
+
+
 def _state_paths() -> List[Path]:
     """Return list of orchestrator state files to delete."""
     data_dir = BENCHMARKER_ROOT / 'data'
@@ -196,16 +261,37 @@ def generate_run_id() -> str:
               help='Automatically start worker, monitor progress, and shut down on completion')
 @click.option('--clear-state', is_flag=True,
               help='Delete all orchestrator state (huey_tasks.db*, progress.db*) and exit')
+@click.option('--stop', is_flag=True,
+              help='Stop all running benchmarker processes (workers and orchestrators) and exit')
 def main(config_path: str, num_questions: Optional[int],
-         resume: bool, run_id: Optional[str], workers: int, monitor: bool, auto: bool, clear_state: bool):
+         resume: bool, run_id: Optional[str], workers: int, monitor: bool, auto: bool, clear_state: bool,
+         stop: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
 
     CONFIG_PATH: Path to configuration TOML file
     """
 
+    # Stop processes early if requested
+    if stop:
+        targets, pgids = _find_benchmarker_procs()
+        click.echo("Found processes:" if targets else "No benchmarker processes found.")
+        for pid, pgid, cmd in targets:
+            click.echo(f"  pid={pid} pgid={pgid} cmd={cmd}")
+        if targets:
+            if click.confirm("Terminate these process groups?", default=False):
+                for g in pgids:
+                    click.echo(_kill_group(g))
+            else:
+                click.echo("Aborted.")
+                return 1
+        if clear_state:
+            click.echo("\nClearing orchestrator state files…")
+            _clear_orchestrator_state()
+        return 0
+
     # Clear state if requested (no config required)
-    if clear_state:
+    if clear_state and not auto and not monitor and not resume and not run_id and not config_path:
         click.echo("You are about to DELETE all orchestrator state (Huey queue and progress DB).\n")
         click.echo("Files to be removed:")
         for p in _state_paths():
