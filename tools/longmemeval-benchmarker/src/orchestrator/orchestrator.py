@@ -20,7 +20,7 @@ from typing import List, Dict, Optional
 
 import tomllib  # Python 3.11+
 
-from huey_orchestrator.progress_tracker import ProgressTracker
+from src.orchestrator.progress_tracker import ProgressTracker
 
 # Configure logging
 logging.basicConfig(
@@ -64,7 +64,7 @@ def _start_worker_subprocess(workers: int, queue_name: str) -> subprocess.Popen:
         if queue_name.startswith('huey-'):
             run_id = queue_name[5:]  # Remove "huey-" prefix
             env['HUEY_RUN_ID'] = run_id
-    cmd = [sys.executable, '-m', 'huey_orchestrator.worker', '--workers', str(max(1, workers))]
+    cmd = [sys.executable, '-m', 'src.orchestrator.worker', '--workers', str(max(1, workers))]
     # Run from the benchmarker root so relative paths and package imports work
     proc = subprocess.Popen(
         cmd,
@@ -93,8 +93,8 @@ def _stop_worker_subprocess(proc: Optional[subprocess.Popen]) -> None:
 
 
 _KILL_PATTERNS = (
-    "python -m huey_orchestrator.worker",
-    "python -m huey_orchestrator.orchestrator",
+    "python -m src.orchestrator.worker",
+    "python -m src.orchestrator.orchestrator",
 )
 
 
@@ -388,7 +388,7 @@ def main(config_path: str, num_questions: Optional[int],
     os.environ['HUEY_RUN_ID'] = run_id
     # Import tasks now so they see the queue name and log file path
     global _TASKS_MOD
-    from huey_orchestrator import tasks as _tasks  # type: ignore
+    from src.orchestrator import tasks as _tasks  # type: ignore
     _TASKS_MOD = _tasks
 
     # Get questions to process
@@ -523,9 +523,9 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("="*60)
         click.echo(f"\nRun ID: {run_id}")
         click.echo(f"\nStart workers to process tasks:")
-        click.echo(f"  HUEY_QUEUE_NAME={queue_name} HUEY_RUN_ID={run_id} PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.worker --workers {workers}")
+        click.echo(f"  HUEY_QUEUE_NAME={queue_name} HUEY_RUN_ID={run_id} PYTHONPATH={BENCHMARKER_ROOT} python -m src.orchestrator.worker --workers {workers}")
         click.echo(f"\nMonitor progress:")
-        click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.orchestrator {config_path} --monitor --run-id {run_id}")
+        click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m src.orchestrator.orchestrator {config_path} --monitor --run-id {run_id}")
 
         return 0
 
@@ -543,7 +543,7 @@ def enqueue_question(question_data: Dict, run_id: str, config_path: str,
     global _TASKS_MOD
     if _TASKS_MOD is None:
         # Fallback: import with current environment
-        from huey_orchestrator import tasks as _tasks  # type: ignore
+        from src.orchestrator import tasks as _tasks  # type: ignore
         _TASKS_MOD = _tasks
     _TASKS_MOD.process_question(
         run_id=run_id,

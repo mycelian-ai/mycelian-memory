@@ -18,13 +18,13 @@ import fcntl
 # Add parent directory to path to import existing modules BEFORE importing runner modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from huey_orchestrator.progress_tracker import ProgressTracker
+from src.orchestrator.progress_tracker import ProgressTracker
 from single_question_runner import SingleQuestionRunner
 from benchmarker import parse_config
 from memory_manager import MemoryManager
 from mycelian_memory_agent import create_mcp_client
 
-from huey_orchestrator.huey_config import (
+from src.orchestrator.orchestrator_config import (
     huey,
     DEFAULT_TASK_RETRIES,
     DEFAULT_RETRY_DELAY,

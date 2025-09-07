@@ -30,9 +30,9 @@ HUEY_QUEUE_NAME = os.environ.get('HUEY_QUEUE_NAME', 'default')
 
 # Per-run log file: pick up run_id from environment for log file path
 HUEY_RUN_ID = os.environ.get('HUEY_RUN_ID', 'default')
-HUEY_LOG_DIR = _BASE_DIR / 'logs' / HUEY_RUN_ID
-HUEY_LOG_DIR.mkdir(parents=True, exist_ok=True)
-HUEY_LOG_FILE = HUEY_LOG_DIR / 'huey_orchestrator.log'
+ORCHESTRATOR_LOG_DIR = _BASE_DIR / 'logs' / HUEY_RUN_ID
+ORCHESTRATOR_LOG_DIR.mkdir(parents=True, exist_ok=True)
+ORCHESTRATOR_LOG_FILE = ORCHESTRATOR_LOG_DIR / 'orchestrator.log'
 
 # Create Huey instance for asynchronous execution only
 huey = SqliteHuey(filename=HUEY_DB_PATH, name=HUEY_QUEUE_NAME, immediate=False)

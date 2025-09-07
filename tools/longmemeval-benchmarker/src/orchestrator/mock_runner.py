@@ -23,29 +23,29 @@ def mock_single_question_runner(
 ):
     """
     Mock implementation of single_question_runner.
-    
+
     Args:
         question_json_path: Path to JSON file with question data
         config_path: Path to config TOML (ignored in mock)
         memory_title: Title for the memory (e.g., "run_123_abc123")
         start_session_index: Session index to start from
         output_dir: Directory for outputs
-    
+
     Returns:
         JSON string with results
     """
     # Load question data
     with open(question_json_path, 'r') as f:
         question_data = json.load(f)
-    
+
     question_id = question_data['question_id']
     sessions = question_data.get('haystack_sessions', [])
     total_sessions = len(sessions)
-    
+
     print(f"[MOCK] Processing question {question_id}")
     print(f"[MOCK] Memory title: {memory_title}")
     print(f"[MOCK] Starting from session {start_session_index}/{total_sessions}")
-    
+
     # Simulate vault/memory creation (only if starting from beginning)
     if start_session_index == 0:
         vault_id = f"vault-{uuid.uuid4()}"
@@ -58,27 +58,27 @@ def mock_single_question_runner(
         memory_id = f"memory-existing-{question_id[:8]}"
         print(f"[MOCK] Using existing vault: {vault_id}")
         print(f"[MOCK] Using existing memory: {memory_id}")
-    
+
     # Process sessions
     sessions_completed = 0
     messages_processed = 0
-    
+
     for idx in range(start_session_index, total_sessions):
         session = sessions[idx]
-        
+
         # Simulate processing time (faster than real)
         process_time = random.uniform(0.1, 0.3)
         time.sleep(process_time)
-        
+
         # Count messages in session
         session_messages = len(session) if isinstance(session, list) else 0
         messages_processed += session_messages
         sessions_completed += 1
-        
+
         # Log progress every 10 sessions
         if (idx + 1) % 10 == 0 or (idx + 1) == total_sessions:
             print(f"[MOCK] Progress: {idx + 1}/{total_sessions} sessions")
-        
+
         # Simulate occasional failure (5% chance)
         if random.random() < 0.05 and idx > start_session_index:
             print(f"[MOCK] Simulated failure at session {idx}")
@@ -95,9 +95,9 @@ def mock_single_question_runner(
                 "error": f"Simulated failure at session {idx}"
             }
             return json.dumps(result)
-    
+
     print(f"[MOCK] Completed all {sessions_completed} sessions")
-    
+
     # Return success result
     result = {
         "status": "success",
@@ -110,7 +110,7 @@ def mock_single_question_runner(
         "messages_processed": messages_processed,
         "processing_time": random.uniform(1, 5)
     }
-    
+
     return json.dumps(result)
 
 
@@ -123,39 +123,39 @@ def mock_qa_runner(
 ):
     """
     Mock implementation of QA runner.
-    
+
     Args:
         question_json_path: Path to JSON file with question data
         vault_id: Mycelian vault ID
         memory_id: Mycelian memory ID
         config_path: Path to config TOML
         output_dir: Directory for outputs
-    
+
     Returns:
         JSON string with QA results
     """
     # Load question data
     with open(question_json_path, 'r') as f:
         question_data = json.load(f)
-    
+
     question_id = question_data['question_id']
     expected_answer = question_data.get('answer', '')
-    
+
     print(f"[MOCK QA] Running QA for question {question_id}")
     print(f"[MOCK QA] Using memory: {memory_id} in vault: {vault_id}")
-    
+
     # Simulate QA processing
     time.sleep(random.uniform(0.5, 1.5))
-    
+
     # Generate mock answer (sometimes correct, sometimes not)
     is_correct = random.random() > 0.3  # 70% accuracy
     if is_correct:
         predicted_answer = expected_answer
     else:
         predicted_answer = f"Wrong answer for {question_id}"
-    
+
     print(f"[MOCK QA] Generated answer: {predicted_answer[:50]}...")
-    
+
     # Create hypothesis
     hypothesis = {
         "question_id": question_id,
@@ -167,7 +167,7 @@ def mock_qa_runner(
         "memory_id": memory_id,
         "timestamp": datetime.now().isoformat()
     }
-    
+
     # Write hypothesis to file if output_dir provided
     if output_dir:
         output_path = Path(output_dir)
@@ -176,7 +176,7 @@ def mock_qa_runner(
         with open(hypothesis_file, 'w') as f:
             json.dump(hypothesis, f, indent=2)
         print(f"[MOCK QA] Wrote hypothesis to {hypothesis_file}")
-    
+
     return json.dumps({
         "status": "success",
         "question_id": question_id,
@@ -194,7 +194,7 @@ def main():
                        help='Path to question JSON file')
     parser.add_argument('--config', required=True,
                        help='Path to config TOML file')
-    parser.add_argument('--memory-title', 
+    parser.add_argument('--memory-title',
                        help='Memory title (for ingest mode)')
     parser.add_argument('--start-session', type=int, default=0,
                        help='Session index to start from (for ingest mode)')
@@ -204,14 +204,14 @@ def main():
                        help='Memory ID (for QA mode)')
     parser.add_argument('--output-dir',
                        help='Output directory')
-    
+
     args = parser.parse_args()
-    
+
     if args.mode == 'ingest':
         if not args.memory_title:
             print("Error: --memory-title required for ingest mode")
             sys.exit(1)
-        
+
         result = mock_single_question_runner(
             question_json_path=args.question_json,
             config_path=args.config,
@@ -220,12 +220,12 @@ def main():
             output_dir=args.output_dir
         )
         print(result)
-    
+
     elif args.mode == 'qa':
         if not args.vault_id or not args.memory_id:
             print("Error: --vault-id and --memory-id required for QA mode")
             sys.exit(1)
-        
+
         result = mock_qa_runner(
             question_json_path=args.question_json,
             vault_id=args.vault_id,

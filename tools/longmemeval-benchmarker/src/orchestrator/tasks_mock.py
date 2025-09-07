@@ -16,7 +16,7 @@ from typing import Dict, Optional
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from huey_config import huey, DEFAULT_TASK_RETRIES, DEFAULT_RETRY_DELAY
+from orchestrator_config import huey, DEFAULT_TASK_RETRIES, DEFAULT_RETRY_DELAY
 from progress_tracker import ProgressTracker
 
 logger = logging.getLogger('orchestrator.tasks.mock')
@@ -32,27 +32,27 @@ def process_question_mock(
 ) -> Dict:
     """
     Process a question using the mock runner for testing.
-    
+
     Args:
         run_id: Unique identifier for this benchmark run
         question_data: Complete question data from dataset
         config_path: Path to configuration TOML file
         start_session_index: Session index to start from (for resume)
         worker_id: Identifier for this worker process
-    
+
     Returns:
         Dict with processing results and statistics
     """
     question_id = question_data['question_id']
     logger.info(f"[MOCK] Worker {worker_id}: Processing question {question_id} from session {start_session_index}")
-    
+
     # Initialize progress tracker
     tracker = ProgressTracker()
-    
+
     try:
         # Create memory name
         memory_title = f"{run_id}_{question_id}"
-        
+
         # Call the mock runner
         result = _run_mock_subprocess(
             question_data=question_data,
@@ -60,27 +60,27 @@ def process_question_mock(
             memory_title=memory_title,
             start_session_index=start_session_index
         )
-        
+
         # Extract vault_id and memory_id from result
         vault_id = result.get('vault_id')
         memory_id = result.get('memory_id')
-        
+
         if vault_id and memory_id:
             tracker.update_vault_memory(run_id, question_id, vault_id, memory_id)
-        
+
         # Update progress
         sessions_completed = result.get('sessions_completed', 0)
         tracker.update_session_progress(run_id, question_id, sessions_completed)
-        
+
         # Mark ingestion as complete if all sessions done
         if sessions_completed == len(question_data.get('haystack_sessions', [])):
             tracker.mark_ingestion_complete(run_id, question_id)
             logger.info(f"[MOCK] Question {question_id}: Ingestion completed ({sessions_completed} sessions)")
         else:
             logger.warning(f"[MOCK] Question {question_id}: Partial completion ({sessions_completed}/{len(question_data.get('haystack_sessions', []))} sessions)")
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"[MOCK] Failed to process question {question_id}: {e}")
         tracker.mark_failed(run_id, question_id, str(e))
@@ -100,7 +100,7 @@ def _run_mock_subprocess(
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(question_data, f)
         question_json_path = f.name
-    
+
     try:
         # Build command for mock runner
         cmd = [
@@ -112,9 +112,9 @@ def _run_mock_subprocess(
             "--memory-title", memory_title,
             "--start-session", str(start_session_index)
         ]
-        
+
         logger.info(f"[MOCK] Running subprocess: {' '.join(cmd[:3])}...")
-        
+
         # Run subprocess
         result = subprocess.run(
             cmd,
@@ -122,10 +122,10 @@ def _run_mock_subprocess(
             text=True,
             timeout=30  # Shorter timeout for mock
         )
-        
+
         if result.returncode != 0:
             raise RuntimeError(f"Mock subprocess failed: {result.stderr}")
-        
+
         # Parse JSON output
         output_lines = result.stdout.strip().split('\n')
         json_output = None
@@ -133,12 +133,12 @@ def _run_mock_subprocess(
             if line.strip().startswith('{'):
                 json_output = line
                 break
-        
+
         if not json_output:
             raise ValueError(f"No JSON output found in subprocess output")
-        
+
         result_data = json.loads(json_output)
-        
+
         # Map to expected format
         return {
             'vault_id': result_data.get('vault_id'),
@@ -148,7 +148,7 @@ def _run_mock_subprocess(
             'status': result_data.get('status', 'unknown'),
             'error': result_data.get('error')
         }
-        
+
     finally:
         # Clean up temp file
         os.unlink(question_json_path)

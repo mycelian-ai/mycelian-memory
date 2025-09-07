@@ -1,4 +1,4 @@
-# Huey Orchestrator for LongMemEval Benchmarker
+# Orchestrator for LongMemEval Benchmarker
 
 This directory contains the Huey-based orchestration layer for the LongMemEval benchmarker. It provides task queue management, progress tracking, and resumability without modifying the existing benchmarker code.
 
@@ -32,7 +32,7 @@ Mycelian Memory Service
 
 Start a new run (enqueue questions only):
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --num-questions 10 \
     --workers 3
@@ -40,7 +40,7 @@ PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
 
 Resume a run (default: resume-from-next-session):
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --resume \
     --run-id run_1234567890
@@ -49,13 +49,13 @@ PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
 Resume with explicit mode:
 ```bash
 # Restart from first session (clears memory_id, resets counters)
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --resume --run-id run_1234567890 \
     --resume-mode restart-from-first-session
 
 # Resume from next session (keep memory_id, continue from completed_sessions)
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --resume --run-id run_1234567890 \
     --resume-mode resume-from-next-session
@@ -63,40 +63,40 @@ PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
 
 Force retry failed questions during resume:
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --resume --run-id run_1234567890 --force
 ```
 
 Monitor progress (no enqueue):
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --monitor --run-id run_1234567890
 ```
 
 Auto mode (enqueue → start worker → monitor → shutdown):
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator \
+python -m src.orchestrator.orchestrator \
     /absolute/path/to/config.toml \
     --auto --workers 3
 ```
 
 Stop workers and orchestrators, optionally clear state:
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator --stop [--force] [--clear-state]
+python -m src.orchestrator.orchestrator --stop [--force] [--clear-state]
 ```
 
 Clear orchestrator state (task DB and progress DB) only:
 ```bash
-PYTHONPATH=.. python -m huey_orchestrator.orchestrator --clear-state
+python -m src.orchestrator.orchestrator --clear-state
 ```
 
 ### Worker
 
 Start workers (separate terminal):
 ```bash
-PYTHONPATH=.. HUEY_QUEUE_NAME=huey-<run_id> HUEY_RUN_ID=<run_id> python -m huey_orchestrator.worker --workers 3
+HUEY_QUEUE_NAME=huey-<run_id> HUEY_RUN_ID=<run_id> python -m src.orchestrator.worker --workers 3
 ```
 
 ### Single-question CLI (advanced)
