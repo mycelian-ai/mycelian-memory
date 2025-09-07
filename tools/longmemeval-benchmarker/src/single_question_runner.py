@@ -6,9 +6,9 @@ import json
 import os
 import time
 
-from mycelian_memory_agent.build import build_agent_with_invoker
-from mycelian_memory_agent.mcp_utils import create_mcp_client
-from memory_manager import MemoryManager
+from src.mycelian_memory_agent.build import build_agent_with_invoker
+from src.mycelian_memory_agent.mcp_utils import create_mcp_client
+from src.memory_manager import MemoryManager
 from pathlib import Path
 import sqlite3
 
@@ -44,7 +44,7 @@ def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:
-    from model_providers import get_chat_model
+    from src.model_providers import get_chat_model
 
     prompt = (
         "You are a helpful assistant. Answer the question using the provided memory context.\n"
@@ -69,7 +69,7 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
     Analysis: Check if results contain relevant information or need refinement.
     Second pass (optional): Refined search based on first pass analysis.
     """
-    from model_providers import get_chat_model
+    from src.model_providers import get_chat_model
 
     if logger is None:
         logger = logging.getLogger("lme.runner")
@@ -421,7 +421,7 @@ class SingleQuestionRunner:
             runner_log.info("AWAIT_CONSISTENCY qid=%s memory_id=%s", qid, memory_id)
             # Use MCP client directly to call await_consistency
             import asyncio
-            from async_utils import run as run_async
+            from src.async_utils import run as run_async
             async def await_consistency():
                 tools = await invoker._mcp.get_tools()
                 for tool in tools:

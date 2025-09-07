@@ -21,11 +21,11 @@ import time
 import logging
 from typing import Any, Dict, List
 
-from dataset_loader import load_longmemeval_file
-from mycelian_memory_agent import create_mcp_client
-from mycelian_memory_agent.build import build_agent_with_invoker
-from memory_manager import MemoryManager
-from single_question_runner import SingleQuestionRunner
+from src.dataset_loader import load_longmemeval_file
+from src.mycelian_memory_agent import create_mcp_client
+from src.mycelian_memory_agent.build import build_agent_with_invoker
+from src.memory_manager import MemoryManager
+from src.single_question_runner import SingleQuestionRunner
 
 # Minimal helpers (replacing the deleted runner module)
 
@@ -40,7 +40,7 @@ def run_model_healthcheck(model_id: str, model_type: str = "agent") -> None:
         Exception: If the model is not accessible
     """
     import time
-    from model_providers import get_chat_model
+    from src.model_providers import get_chat_model
 
     start_time = time.time()
     print(f"[benchmarker] HEALTHCHECK START: {model_type} model: {model_id} at {time.strftime('%Y-%m-%d %H:%M:%S')}")

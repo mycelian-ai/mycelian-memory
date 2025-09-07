@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 import asyncio
-from async_utils import run as run_async
+from src.async_utils import run as run_async
 
 
 class MemoryManager:

@@ -2,11 +2,11 @@
 
 import asyncio
 from typing import Optional
-from model_providers import get_chat_model
+from src.model_providers import get_chat_model
 from .agent import MycelianMemoryAgent
 from .agent_invoker import MycelianAgentInvoker
 from .mcp_utils import create_mcp_client
-from async_utils import run as run_async
+from src.async_utils import run as run_async
 
 
 def build_agent_with_invoker(

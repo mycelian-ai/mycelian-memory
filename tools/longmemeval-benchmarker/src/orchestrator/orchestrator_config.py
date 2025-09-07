@@ -60,7 +60,7 @@ LOGGING_CONFIG = {
         },
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': str(HUEY_LOG_FILE),
+            'filename': str(ORCHESTRATOR_LOG_FILE),
             'maxBytes': 10485760,  # 10MB
             'backupCount': 5,
             'formatter': 'standard'

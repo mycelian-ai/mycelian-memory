@@ -15,7 +15,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
 from .control_state import ControlState
-from async_utils import run as run_async
+from src.async_utils import run as run_async
 
 # Setup logger for audit trail
 # Using "lme.agent" to integrate with benchmarker's logging system
