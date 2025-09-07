@@ -11,12 +11,15 @@ import logging
 import subprocess
 import tempfile
 from pathlib import Path
+from datetime import datetime
+import tomllib
 from typing import Dict, Optional, Tuple
+import fcntl
 
 # Add parent directory to path to import existing modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from .huey_config import (
+from huey_orchestrator.huey_config import (
     huey,
     DEFAULT_TASK_RETRIES,
     DEFAULT_RETRY_DELAY,
@@ -24,7 +27,11 @@ from .huey_config import (
     QA_TIMEOUT_SEC,
     LOGS_DIR,
 )
-from .progress_tracker import ProgressTracker
+from huey_orchestrator.progress_tracker import ProgressTracker
+from single_question_runner import SingleQuestionRunner
+from benchmarker import parse_config
+from memory_manager import MemoryManager
+from mycelian_memory_agent import create_mcp_client
 
 logger = logging.getLogger('orchestrator.tasks')
 
@@ -48,6 +55,57 @@ _SRC_DIR = Path(__file__).parent.parent / "src"
 _BENCH_SCRIPT = _SRC_DIR / "benchmarker.py"
 
 
+def _atomic_write_json(target: Path, payload: Dict) -> None:
+    """Atomically write JSON by writing to a temp file and renaming."""
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(target.suffix + ".tmp")
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False)
+        os.replace(tmp, target)
+    except Exception:
+        # Best effort; avoid crashing the task for artifact write issues
+        pass
+
+
+def _merge_result_json(target: Path, updates: Dict) -> None:
+    """Merge updates into existing result.json and write atomically."""
+    existing: Dict = {}
+    try:
+        if target.exists():
+            existing = json.loads(target.read_text(encoding='utf-8') or '{}')
+    except Exception:
+        existing = {}
+    existing.update(updates)
+    existing['updated_at'] = datetime.utcnow().isoformat() + 'Z'
+    _atomic_write_json(target, existing)
+
+
+def _append_jsonl_atomic(target: Path, record: Dict) -> None:
+    """Append a single JSON record as a line to a JSONL file with best-effort locking."""
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, 'a', encoding='utf-8') as f:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            except Exception:
+                # If flock is unavailable, proceed without locking
+                pass
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+    except Exception:
+        # Do not fail the task due to artifact write issues
+        pass
+
+
 @huey.task(retries=DEFAULT_TASK_RETRIES, retry_delay=DEFAULT_RETRY_DELAY)
 def process_question(
     run_id: str,
@@ -56,21 +114,21 @@ def process_question(
 ) -> Dict:
     """
     Process a single question by calling the existing single_question_runner.
-    
+
     Args:
         run_id: Unique identifier for this benchmark run
         question_data: Complete question data from dataset
         config_path: Path to configuration TOML file
         start_session_index: Session index to start from (for resume)
         worker_id: Identifier for this worker process
-    
+
     Returns:
         Dict with processing results and statistics
     """
     _log_startup_config()
     logger.info(f"Worker {worker_id}: Processing question {question_id}")
     tracker = ProgressTracker()
-    
+
     try:
         # Load config path and question JSON from DB
         run_cfg = tracker.get_run_config(run_id) or {}
@@ -97,10 +155,10 @@ def process_question(
         # Compute resume start index from DB
         start_session_index = int(details.get('completed_sessions', 0)) if details else 0
 
-        # Create memory name and run subprocess
+        # Create memory name and run in-process runner
         memory_title = f"{run_id}_{question_id}"
         # Pass vault_id and memory_id if resuming
-        result = _run_single_question_subprocess(
+        result = _run_single_question_inprocess(
             question_data=question_data,
             config_path=config_path,
             memory_title=memory_title,
@@ -109,18 +167,24 @@ def process_question(
             vault_id=details.get('vault_id') if details else None,
             memory_id=details.get('memory_id') if details else None
         )
-        
-        # Extract vault_id and memory_id from result
+
+        # Extract vault_id and memory_id from result; fallback to DB
         vault_id = result.get('vault_id')
         memory_id = result.get('memory_id')
-        
+        details_after = tracker.get_question_details(run_id, question_id) or {}
+        if not vault_id:
+            vault_id = details_after.get('vault_id')
+        if not memory_id:
+            memory_id = details_after.get('memory_id')
         if vault_id and memory_id:
             tracker.update_vault_memory(run_id, question_id, vault_id, memory_id)
-        
-        # Update progress
-        sessions_completed = result.get('sessions_completed', 0)
+
+        # Update sessions from result or DB
+        sessions_completed = result.get('sessions_completed')
+        if sessions_completed is None:
+            sessions_completed = int(details_after.get('completed_sessions') or 0)
         tracker.update_session_progress(run_id, question_id, sessions_completed)
-        
+
         # Mark ingestion as complete when completed sessions match expected total
         total_sessions = (
             (details.get('total_sessions') if details else None)
@@ -132,14 +196,14 @@ def process_question(
         if sessions_completed == total_sessions:
             tracker.mark_ingestion_complete(run_id, question_id)
             logger.info(f"Question {question_id}: Ingestion completed ({sessions_completed} sessions)")
-            
+
             # Enqueue QA task by ID (task will load from DB)
             run_qa(run_id, question_id)
         else:
             logger.warning(f"Question {question_id}: Partial completion ({sessions_completed}/{len(question_data.get('haystack_sessions', []))} sessions)")
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Failed to process question {question_id}: {e}")
         tracker.mark_failed(run_id, question_id, str(e))
@@ -153,21 +217,21 @@ def run_qa(
 ) -> Dict:
     """
     Run QA phase for a completed question.
-    
+
     Args:
         run_id: Unique identifier for this benchmark run
         question_id: Question identifier
         vault_id: Mycelian vault UUID
         memory_id: Mycelian memory UUID
         config_path: Path to configuration TOML file
-    
+
     Returns:
         Dict with QA results
     """
     _log_startup_config()
     logger.info(f"Running QA for question {question_id}")
     tracker = ProgressTracker()
-    
+
     try:
         # Load config, question, and ids from DB
         run_cfg = tracker.get_run_config(run_id) or {}
@@ -185,28 +249,31 @@ def run_qa(
 
         tracker.mark_qa_in_progress(run_id, question_id)
 
-        # Call QA runner subprocess
-        result = _run_qa_subprocess(
-            question_id=question_id,
+        # Load full question JSON for QA context
+        question_data = tracker.get_question_json(run_id, question_id) or {'question_id': question_id}
+
+        # Call QA runner in-process
+        result = _run_qa_inprocess(
+            question_data=question_data,
             vault_id=vault_id,
             memory_id=memory_id,
             config_path=config_path,
-            output_dir=f"out/{run_id}"
+            run_id=run_id
         )
-        
+
         # Mark QA as complete
         tracker.mark_qa_complete(run_id, question_id)
         logger.info(f"Question {question_id}: QA completed")
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"QA failed for question {question_id}: {e}")
         tracker.mark_failed(run_id, question_id, f"QA failed: {str(e)}")
         raise
 
 
-def _run_single_question_subprocess(
+def _run_single_question_inprocess(
     question_data: Dict,
     config_path: str,
     memory_title: str,
@@ -215,202 +282,144 @@ def _run_single_question_subprocess(
     vault_id: Optional[str] = None,
     memory_id: Optional[str] = None
 ) -> Dict:
-    """
-    Run single_question_runner as a subprocess.
-    
-    This function calls the real runner CLI or mock runner based on environment.
-    """
-    import tempfile
-    
-    # Save question data to temp file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        json.dump(question_data, f)
-        question_json_path = f.name
-    
-    try:
-        # Use benchmarker single-question mode with all options
-        cmd = [
-            sys.executable,
-            str(_BENCH_SCRIPT),
-            "--config", config_path,
-            "--run-id", run_id,
-            "--mode", "ingestion",
-            "--question-id", question_data.get("question_id"),
-            "--start-session", str(start_session_index),
-            "--workers", "1"  # always single-threaded from subprocess
-        ]
-        
-        # Add optional vault_id and memory_id if provided (for resume)
-        if vault_id:
-            cmd.extend(["--vault-id", vault_id])
-        if memory_id:
-            cmd.extend(["--memory-id", memory_id])
-        
-        logger.info(f"Running subprocess: {' '.join(cmd[:3])}...")
-        
-        # Run subprocess
-        # Prepare per-question log file under logs/{run_id}
-        target_run = run_id or "default"
-        logs_dir = Path(LOGS_DIR) / target_run
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        log_file = logs_dir / f"{memory_title}.log"
+    """Run the single-question pipeline in-process inside the worker."""
+    # Prepare directories: logs/<run_id>/ for logs & artifacts, out/run_<run_id>/ for aggregated files
+    target_run = run_id or "default"
+    out_dir = Path("out") / (target_run if target_run.startswith("run_") else f"run_{target_run}")
+    logs_dir = Path(LOGS_DIR) / (run_id or "default")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_path = logs_dir / f"{memory_title}.log"
 
-        # Pass full environment to subprocess
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=QUESTION_PROCESSING_TIMEOUT,
-            env=os.environ.copy(),
-        )
-        
-        if result.returncode != 0:
-            # Write stdout/stderr to log file for triage
-            try:
-                log_file.write_text((result.stdout or '') + "\n" + (result.stderr or ''))
-            except Exception:
-                pass
-            raise RuntimeError(f"Ingestion failed (see {log_file}): {result.stderr.strip()}")
-        
-        # Parse JSON output
-        output_lines = result.stdout.strip().split('\n')
-        # Find the JSON line (last line that starts with '{')
-        json_output = None
-        for line in reversed(output_lines):
-            if line.strip().startswith('{'):
-                json_output = line
-                break
-        
-        if not json_output:
-            raise ValueError(f"No JSON output found in subprocess output")
-        
-        result_data = json.loads(json_output)
-        
-        # Map to expected format
-        return {
-            'vault_id': result_data.get('vault_id'),
-            'memory_id': result_data.get('memory_id'),
-            'sessions_completed': result_data.get('sessions_completed', 0),
-            'messages_processed': result_data.get('messages_processed', 0),
-            'status': result_data.get('status', 'unknown'),
-            'error': result_data.get('error')
-        }
-        
-    finally:
-        # Clean up temp file
-        os.unlink(question_json_path)
+    # Load config and build cfg object
+    with open(config_path, 'rb') as f:
+        cfg_dict = tomllib.load(f)
+    cfg = parse_config(cfg_dict)
+    cfg.run_id = run_id
+
+    # Apply start-session slicing if resuming
+    q = dict(question_data)
+    # Normalize haystack_sessions -> sessions for runner ingestion
+    if not isinstance(q.get('sessions'), list):
+        hs = q.get('haystack_sessions')
+        if isinstance(hs, list):
+            q['sessions'] = [ {'messages': s} if isinstance(s, list) else s for s in hs ]
+    if start_session_index and start_session_index > 0:
+        sessions = q.get('sessions')
+        if isinstance(sessions, list):
+            q['sessions'] = sessions[start_session_index:]
+        else:
+            hs = q.get('haystack_sessions') or []
+            if isinstance(hs, list):
+                q['haystack_sessions'] = hs[start_session_index:]
+
+    # Invoke runner with per-question log
+    with open(log_path, 'a', encoding='utf-8') as qlog:
+        # Ensure MCP client and vault exist; MemoryManager will create/get vault
+        mcp_client = create_mcp_client()
+        mm = MemoryManager(mcp_client, debug=False)
+        # Resolve a valid vault_id from vault_title if not provided
+        if not vault_id:
+            vault_id = mm.ensure_vault(cfg.vault_title, getattr(cfg, 'vault_id', None))
+        runner = SingleQuestionRunner(cfg, mcp_client=mcp_client, mode="ingestion")
+        result = runner.run_question(q, vault_id=vault_id, run_id=run_id, log=qlog, memory_id=memory_id)
+
+    # Read identifiers and counters from DB to ensure consistency
+    tracker = ProgressTracker()
+    qid = q.get("question_id")
+    details = tracker.get_question_details(run_id, qid) or {}
+    artifact = {
+        'vault_id': details.get('vault_id') or result.get('vault_id'),
+        'memory_id': details.get('memory_id') or result.get('memory_id'),
+        'sessions_completed': int(details.get('completed_sessions') or result.get('sessions_completed') or 0),
+        'messages_processed': int(details.get('ingested_messages') or result.get('messages_processed') or 0),
+        'status': 'success',
+        'error': None,
+    }
+    # Write per-question result.json
+    result_path = logs_dir / f"{qid}.result.json"
+    _merge_result_json(result_path, {
+        'run_id': run_id,
+        'question_id': qid,
+        **artifact,
+    })
+    return artifact
 
 
-def _run_qa_subprocess(
-    question_id: str,
+def _run_qa_inprocess(
+    question_data: Dict,
     vault_id: str,
     memory_id: str,
     config_path: str,
-    output_dir: str
+    run_id: str
 ) -> Dict:
-    """
-    Run QA evaluation as a subprocess.
-    
-    This calls the mock QA runner (or real runner when ready).
-    """
-    import tempfile
-    
-    # Need to get question data for QA
-    # In real implementation, this would be passed or loaded from dataset
-    # For now, create minimal question data
-    question_data = {
-        'question_id': question_id,
-        'question': 'Mock question',
-        'answer': 'Mock answer'
+    """Run the QA phase in-process using SingleQuestionRunner."""
+    target_run = run_id or "default"
+    out_dir = Path("out") / (target_run if target_run.startswith("run_") else f"run_{target_run}")
+    logs_dir = Path(LOGS_DIR) / (run_id or "default")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_path = logs_dir / f"{question_data.get('question_id', 'unknown')}_qa.log"
+
+    with open(config_path, 'rb') as f:
+        cfg_dict = tomllib.load(f)
+    cfg = parse_config(cfg_dict)
+    cfg.run_id = run_id
+
+    with open(log_path, 'a', encoding='utf-8') as qlog:
+        mcp_client = create_mcp_client()
+        # Vault is provided; build runner in QA mode
+        runner = SingleQuestionRunner(cfg, mcp_client=mcp_client, mode="qa")
+        result = runner.run_question(question_data, vault_id=vault_id, run_id=run_id, log=qlog, memory_id=memory_id)
+
+    # Return minimal structure; DB is the source of truth
+    artifact = {
+        'question_id': question_data.get('question_id'),
+        'status': 'success'
     }
-    
-    # Save question data to temp file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        json.dump(question_data, f)
-        question_json_path = f.name
-    
-    try:
-        # Get run_id from output_dir pattern (out/{run_id})
-        run_id = output_dir.split('/')[-1] if '/' in output_dir else output_dir.replace('out/', '')
-        
-        cmd = [
-            sys.executable,
-            str(_BENCH_SCRIPT),
-            "--config", config_path,
-            "--run-id", run_id,
-            "--mode", "qa",
-            "--question-id", question_id,
-            "--vault-id", vault_id,
-            "--memory-id", memory_id,
-            "--workers", "1"
-        ]
-        
-        logger.info(f"Running QA subprocess for question {question_id}")
-        
-        # Pass full environment to subprocess
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=QA_TIMEOUT_SEC,
-            env=os.environ.copy(),
-        )
-        
-        if result.returncode != 0:
-            raise RuntimeError(f"QA failed: {result.stderr.strip()}")
-        
-        # Parse JSON output
-        output_lines = result.stdout.strip().split('\n')
-        json_output = None
-        for line in reversed(output_lines):
-            if line.strip().startswith('{'):
-                json_output = line
-                break
-        
-        if not json_output:
-            raise ValueError(f"No JSON output found in QA subprocess output")
-        
-        result_data = json.loads(json_output)
-        
-        # Handle hypothesis as string or dict
-        hypothesis = result_data.get('hypothesis', '')
-        confidence = 0.0
-        if isinstance(hypothesis, dict):
-            confidence = hypothesis.get('confidence', 0.0)
-        
-        return {
-            'question_id': question_id,
-            'answer_correct': result_data.get('is_correct', False),
-            'confidence': confidence,
-            'status': result_data.get('status', 'unknown')
-        }
-        
-    finally:
-        # Clean up temp file
-        os.unlink(question_json_path)
+    # Include hypothesis in per-question result.json and append to aggregated hypotheses.jsonl
+    hypothesis = (result.get('hypothesis') if isinstance(result, dict) else None)
+    result_path = logs_dir / f"{question_data.get('question_id','unknown')}.result.json"
+    _merge_result_json(result_path, {
+        'run_id': run_id,
+        **artifact,
+        'vault_id': vault_id,
+        'memory_id': memory_id,
+        'hypothesis': hypothesis,
+    })
+    # Append to out/run_<run_id>/hypotheses.jsonl
+    jsonl_path = out_dir / 'hypotheses.jsonl'
+    _append_jsonl_atomic(jsonl_path, {
+        'run_id': run_id,
+        'question_id': question_data.get('question_id'),
+        'vault_id': vault_id,
+        'memory_id': memory_id,
+        'model': getattr(cfg.models, 'qa', None),
+        'hypothesis': hypothesis,
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+    })
+    return artifact
 
 
 @huey.task()
 def check_run_health(run_id: str) -> Dict:
     """
     Check health and progress of a benchmark run.
-    
+
     Returns current statistics and identifies any stuck tasks.
     """
     tracker = ProgressTracker()
     stats = tracker.get_run_stats(run_id)
-    
+
     # Add percentage completion
     if stats['total_sessions_expected'] > 0:
         stats['session_completion_pct'] = (
             stats['total_sessions_completed'] / stats['total_sessions_expected'] * 100
         )
-    
+
     if stats['total_questions'] > 0:
         stats['question_completion_pct'] = (
             stats['completed'] / stats['total_questions'] * 100
         )
-    
+
     logger.info(f"Run {run_id}: {stats['completed']}/{stats['total_questions']} questions complete")
-    
+
     return stats

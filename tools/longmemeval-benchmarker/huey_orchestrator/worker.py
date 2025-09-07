@@ -10,10 +10,10 @@ import signal
 import argparse
 import os
 
-from .huey_config import huey, LOGGING_CONFIG
+from huey_orchestrator.huey_config import huey, LOGGING_CONFIG
 
 # Import tasks to ensure they are registered with Huey
-from .tasks import process_question, run_qa, check_run_health  # noqa: F401
+from huey_orchestrator.tasks import process_question, run_qa, check_run_health  # noqa: F401
 
 # Configure logging
 import logging.config
