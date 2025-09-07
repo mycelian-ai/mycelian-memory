@@ -6,6 +6,7 @@ from model_providers import get_chat_model
 from .agent import MycelianMemoryAgent
 from .agent_invoker import MycelianAgentInvoker
 from .mcp_utils import create_mcp_client
+from async_utils import run as run_async
 
 
 def build_agent_with_invoker(
@@ -16,27 +17,27 @@ def build_agent_with_invoker(
     max_tool_calls_per_turn: int = 5
 ) -> MycelianAgentInvoker:
     """Build an agent with invoker for the benchmarker.
-    
+
     Args:
         model_id: LLM model identifier
-        vault_id: Vault UUID for memory organization  
+        vault_id: Vault UUID for memory organization
         memory_id: Memory UUID for storage
         mcp_client: Optional pre-configured MCP client
         max_tool_calls_per_turn: Maximum tool calls (unused in new implementation)
-        
+
     Returns:
         MycelianAgentInvoker ready to handle messages
     """
     # Create MCP client if not provided
     if mcp_client is None:
         mcp_client = create_mcp_client()
-    
+
     # Get tools from MCP client
     async def _get_tools():
         return await mcp_client.get_tools()
-    
-    tools = asyncio.run(_get_tools())
-    
+
+    tools = run_async(_get_tools())
+
     # Get prompts from MCP
     # For now, using dummy prompts - in production these would come from MCP
     prompts = {
@@ -44,7 +45,7 @@ def build_agent_with_invoker(
         "summary_prompt": "",        # Will be loaded from MCP
         "context_prompt": ""         # Will be loaded from MCP
     }
-    
+
     # Try to get actual prompts from MCP if available
     try:
         # This would be the actual MCP call to get prompts
@@ -52,10 +53,10 @@ def build_agent_with_invoker(
         pass
     except:
         pass
-    
+
     # Initialize LLM with built-in retry (supports multiple providers)
     llm = get_chat_model(model_id)  # max_retries=6 is default
-    
+
     # Create the agent (logging is always enabled)
     agent = MycelianMemoryAgent(
         llm=llm,
@@ -64,13 +65,13 @@ def build_agent_with_invoker(
         vault_id=vault_id,
         memory_id=memory_id
     )
-    
+
     # Wrap with invoker
     invoker = MycelianAgentInvoker(agent)
-    
+
     # Store some metadata for compatibility
     invoker._mcp = mcp_client  # For QA search later
     invoker._vault_id = vault_id
     invoker._memory_id = memory_id
-    
+
     return invoker

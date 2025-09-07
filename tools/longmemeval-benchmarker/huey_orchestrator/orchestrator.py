@@ -18,14 +18,9 @@ import sqlite3
 from datetime import datetime
 from typing import List, Dict, Optional
 
-try:
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:
-    import tomli as tomllib
+import tomllib  # Python 3.11+
 
-from huey_orchestrator.huey_config import huey, HUEY_DB_PATH
 from huey_orchestrator.progress_tracker import ProgressTracker
-from huey_orchestrator.tasks import process_question, check_run_health
 
 # Configure logging
 logging.basicConfig(
@@ -36,6 +31,11 @@ logger = logging.getLogger('orchestrator.main')
 
 
 BENCHMARKER_ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = BENCHMARKER_ROOT / 'data'
+HUEY_DB_PATH = str(DATA_DIR / 'huey_tasks.db')
+
+# Lazily imported tasks module bound to the per-run queue
+_TASKS_MOD = None
 
 # Optional Rich UI
 try:
@@ -51,12 +51,15 @@ except Exception:
     _console = None
 
 
-def _start_worker_subprocess(workers: int) -> subprocess.Popen:
+def _start_worker_subprocess(workers: int, queue_name: str) -> subprocess.Popen:
     """Start the Huey worker in its own process group and return the Popen."""
     env = os.environ.copy()
     existing = env.get('PYTHONPATH', '')
     # Ensure the benchmarker root is importable as a top-level package
     env['PYTHONPATH'] = f"{str(BENCHMARKER_ROOT)}{(':' + existing) if existing else ''}"
+    # Ensure worker binds to the intended per-run queue
+    if queue_name:
+        env['HUEY_QUEUE_NAME'] = queue_name
     cmd = [sys.executable, '-m', 'huey_orchestrator.worker', '--workers', str(max(1, workers))]
     # Run from the benchmarker root so relative paths and package imports work
     proc = subprocess.Popen(
@@ -112,9 +115,12 @@ def _ps_list() -> List[tuple[int, int, str]]:
     return rows
 
 
-def _find_benchmarker_procs() -> tuple[List[tuple[int, int, str]], List[int]]:
+def _find_benchmarker_procs(exclude_pids: Optional[set[int]] = None) -> tuple[List[tuple[int, int, str]], List[int]]:
     rows = _ps_list()
-    targets = [r for r in rows if any(pat in r[2] for pat in _KILL_PATTERNS)]
+    if exclude_pids is None:
+        exclude_pids = set()
+    # Match patterns and exclude any explicitly excluded PIDs (e.g., this process)
+    targets = [r for r in rows if (r[0] not in exclude_pids) and any(pat in r[2] for pat in _KILL_PATTERNS)]
     pgids = sorted({r[1] for r in targets})
     return targets, pgids
 
@@ -263,9 +269,11 @@ def generate_run_id() -> str:
               help='Delete all orchestrator state (huey_tasks.db*, progress.db*) and exit')
 @click.option('--stop', is_flag=True,
               help='Stop all running benchmarker processes (workers and orchestrators) and exit')
+@click.option('--force', is_flag=True,
+              help='Do not prompt for confirmation when used with --stop')
 def main(config_path: str, num_questions: Optional[int],
          resume: bool, run_id: Optional[str], workers: int, monitor: bool, auto: bool, clear_state: bool,
-         stop: bool):
+         stop: bool, force: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
 
@@ -274,12 +282,17 @@ def main(config_path: str, num_questions: Optional[int],
 
     # Stop processes early if requested
     if stop:
-        targets, pgids = _find_benchmarker_procs()
+        # Exclude this orchestrator (so we don't kill ourselves)
+        mypid = os.getpid()
+        targets, pgids = _find_benchmarker_procs(exclude_pids={mypid})
         click.echo("Found processes:" if targets else "No benchmarker processes found.")
         for pid, pgid, cmd in targets:
             click.echo(f"  pid={pid} pgid={pgid} cmd={cmd}")
         if targets:
-            if click.confirm("Terminate these process groups?", default=False):
+            proceed = True
+            if not force:
+                proceed = click.confirm("Terminate these process groups?", default=False)
+            if proceed:
                 for g in pgids:
                     click.echo(_kill_group(g))
             else:
@@ -363,14 +376,29 @@ def main(config_path: str, num_questions: Optional[int],
         # Initialize run in database with metadata
         tracker.init_run(run_id, dataset, dataset_path=dataset_path, config_path=config_path)
 
+    # Bind per-run queue before importing tasks
+    queue_name = f"huey-{run_id}"
+    os.environ['HUEY_QUEUE_NAME'] = queue_name
+    # Import tasks now so they see the queue name
+    global _TASKS_MOD
+    from huey_orchestrator import tasks as _tasks  # type: ignore
+    _TASKS_MOD = _tasks
+
     # Get questions to process
     if resume:
         # Get pending and resumable questions
         pending = tracker.get_pending_questions(run_id)
         resumable = tracker.get_resumable_questions(run_id)
+        # Additionally, detect obviously stuck states and hard-reset them
+        stuck_unstarted = tracker.get_inprogress_unstarted(run_id)
+        stuck_qa = tracker.get_qa_inprogress_after_ingest(run_id)
 
         logger.info(f"Found {len(pending)} pending questions")
         logger.info(f"Found {len(resumable)} resumable questions")
+        if stuck_unstarted:
+            logger.info(f"Found {len(stuck_unstarted)} in_progress with 0 sessions; hard-resetting from session 0")
+        if stuck_qa:
+            logger.info(f"Found {len(stuck_qa)} QA-in-progress after ingestion; hard-resetting from session 0")
 
         # For resumable questions, restart ingestion from session 0 with a fresh memory_id
         for q_progress in resumable:
@@ -379,6 +407,24 @@ def main(config_path: str, num_questions: Optional[int],
             question_data = next((q for q in dataset if q['question_id'] == question_id), None)
             if question_data:
                 logger.info(f"Restarting {question_id} from session 0 (clearing memory_id; preserving vault_id)")
+                tracker.reset_for_restart(run_id, question_id)
+                enqueue_question(question_data, run_id, config_path, 0)
+
+        # Hard-reset stuck-in-progress with 0 sessions
+        for q_progress in stuck_unstarted:
+            question_id = q_progress['question_id']
+            question_data = next((q for q in dataset if q['question_id'] == question_id), None)
+            if question_data:
+                logger.info(f"Hard-resetting stuck question {question_id} (0 sessions done) from session 0")
+                tracker.reset_for_restart(run_id, question_id)
+                enqueue_question(question_data, run_id, config_path, 0)
+
+        # Hard-reset QA-in-progress-after-ingest (deterministic recovery)
+        for q_progress in stuck_qa:
+            question_id = q_progress['question_id']
+            question_data = next((q for q in dataset if q['question_id'] == question_id), None)
+            if question_data:
+                logger.info(f"Hard-resetting QA-stuck question {question_id} to re-ingest from session 0")
                 tracker.reset_for_restart(run_id, question_id)
                 enqueue_question(question_data, run_id, config_path, 0)
 
@@ -399,7 +445,7 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("\n" + "="*60)
         click.echo("Auto mode: starting worker and monitoring run")
         click.echo("="*60)
-        worker_proc = _start_worker_subprocess(workers)
+        worker_proc = _start_worker_subprocess(workers, queue_name)
 
         # Ensure cleanup on abnormal exits as well
         atexit.register(lambda: _stop_worker_subprocess(worker_proc))
@@ -418,7 +464,7 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("="*60)
         click.echo(f"\nRun ID: {run_id}")
         click.echo(f"\nStart workers to process tasks:")
-        click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.worker --workers {workers}")
+        click.echo(f"  HUEY_QUEUE_NAME={queue_name} PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.worker --workers {workers}")
         click.echo(f"\nMonitor progress:")
         click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.orchestrator {config_path} --monitor --run-id {run_id}")
 
@@ -435,7 +481,12 @@ def enqueue_question(question_data: Dict, run_id: str, config_path: str,
     worker_id = f"worker-{random.randint(1000, 9999)}"
 
     # Enqueue the task with IDs only (task loads from DB)
-    process_question(
+    global _TASKS_MOD
+    if _TASKS_MOD is None:
+        # Fallback: import with current environment
+        from huey_orchestrator import tasks as _tasks  # type: ignore
+        _TASKS_MOD = _tasks
+    _TASKS_MOD.process_question(
         run_id=run_id,
         question_id=question_id,
         worker_id=worker_id

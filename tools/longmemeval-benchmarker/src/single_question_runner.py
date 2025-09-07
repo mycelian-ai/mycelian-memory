@@ -350,33 +350,39 @@ class SingleQuestionRunner:
                     # Start session (retrieves context and recent entries)
                     invoker.start_session(thread_id)
 
-                    # Process all messages in the session
-                    for msg_idx, m in enumerate(s.get("messages", []), start=1):
-                        role = (m.get("role") or "").strip().lower()
-                        content = m.get("content") or ""
+                    try:
+                        # Process all messages in the session
+                        for msg_idx, m in enumerate(s.get("messages", []), start=1):
+                            role = (m.get("role") or "").strip().lower()
+                            content = m.get("content") or ""
 
-                        # Only process user and assistant messages with content
-                        if role in ("user", "assistant") and isinstance(content, str) and content.strip():
-                            runner_log.info("MSG qid=%s s=%d msg=%d role=%s memory_id=%s",
-                                          qid, s_idx, msg_idx, role, memory_id)
+                            # Only process user and assistant messages with content
+                            if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                                runner_log.info("MSG qid=%s s=%d msg=%d role=%s memory_id=%s",
+                                              qid, s_idx, msg_idx, role, memory_id)
 
-                            # Process the message (handles flush every 6 messages automatically)
-                            invoker.process_conversation_message(
-                                role=role,
-                                content=content,
-                                thread_id=thread_id
-                            )
-                            messages_processed += 1
-                            # Periodically persist message-level progress (every 10 messages)
-                            _write_progress(messages_processed)
-
-                    # End session (ensures consistency and saves context)
-                    invoker.end_session(thread_id)
-                    runner_log.info("SESSION_END qid=%s s=%d memory_id=%s thread_id=%s",
-                                  qid, s_idx, memory_id, thread_id)
-                    sessions_done += 1
-                    # Flush any remaining message increments since last batch
-                    _write_progress(messages_processed, sessions_done)
+                                # Process the message (handles flush every 6 messages automatically)
+                                invoker.process_conversation_message(
+                                    role=role,
+                                    content=content,
+                                    thread_id=thread_id
+                                )
+                                messages_processed += 1
+                                # Periodically persist message-level progress (every 10 messages)
+                                _write_progress(messages_processed)
+                    finally:
+                        # Always attempt to end the session and advance counters,
+                        # even if message processing raised.
+                        try:
+                            invoker.end_session(thread_id)
+                        except Exception:
+                            # Best-effort: continue to mark progress so orchestrator can resume safely
+                            pass
+                        runner_log.info("SESSION_END qid=%s s=%d memory_id=%s thread_id=%s",
+                                      qid, s_idx, memory_id, thread_id)
+                        sessions_done += 1
+                        # Flush any remaining message increments since last batch
+                        _write_progress(messages_processed, sessions_done)
 
                     # Optional state dump for debugging
                     try:

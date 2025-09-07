@@ -371,6 +371,44 @@ class ProgressTracker:
             """, (run_id,))
             return [dict(row) for row in result.fetchall()]
 
+    def get_inprogress_unstarted(self, run_id: str) -> List[Dict]:
+        """Get questions marked in_progress but with zero sessions completed.
+
+        These likely got stuck before the first session finished and should be
+        safe to hard-reset on resume.
+        """
+        with self._get_connection() as conn:
+            result = conn.execute(
+                """
+                SELECT * FROM question_progress
+                WHERE run_id = ?
+                  AND status = 'in_progress'
+                  AND COALESCE(completed_sessions, 0) = 0
+                ORDER BY question_id
+                """,
+                (run_id,),
+            )
+            return [dict(row) for row in result.fetchall()]
+
+    def get_qa_inprogress_after_ingest(self, run_id: str) -> List[Dict]:
+        """Get questions where ingestion completed but QA is stuck in_progress.
+
+        On resume, we can either requeue QA or hard reset to re-ingest. For
+        simplicity and determinism, callers may choose to hard-reset.
+        """
+        with self._get_connection() as conn:
+            result = conn.execute(
+                """
+                SELECT * FROM question_progress
+                WHERE run_id = ?
+                  AND ingestion_status = 'completed'
+                  AND qa_status = 'in_progress'
+                ORDER BY question_id
+                """,
+                (run_id,),
+            )
+            return [dict(row) for row in result.fetchall()]
+
     def get_run_stats(self, run_id: str) -> Dict:
         """Get overall statistics for a run."""
         with self._get_connection() as conn:

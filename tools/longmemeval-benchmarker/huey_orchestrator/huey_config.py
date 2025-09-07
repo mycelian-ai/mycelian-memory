@@ -2,8 +2,13 @@
 """
 Huey configuration for LongMemEval benchmarker orchestration.
 Uses SqliteHuey for persistent task queue with proper retry logic.
+
+Strong isolation: the queue name is derived from the environment variable
+HUEY_QUEUE_NAME. Orchestrator sets this per-run so workers only consume tasks
+for the intended run.
 """
 
+import os
 from huey import SqliteHuey
 from pathlib import Path
 
@@ -20,8 +25,11 @@ QA_TIMEOUT_SEC = 900       # 15 minutes per QA
 # Logs directory (fixed default)
 LOGS_DIR = 'logs'
 
+# Per-run queue isolation: pick up queue name from environment
+HUEY_QUEUE_NAME = os.environ.get('HUEY_QUEUE_NAME', 'default')
+
 # Create Huey instance for asynchronous execution only
-huey = SqliteHuey(filename=HUEY_DB_PATH, immediate=False)
+huey = SqliteHuey(filename=HUEY_DB_PATH, name=HUEY_QUEUE_NAME, immediate=False)
 
 # Configuration constants
 DEFAULT_TASK_RETRIES = 3
