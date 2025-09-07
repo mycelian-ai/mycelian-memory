@@ -15,9 +15,14 @@ from datetime import datetime
 import tomllib
 from typing import Dict, Optional, Tuple
 import fcntl
-
-# Add parent directory to path to import existing modules
+# Add parent directory to path to import existing modules BEFORE importing runner modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from huey_orchestrator.progress_tracker import ProgressTracker
+from single_question_runner import SingleQuestionRunner
+from benchmarker import parse_config
+from memory_manager import MemoryManager
+from mycelian_memory_agent import create_mcp_client
 
 from huey_orchestrator.huey_config import (
     huey,
@@ -27,11 +32,6 @@ from huey_orchestrator.huey_config import (
     QA_TIMEOUT_SEC,
     LOGS_DIR,
 )
-from huey_orchestrator.progress_tracker import ProgressTracker
-from single_question_runner import SingleQuestionRunner
-from benchmarker import parse_config
-from memory_manager import MemoryManager
-from mycelian_memory_agent import create_mcp_client
 
 logger = logging.getLogger('orchestrator.tasks')
 
