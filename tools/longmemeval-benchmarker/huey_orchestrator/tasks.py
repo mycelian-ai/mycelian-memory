@@ -141,7 +141,14 @@ def process_question(
         # No-op if already completed
         details = tracker.get_question_details(run_id, question_id)
         if details and details.get('ingestion_status') == 'completed':
-            logger.info(f"Question {question_id} already ingested; skipping")
+            logger.info(f"Question {question_id} already ingested; skipping ingestion")
+            # If QA isn't completed yet (pending or failed), enqueue QA
+            qa_status = (details.get('qa_status') or '').strip()
+            if qa_status in ('pending', 'failed'):
+                logger.info(f"Question {question_id}: scheduling QA (status={qa_status})")
+                run_qa(run_id, question_id)
+            else:
+                logger.info(f"Question {question_id}: QA status is {qa_status or 'unknown'}; not scheduling")
             return {
                 'vault_id': details.get('vault_id'),
                 'memory_id': details.get('memory_id'),

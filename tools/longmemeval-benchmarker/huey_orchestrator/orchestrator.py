@@ -265,6 +265,8 @@ def generate_run_id() -> str:
               help='Specify run ID (for resume or custom ID)')
 @click.option('--workers', '-w', default=1, type=int,
               help='Number of worker processes to use')
+@click.option('--resume-mode', type=click.Choice(['restart-from-first-session', 'resume-from-next-session']), default='resume-from-next-session',
+              help='On resume, either restart from the first session or resume from the next session after the last successfully ingested session')
 @click.option('--monitor', '-m', is_flag=True,
               help='Monitor mode: show progress without enqueueing')
 @click.option('--auto', is_flag=True,
@@ -276,7 +278,7 @@ def generate_run_id() -> str:
 @click.option('--force', is_flag=True,
               help='When used with --stop: do not prompt. With --resume: force retry all failed questions.')
 def main(config_path: str, num_questions: Optional[int],
-         resume: bool, run_id: Optional[str], workers: int, monitor: bool, auto: bool, clear_state: bool,
+         resume: bool, run_id: Optional[str], workers: int, resume_mode: str, monitor: bool, auto: bool, clear_state: bool,
          stop: bool, force: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
@@ -371,7 +373,7 @@ def main(config_path: str, num_questions: Optional[int],
         if not run_id:
             click.echo("Error: --run-id required for resume")
             return 1
-        logger.info(f"Resuming run: {run_id}")
+        logger.info(f"Resuming run: {run_id} (mode={resume_mode})")
     else:
         if not run_id:
             run_id = generate_run_id()
@@ -412,20 +414,25 @@ def main(config_path: str, num_questions: Optional[int],
         if stuck_unstarted:
             logger.info(f"Found {len(stuck_unstarted)} in_progress with 0 sessions; hard-resetting from session 0")
         if stuck_qa:
-            logger.info(f"Found {len(stuck_qa)} QA-in-progress after ingestion; hard-resetting from session 0")
+            logger.info(f"Found {len(stuck_qa)} QA-in-progress after ingestion; action depends on resume-mode")
 
         # Track which question_ids we will (re)enqueue to avoid duplicates
         enqueued_ids = set()
 
-        # For resumable questions, restart ingestion from session 0 with a fresh memory_id
+        # For resumable questions, either restart from 0 or continue from last completed session
         for q_progress in resumable:
             question_id = q_progress['question_id']
             # Find question data in dataset
             question_data = next((q for q in dataset if q['question_id'] == question_id), None)
             if question_data:
-                logger.info(f"Restarting {question_id} from session 0 (clearing memory_id; preserving vault_id)")
-                tracker.reset_for_restart(run_id, question_id)
-                enqueue_question(question_data, run_id, config_path, 0)
+                if resume_mode == 'restart-from-first-session':
+                    logger.info(f"Restarting {question_id} from session 0 (clearing memory_id; preserving vault_id)")
+                    tracker.reset_for_restart(run_id, question_id)
+                    enqueue_question(question_data, run_id, config_path, 0)
+                else:
+                    done = int(q_progress.get('completed_sessions') or 0)
+                    logger.info(f"Continuing {question_id} from session {done} using existing memory_id")
+                    enqueue_question(question_data, run_id, config_path, 0)
                 enqueued_ids.add(question_id)
 
         # Hard-reset stuck-in-progress with 0 sessions
@@ -438,14 +445,18 @@ def main(config_path: str, num_questions: Optional[int],
                 enqueue_question(question_data, run_id, config_path, 0)
                 enqueued_ids.add(question_id)
 
-        # Hard-reset QA-in-progress-after-ingest (deterministic recovery)
+        # Handle QA-in-progress-after-ingest
         for q_progress in stuck_qa:
             question_id = q_progress['question_id']
             question_data = next((q for q in dataset if q['question_id'] == question_id), None)
             if question_data:
-                logger.info(f"Hard-resetting QA-stuck question {question_id} to re-ingest from session 0")
-                tracker.reset_for_restart(run_id, question_id)
-                enqueue_question(question_data, run_id, config_path, 0)
+                if resume_mode == 'restart-from-first-session':
+                    logger.info(f"Hard-resetting QA-stuck question {question_id} to re-ingest from session 0")
+                    tracker.reset_for_restart(run_id, question_id)
+                    enqueue_question(question_data, run_id, config_path, 0)
+                else:
+                    logger.info(f"Re-enqueuing QA-stuck question {question_id} without reset; QA will be scheduled")
+                    enqueue_question(question_data, run_id, config_path, 0)
                 enqueued_ids.add(question_id)
 
         # Force retry previously failed questions (regardless of retry_count)
@@ -456,9 +467,14 @@ def main(config_path: str, num_questions: Optional[int],
                     continue
                 question_data = next((q for q in dataset if q['question_id'] == question_id), None)
                 if question_data:
-                    logger.info(f"Force retrying failed question {question_id} from session 0")
-                    tracker.reset_for_restart(run_id, question_id)
-                    enqueue_question(question_data, run_id, config_path, 0)
+                    if resume_mode == 'restart-from-first-session':
+                        logger.info(f"Force retrying failed question {question_id} from session 0")
+                        tracker.reset_for_restart(run_id, question_id)
+                        enqueue_question(question_data, run_id, config_path, 0)
+                    else:
+                        done = int((q_progress.get('completed_sessions') or 0))
+                        logger.info(f"Force retrying failed question {question_id} continuing from session {done}")
+                        enqueue_question(question_data, run_id, config_path, 0)
                     enqueued_ids.add(question_id)
 
         # Enqueue pending questions
@@ -467,8 +483,16 @@ def main(config_path: str, num_questions: Optional[int],
             if question_id in enqueued_ids:
                 continue
             question_data = next((q for q in dataset if q['question_id'] == question_id), None)
-            if question_data:
-                enqueue_question(question_data, run_id, config_path, 0)
+            if not question_data:
+                continue
+            status = (q_progress.get('status') or '').strip()
+            if status == 'failed' and resume_mode == 'restart-from-first-session':
+                logger.info(f"Resetting failed question {question_id} for full retry")
+                tracker.reset_for_restart(run_id, question_id)
+            elif status == 'failed' and resume_mode == 'resume-from-next-session':
+                done = int(q_progress.get('completed_sessions') or 0)
+                logger.info(f"Retrying failed question {question_id} from session {done}")
+            enqueue_question(question_data, run_id, config_path, 0)
     else:
         # Enqueue all questions
         logger.info(f"Enqueueing {len(dataset)} questions...")

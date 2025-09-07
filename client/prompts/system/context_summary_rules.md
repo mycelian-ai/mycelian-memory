@@ -44,12 +44,13 @@
    For routine conversation turns, rely on current context and the recent entries.
 
 7. **TOOL: get_context (RESTRICTED)**
-   
+
    • DO NOT call `get_context` on every turn or automatically before processing messages.
    • Call `get_context` only when:
      – immediately after `put_context` followed by `await_consistency`, to verify the write; or
      – resuming a previously paused session; or
      – explicitly instructed by the user to reload the context.
+   • When adding retrieved context to the conversation history for synthesis, prefix it with `[previous_context]` to mark it as prior context for pruning. This tag MUST NOT be persisted in stored context.
 
 8. **References**
    • Context content/format: `client/prompts/default/chat/context_prompt.md`
@@ -57,8 +58,9 @@
    • Summary content/format: `client/prompts/default/chat/summary_prompt.md`
 
 9. **Prompt usage**
-   • For `add_entry`: Generate the summary using `client/prompts/default/chat/summary_prompt.md` and construct tool inputs per `client/prompts/default/chat/entry_capture_prompt.md`. Do not include any `[SYSTEM_MSG]`/`[CONVERSATION_MSG]` markers in raw_entry or summary.
+   • For `add_entry`: Generate the summary using `client/prompts/default/chat/summary_prompt.md` and construct tool inputs per `client/prompts/default/chat/entry_capture_prompt.md`. Do not include any `[SYSTEM_MSG]`/`[CONVERSATION_MSG]` markers or tag markers like `[previous_context]` in raw_entry or summary.
    • For `put_context`: Produce the full context string using `client/prompts/default/chat/context_prompt.md`, then write it via `put_context`.
+     – If any input message begins with `[previous_context]`, treat everything after the tag as prior conversation context from earlier turns; use it to guide pruning per the context prompt; strip the tag and do not copy the raw prior context verbatim.
 
 10. **Creation procedures**
    **Entry (per message):**
@@ -69,6 +71,7 @@
 
    **Context (on flush or session end):**
    1) When cadence triggers (≈6 stored entries) or at session end, construct the full context by invoking `client/prompts/default/chat/context_prompt.md`.
+      - Previous context handling: If any input message begins with `[previous_context]`, treat the content after the tag as prior context. Use it to guide pruning according to the context prompt. Strip the `[previous_context]` tag and do not copy the raw prior context verbatim into the stored context.
    2) Do NOT include any system/control text or prompt markers in the context.
    3) Issue `await_consistency()`; then call `put_context` with the generated context.
 
@@ -82,4 +85,3 @@ flowchart TD
     Add --> Continue[Continue conversation]
 ```
 <!-- See References above for canonical prompt files -->
-

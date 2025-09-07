@@ -326,10 +326,10 @@ class MycelianMemoryAgent:
                         elif msg.name == "list_entries":
                             entries_text = msg.content
 
-                # Add retrieved context and entries to conversation_history
+                # Add retrieved context (prefixed with [previous_context]) and entries to conversation_history
                 context_msg = ChatMessage(
                     role="system",
-                    content=f"Previous session context:\n{context_text}"
+                    content=f"[previous_context]\n{context_text}"
                 )
                 entries_msg = ChatMessage(
                     role="system",
