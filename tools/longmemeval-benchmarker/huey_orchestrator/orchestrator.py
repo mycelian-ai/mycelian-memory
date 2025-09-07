@@ -57,9 +57,13 @@ def _start_worker_subprocess(workers: int, queue_name: str) -> subprocess.Popen:
     existing = env.get('PYTHONPATH', '')
     # Ensure the benchmarker root is importable as a top-level package
     env['PYTHONPATH'] = f"{str(BENCHMARKER_ROOT)}{(':' + existing) if existing else ''}"
-    # Ensure worker binds to the intended per-run queue
+    # Ensure worker binds to the intended per-run queue and log file
     if queue_name:
         env['HUEY_QUEUE_NAME'] = queue_name
+        # Extract run_id from queue_name (format: "huey-{run_id}")
+        if queue_name.startswith('huey-'):
+            run_id = queue_name[5:]  # Remove "huey-" prefix
+            env['HUEY_RUN_ID'] = run_id
     cmd = [sys.executable, '-m', 'huey_orchestrator.worker', '--workers', str(max(1, workers))]
     # Run from the benchmarker root so relative paths and package imports work
     proc = subprocess.Popen(
@@ -376,10 +380,11 @@ def main(config_path: str, num_questions: Optional[int],
         # Initialize run in database with metadata
         tracker.init_run(run_id, dataset, dataset_path=dataset_path, config_path=config_path)
 
-    # Bind per-run queue before importing tasks
+    # Bind per-run queue and log file before importing tasks
     queue_name = f"huey-{run_id}"
     os.environ['HUEY_QUEUE_NAME'] = queue_name
-    # Import tasks now so they see the queue name
+    os.environ['HUEY_RUN_ID'] = run_id
+    # Import tasks now so they see the queue name and log file path
     global _TASKS_MOD
     from huey_orchestrator import tasks as _tasks  # type: ignore
     _TASKS_MOD = _tasks
@@ -464,7 +469,7 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("="*60)
         click.echo(f"\nRun ID: {run_id}")
         click.echo(f"\nStart workers to process tasks:")
-        click.echo(f"  HUEY_QUEUE_NAME={queue_name} PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.worker --workers {workers}")
+        click.echo(f"  HUEY_QUEUE_NAME={queue_name} HUEY_RUN_ID={run_id} PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.worker --workers {workers}")
         click.echo(f"\nMonitor progress:")
         click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m huey_orchestrator.orchestrator {config_path} --monitor --run-id {run_id}")
 
