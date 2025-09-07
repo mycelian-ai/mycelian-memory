@@ -107,6 +107,16 @@ credentials*.json
 /dist/
 /build/
 
+# Compiled Go binaries (should be built, not committed)
+cmd/*/memory-service
+cmd/*/mycelian-mcp-server
+cmd/*/outbox-worker
+tools/*/mycelianCli
+tools/*/synapse
+tools/*/memoryctl
+tools/*/mycelian-service-tools
+tools/*/waviate-tool
+
 .obsidian/
 
 # Local database files
