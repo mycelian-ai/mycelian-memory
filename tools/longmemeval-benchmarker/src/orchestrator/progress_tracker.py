@@ -493,3 +493,36 @@ class ProgressTracker:
                 (run_id, limit),
             )
             return [dict(row) for row in result.fetchall()]
+
+    def get_questions_for_qa(self, run_id: str, include_completed: bool = False) -> List[Dict]:
+        """Return questions eligible for QA (ingestion completed).
+
+        Args:
+            run_id: Target run identifier
+            include_completed: If True, include questions whose QA is already completed
+
+        Returns:
+            List of rows with at least question_id, ingestion_status, qa_status
+        """
+        with self._get_connection() as conn:
+            if include_completed:
+                result = conn.execute(
+                    """
+                    SELECT question_id, ingestion_status, qa_status
+                    FROM question_progress
+                    WHERE run_id = ? AND ingestion_status = 'completed'
+                    ORDER BY question_id
+                    """,
+                    (run_id,),
+                )
+            else:
+                result = conn.execute(
+                    """
+                    SELECT question_id, ingestion_status, qa_status
+                    FROM question_progress
+                    WHERE run_id = ? AND ingestion_status = 'completed' AND qa_status != 'completed'
+                    ORDER BY question_id
+                    """,
+                    (run_id,),
+                )
+            return [dict(row) for row in result.fetchall()]
