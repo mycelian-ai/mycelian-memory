@@ -3,6 +3,7 @@
 from typing import Any, Dict, Optional
 import asyncio
 from src.async_utils import run as run_async
+import uuid
 
 
 class MemoryManager:
@@ -173,74 +174,75 @@ class MemoryManager:
         return vid
 
     def ensure_memory(self, vault_id: str, title: str, memory_type: str = "NOTES") -> str:
-        """Ensure a memory exists, creating if necessary."""
-        # Try to create memory
-        try:
-            created = self._call_tool(
-                "create_memory_in_vault",
-                {"vault_id": vault_id, "title": title, "memory_type": memory_type, "description": ""},
-            )
-        except Exception as e:
-            # Log the error for debugging
-            if self._debug:
-                self._log(f"[memory_manager] create_memory failed: {str(e)[:100]}")
-            created = None
+        """Ensure a fresh memory exists; never reuse an existing same-title memory.
 
-        # Extract memory ID from response
-        mid = None
-        if created:
-            if isinstance(created, str):
-                # Try to parse JSON string
-                if created.startswith('{'):
-                    try:
-                        import json
-                        parsed = json.loads(created)
-                        mid = parsed.get("memoryId") or parsed.get("id") or parsed.get("memory_id")
-                    except:
-                        mid = created  # Treat as ID string
-                else:
-                    mid = created  # Treat as ID string
-            elif isinstance(created, dict):
-                mid = created.get("memoryId") or created.get("id") or created.get("memory_id")
+        If a duplicate-title error is encountered, generate a unique title by
+        appending a deterministic numeric suffix, and as a last resort a UUID
+        suffix, then retry creation. This prevents cross-run contamination.
+        """
 
+        def _try_create(with_title: str) -> Optional[str]:
+            try:
+                created_local = self._call_tool(
+                    "create_memory_in_vault",
+                    {"vault_id": vault_id, "title": with_title, "memory_type": memory_type, "description": ""},
+                )
+            except Exception as exc:
+                # Detect duplicate title; signal to caller via None with flag
+                msg = str(exc).lower()
+                is_duplicate = (
+                    "duplicate" in msg or
+                    "already exists" in msg or
+                    "23505" in msg or
+                    "unique" in msg or
+                    "memories_actor_id_title_key" in msg
+                )
+                if is_duplicate:
+                    return None  # signal duplicate
+                # Non-duplicate error: re-raise
+                raise
+
+            # Extract memory ID from response
+            mid_local: Optional[str] = None
+            if created_local:
+                if isinstance(created_local, str):
+                    if created_local.startswith('{'):
+                        try:
+                            import json
+                            parsed = json.loads(created_local)
+                            mid_local = parsed.get("memoryId") or parsed.get("id") or parsed.get("memory_id")
+                        except Exception:
+                            mid_local = created_local
+                    else:
+                        mid_local = created_local
+                elif isinstance(created_local, dict):
+                    mid_local = created_local.get("memoryId") or created_local.get("id") or created_local.get("memory_id")
+            return mid_local
+
+        # First attempt with the provided title
+        mid = _try_create(title)
         if mid:
             self._log(f"[memory_manager] created memory: {mid}")
             return mid
 
-        # If creation failed, try to find existing memory
-        listed = self._call_tool("list_memories", {"vault_id": vault_id})
-        memories = []
+        # On duplicate, try a small set of numeric suffixes deterministically
+        for i in range(2, 6):  # __2 .. __5
+            candidate = f"{title}__{i}"
+            mid = _try_create(candidate)
+            if mid:
+                self._log(f"[memory_manager] created memory with suffix: {candidate} -> {mid}")
+                return mid
 
-        # Parse the response
-        if isinstance(listed, str):
-            try:
-                import json
-                parsed = json.loads(listed)
-                if isinstance(parsed, list):
-                    memories = parsed
-                elif isinstance(parsed, dict):
-                    memories = parsed.get("memories", []) or parsed.get("items", [])
-            except:
-                pass
-        elif isinstance(listed, list):
-            memories = listed
-        elif isinstance(listed, dict):
-            memories = listed.get("memories", []) or listed.get("items", [])
+        # Last resort: UUID suffix to guarantee uniqueness
+        unique_suffix = uuid.uuid4().hex[:8]
+        candidate = f"{title}__{unique_suffix}"
+        mid = _try_create(candidate)
+        if mid:
+            self._log(f"[memory_manager] created memory with uuid suffix: {candidate} -> {mid}")
+            return mid
 
-        if self._debug:
-            self._log(f"[memory_manager] searching {len(memories)} memories for '{title}'")
-
-        for m in memories:
-            if not isinstance(m, dict):
-                continue
-            mt = m.get("title", "")
-            if mt == title:
-                mmid = m.get("memoryId") or m.get("id") or m.get("memory_id")
-                if mmid:
-                    self._log(f"[memory_manager] found existing memory: {mmid}")
-                    return mmid
-
-        raise RuntimeError(f"Could not create or find memory '{title}' in vault {vault_id}")
+        # If we reach here, something else went wrong (non-duplicate errors re-raised earlier)
+        raise RuntimeError(f"Failed to create a new memory in vault {vault_id} after duplicate-title retries")
 
     def search_memories(self, memory_id: str, query: str, top_ke: int = 5, top_kc: int = 2, top_k: Optional[int] = None) -> Dict[str, Any]:
         """Search memories and normalize the response.
