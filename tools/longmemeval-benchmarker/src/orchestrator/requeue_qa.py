@@ -21,7 +21,7 @@ def main():
     config_path = sys.argv[2]
 
     # Connect to progress database
-    db_path = Path(__file__).resolve().parents[1] / 'data' / 'progress.db'
+    db_path = Path(__file__).resolve().parents[2] / 'data' / 'progress.db'  # Go up 2 levels now
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
 

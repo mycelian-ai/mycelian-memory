@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger('orchestrator.main')
 
 
-BENCHMARKER_ROOT = Path(__file__).resolve().parents[1]
+BENCHMARKER_ROOT = Path(__file__).resolve().parents[2]  # Go up 2 levels: orchestrator -> src -> benchmarker
 DATA_DIR = BENCHMARKER_ROOT / 'data'
 HUEY_DB_PATH = str(DATA_DIR / 'huey_tasks.db')
 
@@ -94,7 +94,7 @@ def _stop_worker_subprocess(proc: Optional[subprocess.Popen]) -> None:
 
 _KILL_PATTERNS = (
     "python -m src.orchestrator.worker",
-    "python -m src.orchestrator.orchestrator",
+    "python -m src.orchestrator",
 )
 
 
@@ -525,7 +525,7 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo(f"\nStart workers to process tasks:")
         click.echo(f"  HUEY_QUEUE_NAME={queue_name} HUEY_RUN_ID={run_id} PYTHONPATH={BENCHMARKER_ROOT} python -m src.orchestrator.worker --workers {workers}")
         click.echo(f"\nMonitor progress:")
-        click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m src.orchestrator.orchestrator {config_path} --monitor --run-id {run_id}")
+        click.echo(f"  PYTHONPATH={BENCHMARKER_ROOT} python -m src.orchestrator {config_path} --monitor --run-id {run_id}")
 
         return 0
 

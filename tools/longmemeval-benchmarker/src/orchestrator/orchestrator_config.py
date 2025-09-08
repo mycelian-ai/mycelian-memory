@@ -13,7 +13,7 @@ from huey import SqliteHuey
 from pathlib import Path
 
 # Fixed configuration (no env- or CLI-driven toggles)
-_BASE_DIR = Path(__file__).resolve().parents[1]  # benchmarker root
+_BASE_DIR = Path(__file__).resolve().parents[2]  # Go up 2 levels: orchestrator -> src -> benchmarker root
 _DATA_DIR = _BASE_DIR / 'data'
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
 

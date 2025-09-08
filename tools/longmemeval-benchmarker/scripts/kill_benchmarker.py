@@ -2,8 +2,8 @@
 """Kill all LongMemEval benchmarker processes safely.
 
 This script terminates:
-  - python -m huey_orchestrator.worker
-  - python -m huey_orchestrator.orchestrator
+  - python -m src.orchestrator.tasks
+  - python -m src.orchestrator
 
 It sends SIGTERM to the entire process group first, waits briefly, then SIGKILL
 if necessary. Optionally clears orchestrator state files.
@@ -26,8 +26,8 @@ BENCH_ROOT = Path(__file__).resolve().parents[1]
 
 
 PATTERNS: Tuple[str, ...] = (
-    "python -m huey_orchestrator.worker",
-    "python -m huey_orchestrator.orchestrator",
+    "python -m src.orchestrator.tasks",
+    "python -m src.orchestrator",
 )
 
 

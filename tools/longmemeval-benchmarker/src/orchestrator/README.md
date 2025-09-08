@@ -32,7 +32,7 @@ Mycelian Memory Service
 
 Start a new run (enqueue questions only):
 ```bash
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --num-questions 10 \
     --workers 3
@@ -40,7 +40,7 @@ python -m src.orchestrator.orchestrator \
 
 Resume a run (default: resume-from-next-session):
 ```bash
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --resume \
     --run-id run_1234567890
@@ -49,13 +49,13 @@ python -m src.orchestrator.orchestrator \
 Resume with explicit mode:
 ```bash
 # Restart from first session (clears memory_id, resets counters)
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --resume --run-id run_1234567890 \
     --resume-mode restart-from-first-session
 
 # Resume from next session (keep memory_id, continue from completed_sessions)
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --resume --run-id run_1234567890 \
     --resume-mode resume-from-next-session
@@ -63,33 +63,33 @@ python -m src.orchestrator.orchestrator \
 
 Force retry failed questions during resume:
 ```bash
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --resume --run-id run_1234567890 --force
 ```
 
 Monitor progress (no enqueue):
 ```bash
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --monitor --run-id run_1234567890
 ```
 
 Auto mode (enqueue → start worker → monitor → shutdown):
 ```bash
-python -m src.orchestrator.orchestrator \
+python -m src.orchestrator \
     /absolute/path/to/config.toml \
     --auto --workers 3
 ```
 
 Stop workers and orchestrators, optionally clear state:
 ```bash
-python -m src.orchestrator.orchestrator --stop [--force] [--clear-state]
+python -m src.orchestrator --stop [--force] [--clear-state]
 ```
 
 Clear orchestrator state (task DB and progress DB) only:
 ```bash
-python -m src.orchestrator.orchestrator --clear-state
+python -m src.orchestrator --clear-state
 ```
 
 ### Worker

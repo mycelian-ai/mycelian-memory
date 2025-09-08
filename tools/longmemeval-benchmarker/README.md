@@ -146,31 +146,31 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
    source venv/bin/activate
 
    # Auto mode (recommended): Start, monitor, and shutdown automatically
-   python -m src.orchestrator.orchestrator run.toml --auto --workers 3
+   python -m src.orchestrator run.toml --auto --workers 3
 
    # Or run with custom run ID
-   python -m src.orchestrator.orchestrator run.toml --auto --workers 3 --run-id my_benchmark_run
+   python -m src.orchestrator run.toml --auto --workers 3 --run-id my_benchmark_run
 
    # Process only first N questions
-   python -m src.orchestrator.orchestrator run.toml --auto --workers 3 --num-questions 10
+   python -m src.orchestrator run.toml --auto --workers 3 --num-questions 10
    ```
 
 3. **Resume a failed/incomplete run**:
    ```bash
    # Resume from where it left off (default behavior)
-   python -m src.orchestrator.orchestrator run.toml --resume --run-id my_benchmark_run
+   python -m src.orchestrator run.toml --resume --run-id my_benchmark_run
 
    # Force retry failed questions
-   python -m src.orchestrator.orchestrator run.toml --resume --run-id my_benchmark_run --force
+   python -m src.orchestrator run.toml --resume --run-id my_benchmark_run --force
 
    # Restart questions from beginning (clears memory)
-   python -m src.orchestrator.orchestrator run.toml --resume --run-id my_benchmark_run \
+   python -m src.orchestrator run.toml --resume --run-id my_benchmark_run \
      --resume-mode restart-from-first-session
    ```
 
 4. **Monitor progress** (separate terminal):
    ```bash
-   python -m src.orchestrator.orchestrator run.toml --monitor --run-id my_benchmark_run
+   python -m src.orchestrator run.toml --monitor --run-id my_benchmark_run
    ```
 
 5. **Check results**:
