@@ -21,7 +21,7 @@ class ProgressTracker:
     def __init__(self, db_path: str = "progress.db"):
         # Anchor default DB under benchmarker root data/ to avoid CWD mismatches
         if not db_path or db_path == "progress.db":
-            data_dir = Path(__file__).resolve().parents[1] / 'data'
+            data_dir = Path(__file__).resolve().parents[2] / 'data'
             data_dir.mkdir(parents=True, exist_ok=True)
             self.db_path = str(data_dir / "progress.db")
         else:

@@ -816,6 +816,11 @@ CRITICAL INSTRUCTION: You MUST call ONLY the put_context tool - no other tools.
 - Do NOT call add_entry, await_consistency, or any other tools
 - Return ONLY a single put_context tool call
 
+STRICT OUTPUT RULES FOR put_context.content:
+- Return ONLY the context body. Do NOT include any headings, titles, or prefaces such as "Context synthesized...", "Summary:", or similar.
+- Do NOT include meta commentary or labels. Start directly with the synthesized context content.
+- Use clear paragraphs or bullet points as needed, but avoid a leading label line.
+
 ---
 CONTEXT MAINTENANCE RULES:
 {context_prompt}"""
