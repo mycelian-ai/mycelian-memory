@@ -30,8 +30,39 @@ def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
 
 
 def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
-    latest_ctx = (search_result.get("latestContext") or search_result.get("latest_context") or "").strip()
-    best_ctx = (search_result.get("bestContext") or search_result.get("best_context") or "").strip()
+    import json
+
+    # Get latestContext - handle JSON-encoded strings
+    latest_ctx_raw = search_result.get("latestContext") or ""
+    latest_ctx = ""
+    if latest_ctx_raw:
+        # Check if it's a JSON string (starts with '{')
+        if isinstance(latest_ctx_raw, str) and latest_ctx_raw.strip().startswith('{'):
+            try:
+                parsed = json.loads(latest_ctx_raw)
+                # Extract the actual context from JSON structure
+                if isinstance(parsed, dict):
+                    # Handle old format with activeContext field
+                    latest_ctx = parsed.get("activeContext", "")
+                    if not latest_ctx:
+                        # If no activeContext, use the whole parsed object as string
+                        latest_ctx = str(parsed)
+            except json.JSONDecodeError:
+                latest_ctx = latest_ctx_raw
+        else:
+            latest_ctx = str(latest_ctx_raw)
+    latest_ctx = latest_ctx.strip()
+
+    # Get context shards from contexts array (new API format)
+    contexts = search_result.get("contexts") or []
+    context_texts: list[str] = []
+    for ctx in contexts[:3]:  # Get top context shards
+        if isinstance(ctx, dict):
+            ctx_text = ctx.get("context", "")
+            if ctx_text:
+                context_texts.append(str(ctx_text))
+
+    # Get entry summaries
     entries = search_result.get("entries") or []
     entries_text: list[str] = []
     for e in entries[: top_k]:
@@ -39,8 +70,18 @@ def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
             txt = e.get("summary") or ""
             if txt:
                 entries_text.append(str(txt))
-    parts = [s for s in [latest_ctx, best_ctx, "\n\n".join(entries_text)] if s]
-    return "\n\n".join(parts)
+
+    # Build final context from all parts
+    # Priority: latestContext, then context shards, then entry summaries
+    parts = []
+    if latest_ctx:
+        parts.append(latest_ctx)
+    if context_texts:
+        parts.append("\n\n".join(context_texts))
+    if entries_text:
+        parts.append("\n\n".join(entries_text))
+
+    return "\n\n".join(parts) if parts else ""
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:

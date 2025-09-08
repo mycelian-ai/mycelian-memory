@@ -7,7 +7,16 @@ shards. This allows the memory to ensure that we have high fidelity context avai
 
 **Core Rules:**
 
-Context Sharding and Pruning Rules: You MUST limit a materialized context to be under 5000 words or 1000 tokens, whichever is smaller. If it is larger than that this limit then you have to prune some information. Prioritize pruning information that is from an older part of the conversation that you didn't observe in this specific session. If an input message begins with the exact tag `[previous_context]`, treat everything after the tag as prior conversation context from earlier turns. Use this prior context to guide pruning when applying the sharding/size limits: prefer preserving facts, entities, topics, decisions, and timeline items that align with or are referenced by this prior context; deprioritize unrelated older details. Do not copy the whole prior context verbatim. Extract durable facts and integrate them into the appropriate sections of the materialized context shards per the Document Structure above. Strip the `[previous_context]` tag itself and do not persist the tag or its raw content verbatim in shards.
+Context Sharding and Pruning Rules: You MUST limit a materialized context to be under 5000 words or 1000 tokens, whichever is smaller. If it is larger than that this limit then you have to prune some information. Prioritize pruning information that is from an older part of the conversation that you didn't observe in this specific session.
+
+**CRITICAL CONTEXT REPLACEMENT RULES:**
+- If an input message begins with the exact tag `[previous_context]`, treat everything after the tag as OLD context from previous sessions
+- Messages WITHOUT the `[previous_context]` tag are the NEW conversation from the current session
+- When the new conversation discusses DIFFERENT topics than the old context, REPLACE the old unrelated content with the new information
+- Only preserve old context if it's directly relevant to or referenced by the new conversation
+- Priority order: Current session messages > Relevant old context > Unrelated old context (prune this)
+- Do not copy the whole prior context verbatim. Extract only durable facts that remain relevant given the new conversation
+- Strip the `[previous_context]` tag itself and do not persist the tag or its raw content verbatim in shards
 
 Data Extraction Rule:
 - Record durable facts, user preferences, decisions, key events, key topics, and important entities.
