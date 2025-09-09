@@ -187,8 +187,7 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
     merged = {
         "entries": [],
         "contexts": [],
-        "latestContext": first_results.get("latestContext") or first_results.get("latest_context"),
-        "bestContext": first_results.get("bestContext") or first_results.get("best_context")
+        "latestContext": first_results.get("latestContext") or first_results.get("latest_context")
     }
 
     # Track seen entry IDs to avoid duplicates
@@ -490,18 +489,18 @@ class SingleQuestionRunner:
                     runner_log
                 )
             else:
-                runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=single query='%s' top_k=%d",
-                              qid, memory_id, query_text[:100], self.cfg.params.top_k)
+                runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=single query='%s' top_ke=%d top_kc=%d",
+                              qid, memory_id, query_text[:100], 5, 3)
                 sr = memory_manager.search_memories(
-                    memory_id, query=query_text, top_k=self.cfg.params.top_k
+                    memory_id, query=query_text, top_ke=5, top_kc=3
                 )
 
             # Log search results
             entries_count = len(sr.get("entries", []) if isinstance(sr, dict) else [])
             has_latest = bool((sr.get("latestContext") or sr.get("latest_context")) if isinstance(sr, dict) else False)
-            has_best = bool((sr.get("bestContext") or sr.get("best_context")) if isinstance(sr, dict) else False)
-            runner_log.info("SEARCH_RESULT qid=%s entries=%d has_latest=%s has_best=%s",
-                          qid, entries_count, has_latest, has_best)
+            contexts_count = len(sr.get("contexts", []) if isinstance(sr, dict) else [])
+            runner_log.info("SEARCH_RESULT qid=%s entries=%d has_latest=%s contexts=%d",
+                          qid, entries_count, has_latest, contexts_count)
 
             # Build context and log it
             ctx = _build_qa_context(sr, self.cfg.params.top_k)
