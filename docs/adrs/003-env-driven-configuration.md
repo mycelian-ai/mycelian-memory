@@ -1,6 +1,6 @@
 # ADR-003: Environment-Driven Configuration (12-Factor)
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-07-21
 
 ## Context
@@ -9,7 +9,7 @@ Services run in containers across local Docker, CI, and production environments.
 
 ## Decision
 
-1. All runtime configuration provided via environment variables parsed with `kelseyhightower/envconfig`  
+1. All runtime configuration provided via environment variables parsed with `kelseyhightower/envconfig`
 2. Required keys include: `DB_CONNECTION_STRING`, `PORT`, `ENV_STAGE`, `VECTOR_SEARCH_URL`
 3. Defaults exist only for local development (e.g., `PORT=8080`); CI ensures required keys are set for other stages
 
@@ -17,11 +17,11 @@ Services run in containers across local Docker, CI, and production environments.
 
 ### Positive Consequences
 - Containers are stateless and portable across environments
-- Secret injection (cloud-specific) is seamless  
+- Secret injection (cloud-specific) is seamless
 - Configuration changes require no image rebuild—only env-var updates in deployment
 - Eliminates config file sync issues between environments
 
-### Negative Consequences  
+### Negative Consequences
 - Configuration scattered across deployment files rather than centralized
 - Environment-specific debugging requires access to deployment environment
 - No compile-time validation of configuration structure
@@ -36,7 +36,7 @@ Services run in containers across local Docker, CI, and production environments.
 
 ### Environment Categories
 - **Local Development**: Minimal required config with sensible defaults
-- **CI/Testing**: All required fields explicitly set  
+- **CI/Testing**: All required fields explicitly set
 - **Production**: All config via encrypted environment variables
 
 ### Secret Management

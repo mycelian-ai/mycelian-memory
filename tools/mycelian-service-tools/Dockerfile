@@ -10,5 +10,3 @@ WORKDIR /root/
 COPY --from=builder /app/mycelian-service-tools ./mycelian-service-tools
 RUN apk add --no-cache curl
 ENTRYPOINT ["./mycelian-service-tools"]
-
-

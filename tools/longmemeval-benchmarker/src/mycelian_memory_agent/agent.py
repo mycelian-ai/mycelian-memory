@@ -352,6 +352,14 @@ class MycelianMemoryAgent:
                     if isinstance(msg, ToolMessage):
                         if msg.name == "get_context":
                             context_text = msg.content
+                            # Log the retrieved context content
+                            logger.info(json.dumps({
+                                "event": "get_context_retrieved",
+                                "timestamp": datetime.utcnow().isoformat(),
+                                "memory_id": self.memory_id,
+                                "context_length": len(context_text),
+                                "context_preview": context_text[:500] if context_text else "[empty]"
+                            }))
                         elif msg.name == "list_entries":
                             entries_text = msg.content
 
@@ -387,8 +395,9 @@ class MycelianMemoryAgent:
                 }))
 
                 # Just add to conversation history and return
+                # FIX: Append to existing conversation_history instead of replacing it
                 return {
-                    "conversation_history": to_process,
+                    "conversation_history": conversation_history + to_process,
                     "tool_history": tool_history + [AIMessage(content="Message accumulated (context-only).")]
                 }
 
@@ -415,10 +424,32 @@ class MycelianMemoryAgent:
                     conversation_history, to_process[0], self.prompts,
                     self.vault_id, self.memory_id
                 )
-                response = self._invoke_llm_with_retry([
+                llm_messages = [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
-                ])
+                ]
+                # Log the full message array being sent to the model (add_entry)
+                try:
+                    logger.info(json.dumps({
+                        "event": "llm_input_messages_full",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "purpose": "add_entry",
+                        "memory_id": self.memory_id,
+                        "vault_id": self.vault_id,
+                        "messages_count": len(llm_messages),
+                        "messages": llm_messages
+                    }))
+                except (TypeError, ValueError):
+                    # Fallback: omit messages if they are not JSON serializable in unexpected cases
+                    logger.info(json.dumps({
+                        "event": "llm_input_messages_full",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "purpose": "add_entry",
+                        "memory_id": self.memory_id,
+                        "vault_id": self.vault_id,
+                        "messages_count": len(llm_messages)
+                    }))
+                response = self._invoke_llm_with_retry(llm_messages)
                 # Filter tool calls to only allowed ones
                 response = self._filter_tool_calls(response, control, last_tool)
                 # Also add to messages for ToolNode
@@ -491,10 +522,31 @@ class MycelianMemoryAgent:
                     conversation_history, self.prompts,
                     self.vault_id, self.memory_id
                 )
-                response = self._invoke_llm_with_retry([
+                llm_messages = [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
-                ])
+                ]
+                # Log the full message array being sent to the model (put_context during FLUSH)
+                try:
+                    logger.info(json.dumps({
+                        "event": "llm_input_messages_full",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "purpose": "put_context",
+                        "memory_id": self.memory_id,
+                        "vault_id": self.vault_id,
+                        "messages_count": len(llm_messages),
+                        "messages": llm_messages
+                    }))
+                except (TypeError, ValueError):
+                    logger.info(json.dumps({
+                        "event": "llm_input_messages_full",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "purpose": "put_context",
+                        "memory_id": self.memory_id,
+                        "vault_id": self.vault_id,
+                        "messages_count": len(llm_messages)
+                    }))
+                response = self._invoke_llm_with_retry(llm_messages)
                 # Filter tool calls to only allowed ones
                 response = self._filter_tool_calls(response, control, last_tool)
                 # Also add to messages for ToolNode
@@ -557,10 +609,31 @@ class MycelianMemoryAgent:
                     conversation_history, self.prompts,
                     self.vault_id, self.memory_id
                 )
-                response = self._invoke_llm_with_retry([
+                llm_messages = [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Execute the required operation."}
-                ])
+                ]
+                # Log the full message array being sent to the model (final put_context)
+                try:
+                    logger.info(json.dumps({
+                        "event": "llm_input_messages_full",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "purpose": "put_context_final",
+                        "memory_id": self.memory_id,
+                        "vault_id": self.vault_id,
+                        "messages_count": len(llm_messages),
+                        "messages": llm_messages
+                    }))
+                except (TypeError, ValueError):
+                    logger.info(json.dumps({
+                        "event": "llm_input_messages_full",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "purpose": "put_context_final",
+                        "memory_id": self.memory_id,
+                        "vault_id": self.vault_id,
+                        "messages_count": len(llm_messages)
+                    }))
+                response = self._invoke_llm_with_retry(llm_messages)
                 # Filter tool calls to only allowed ones
                 response = self._filter_tool_calls(response, control, last_tool)
                 # Also add to messages for ToolNode
@@ -623,14 +696,28 @@ class MycelianMemoryAgent:
         """
         if hasattr(response, 'tool_calls') and response.tool_calls:
             for idx, call in enumerate(response.tool_calls):
+                tool_name = call.get('name', 'unknown') if isinstance(call, dict) else getattr(call, 'name', 'unknown')
+                args = call.get('args', {}) if isinstance(call, dict) else getattr(call, 'args', {})
+
+                # Enhanced logging for put_context to see what content is being stored
+                if tool_name == 'put_context' and 'content' in args:
+                    logger.info(json.dumps({
+                        "event": "put_context_content",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "invocation_id": invocation_id,
+                        "memory_id": args.get('memory_id', ''),
+                        "content_length": len(args['content']),
+                        "content_preview": args['content'][:1000] if args['content'] else "[empty]"
+                    }))
+
                 logger.info(json.dumps({
                     "event": "llm_tool_call",
                     "timestamp": datetime.utcnow().isoformat(),
                     "invocation_id": invocation_id,
                     "tool_index": idx,
                     "tool_count": len(response.tool_calls),
-                    "tool": call.get('name', 'unknown') if isinstance(call, dict) else getattr(call, 'name', 'unknown'),
-                    "args": call.get('args', {}) if isinstance(call, dict) else getattr(call, 'args', {})
+                    "tool": tool_name,
+                    "args": args
                 }))
 
     def invoke(self, control: ControlState, thread_id: str,
@@ -801,6 +888,16 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
 
     # Format all conversation messages
     full_conversation = format_messages(conversation_history)
+
+    # Log the conversation being sent to LLM for context synthesis
+    logger.info(json.dumps({
+        "event": "put_context_llm_input",
+        "timestamp": datetime.utcnow().isoformat(),
+        "memory_id": memory_id,
+        "conversation_count": len(conversation_history),
+        "conversation_length": len(full_conversation),
+        "conversation_preview": full_conversation[:1000] if full_conversation else "[empty]"
+    }))
 
     prompt = f"""{AGENT_PREFIX}
 

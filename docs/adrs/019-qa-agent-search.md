@@ -30,7 +30,7 @@ Implement an **Agentic Search System** that iteratively refines queries based on
 ```python
 class SearchAgent:
     """Agentic search with iterative refinement based on observations."""
-    
+
     def __init__(self, memory_id: str, memory_manager: MemoryManager, model_id: str):
         self.memory_id = memory_id
         self.mm = memory_manager
@@ -112,15 +112,15 @@ For "How many items of clothing do I need to pick up or return from a store?":
 # In single_question_runner.py
 def _agentic_search(memory_id: str, question: str, mm: MemoryManager, model_id: str) -> Dict:
     """Use search agent for complex questions."""
-    
+
     agent = SearchAgent(memory_id, mm, model_id)
     results = agent.search(question, max_iterations=3)
-    
+
     # Log search trajectory for debugging
     logger.info(f"Search completed in {len(agent.search_history)} iterations")
     for step in agent.search_history:
         logger.debug(f"  {step['action']}: {step['query']} -> {step['results_count']} results")
-    
+
     return results
 ```
 
@@ -129,16 +129,16 @@ def _agentic_search(memory_id: str, question: str, mm: MemoryManager, model_id: 
 ```python
 def _identify_noise_patterns(self, results: Dict, question_intent: Dict):
     """Identify irrelevant contexts that match keywords."""
-    
+
     prompt = """Analyze these search results to identify noise vs signal:
-    
+
     Question Intent: {intent}
     Results: {results_summary}
-    
+
     Identify:
     1. NOISE: Contexts matching keywords but irrelevant to the question
     2. SIGNAL: Contexts relevant to answering the question
-    
+
     Return patterns to filter and patterns to pursue."""
 ```
 
@@ -147,7 +147,7 @@ def _identify_noise_patterns(self, results: Dict, question_intent: Dict):
 ```python
 def _is_sufficient(self, question: str, intent: Dict) -> bool:
     """Determine if accumulated results are sufficient."""
-    
+
     if intent['answer_type'] == 'count':
         # Check if we have all items for counting
         return self._verify_count_completeness()
@@ -162,7 +162,7 @@ def _is_sufficient(self, question: str, intent: Dict) -> bool:
 ## Benefits
 
 1. **Improved Recall**: Iterative refinement finds scattered information
-2. **Better Precision**: Active noise filtering reduces irrelevant results  
+2. **Better Precision**: Active noise filtering reduces irrelevant results
 3. **Adaptive Strategy**: Adjusts approach based on what's found
 4. **Explainable Process**: Search history provides debugging insight
 5. **Graceful Degradation**: Works with partial information

@@ -157,5 +157,3 @@ No assistant text authored by the agent is ever added to state; AIMessage entrie
 ## References
 
 - LangGraph – Workflows & agents → Agent (custom graph with tool loop): [link](https://langchain-ai.github.io/langgraph/tutorials/workflows/#agent)
-
-

@@ -21,6 +21,7 @@ from typing import List, Dict, Optional
 import tomllib  # Python 3.11+
 
 from src.orchestrator.progress_tracker import ProgressTracker
+from src.paths import resolve_under_root
 
 # Configure logging
 logging.basicConfig(
@@ -277,9 +278,11 @@ def generate_run_id() -> str:
               help='Stop all running benchmarker processes (workers and orchestrators) and exit')
 @click.option('--force', is_flag=True,
               help='When used with --stop: do not prompt. With --resume: force retry all failed questions.')
+@click.option('--qa-only', is_flag=True,
+              help='Run only QA phase for an existing run (requires --run-id). Always re-runs QA for questions with completed ingestion.')
 def main(config_path: str, num_questions: Optional[int],
          resume: bool, run_id: Optional[str], workers: int, resume_mode: str, monitor: bool, auto: bool, clear_state: bool,
-         stop: bool, force: bool):
+         stop: bool, force: bool, qa_only: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
 
@@ -326,6 +329,57 @@ def main(config_path: str, num_questions: Optional[int],
     # Initialize progress tracker
     tracker = ProgressTracker()
 
+    # Handle QA-only mode
+    if qa_only:
+        if not run_id:
+            click.echo("Error: --run-id is required for --qa-only mode")
+            return 1
+
+        logger.info(f"QA-only mode for run: {run_id}")
+
+        # Bind per-run queue
+        queue_name = f"huey-{run_id}"
+        os.environ['HUEY_QUEUE_NAME'] = queue_name
+        os.environ['HUEY_RUN_ID'] = run_id
+
+        # Import tasks
+        from src.orchestrator import tasks as _tasks
+
+        # Get all completed-ingestion questions from tracker
+        questions = tracker.get_questions_for_qa(run_id, include_completed=True)
+
+        if not questions:
+            click.echo(f"No completed questions found for run {run_id}")
+            return 1
+
+        click.echo(f"Found {len(questions)} questions to run QA for")
+
+        # Enqueue QA tasks
+        for row in questions:
+            qid = row.get('question_id') if isinstance(row, dict) else (row[0] if row else None)
+            if not qid:
+                continue
+            _tasks.run_qa(run_id, qid)
+
+        click.echo(f"{len(questions)} QA tasks enqueued")
+
+        if auto:
+            click.echo("\nAuto mode: starting worker and monitoring")
+            worker_proc = _start_worker_subprocess(workers, queue_name)
+            atexit.register(lambda: _stop_worker_subprocess(worker_proc))
+
+            try:
+                monitor_progress(tracker, run_id)
+            except KeyboardInterrupt:
+                click.echo("\nStopping worker...")
+            finally:
+                _stop_worker_subprocess(worker_proc)
+        else:
+            click.echo(f"\nStart worker to process QA tasks:")
+            click.echo(f"  HUEY_QUEUE_NAME={queue_name} python -m src.orchestrator.worker --workers {workers}")
+
+        return 0
+
     if monitor:
         # Monitor mode - just show progress
         if not run_id:
@@ -340,6 +394,8 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("Error: CONFIG_PATH is required unless using --clear-state")
         return 1
 
+    # Normalize config path early to an absolute path
+    config_path = str(resolve_under_root(config_path))
     with open(config_path, 'rb') as f:
         cfg_dict = tomllib.load(f)
 
@@ -379,8 +435,8 @@ def main(config_path: str, num_questions: Optional[int],
             run_id = generate_run_id()
         logger.info(f"Starting new run: {run_id}")
 
-        # Initialize run in database with metadata
-        tracker.init_run(run_id, dataset, dataset_path=dataset_path, config_path=config_path)
+        # Initialize run in database with metadata (persist absolute config path)
+        tracker.init_run(run_id, dataset, dataset_path=dataset_path, config_path=str(config_path))
 
     # Bind per-run queue and log file before importing tasks
     queue_name = f"huey-{run_id}"

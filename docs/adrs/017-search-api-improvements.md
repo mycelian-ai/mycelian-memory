@@ -1,8 +1,8 @@
 # ADR-017: Search API Parameter Standardization
 
-**Status:** Accepted  
-**Date:** 2025-01-04  
-**Authors:** @sam33rch  
+**Status:** Accepted
+**Date:** 2025-01-04
+**Authors:** @sam33rch
 
 ## Context
 
@@ -43,7 +43,7 @@ This is a breaking change with no backward compatibility.
 ```json
 {
   "memoryId": "string",    // Required
-  "query": "string",        // Required  
+  "query": "string",        // Required
   "top_ke": 5,             // Optional (default: 5, range: 0-10)
   "top_kc": 2              // Optional (default: 2, range: 1-3)
 }

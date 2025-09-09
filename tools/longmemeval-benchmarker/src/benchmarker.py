@@ -155,6 +155,8 @@ def main() -> None:
                        help="Start from this session index (for resume)")
     parser.add_argument("--memory-id", help="Memory ID for QA-only mode (skips memory creation)")
     parser.add_argument("--vault-id", help="Vault ID for QA-only mode (skips vault resolution)")
+    parser.add_argument("--qa-rerun", action="store_true",
+                       help="Re-run QA for an existing run (loads vault/memory IDs from previous run)")
     args = parser.parse_args()
 
     with open(args.config, "rb") as f:

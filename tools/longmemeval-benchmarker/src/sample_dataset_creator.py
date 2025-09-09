@@ -21,12 +21,12 @@ from typing import List, Dict
 
 def load_dataset(dataset_path: str) -> List[Dict]:
     path = Path(dataset_path)
-    
+
     # If it's a direct file path, use it
     if path.is_file():
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
-    
+
     # Otherwise, treat as directory and search for known files
     if path.is_dir():
         candidates = [
@@ -44,7 +44,7 @@ def load_dataset(dataset_path: str) -> List[Dict]:
             )
         with src.open("r", encoding="utf-8") as f:
             return json.load(f)
-    
+
     raise FileNotFoundError(f"Path does not exist: {dataset_path}")
 
 
@@ -119,11 +119,11 @@ def main() -> None:
     if args.question_id:
         if not args.output:
             args.output = f"longmemeval_{args.question_id}.json"
-        
+
         print(f"Loading dataset from: {args.dataset_path}")
         questions = load_dataset(args.dataset_path)
         print(f"Total questions loaded: {len(questions)}")
-        
+
         # Filter to specific question ID
         subset = [q for q in questions if q.get("question_id") == args.question_id]
         if not subset:
@@ -172,5 +172,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

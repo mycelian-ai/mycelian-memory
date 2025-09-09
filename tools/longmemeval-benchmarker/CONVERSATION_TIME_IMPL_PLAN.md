@@ -1,3 +1,98 @@
+## Conversation Time – Implementation Plan (tools/longmemeval-benchmarker)
+
+### TL;DR
+- **Goal**: Define, instrument, compute, and report conversation-time metrics per session/question and per run, without altering benchmark semantics.
+- **Output**: Persisted metrics in `progress.db` (UTC), per-session metrics in `out/run_*/hypotheses.jsonl`, and a run-level summary artifact.
+- **Approach**: Start with clear definitions and post-hoc validation from logs, then add targeted instrumentation at the runner level.
+
+### Scope
+- **In-scope**: Definitions, instrumentation points in the runner/orchestrator, storage schema shaping, reporting, validation, and rollout.
+- **Out-of-scope**: Changing agent behavior, model parameters, dataset content, or server-side APIs.
+
+### Non-Goals
+- No change to how messages are authored or persisted beyond timestamps/metrics.
+- No introduction of environment-variable switches; behavior is driven by runner configuration/flags only.
+
+### Definitions (all timestamps UTC)
+- **Conversation window**:
+  - `conversation_start_at`: Timestamp of the first persisted conversation message for a session after the question begins (user or assistant), or the first agent invocation start—whichever occurs first and is observed by the runner.
+  - `conversation_end_at`: Timestamp when the session reaches a terminal state (DONE/FAIL/CANCEL), defined as the timestamp of the last persisted conversation message leading to finalization if available; otherwise, the terminal event time recorded by the runner.
+  - `conversation_elapsed_ms = conversation_end_at - conversation_start_at`.
+- **Active time**:
+  - Sum of assistant invocation active durations observed by the runner (model request/stream spans, tool resolution spans) across the session.
+  - `conversation_active_ms = Σ(invocation_active_ms + tool_active_ms)`.
+- **Idle time**:
+  - Time inside the window not accounted as active.
+  - `conversation_idle_ms = conversation_elapsed_ms - conversation_active_ms` (floored at 0).
+- **Turns**:
+  - Count of persisted conversation messages in the session (assistant or user) that are part of the solution attempt.
+
+Edge cases to define precisely during validation:
+- Sessions with zero assistant invocations (report `active_ms = 0`).
+- Finalization without a last message (use terminal event timestamp).
+- Retries/backoffs: count only time when a live request is in-flight as active; backoff delays are idle.
+- Concurrent spans: do not double-count overlapping active intervals.
+
+### Data Sources
+- Runner/orchestrator logs (e.g., events like `invoker_start`, `invoker_flush`, tool timing).
+- Runner in-memory timing spans around assistant/model calls and tool operations.
+- `progress.db` (SQLite) session/message rows and timestamps (stored in UTC).
+
+### Instrumentation Plan (runner-side only)
+1. **Boundary markers**
+   - Start: on the first persisted conversation message for the session or the first assistant invocation start—whichever occurs first.
+   - End: on terminal session state (DONE/FAIL/CANCEL); prefer the timestamp of the final persisted message if present, else the terminal event time.
+2. **Active spans**
+   - Assistant invocation span: from request dispatch to final token/stream completion.
+   - Tool span(s): from tool-call dispatch to completion per tool.
+   - Merge spans to avoid double counting (interval union).
+3. **Turn counting**
+   - Count persisted conversation messages (assistant/user) within the window.
+4. **Clock discipline**
+   - Use monotonic timers for durations; attach wall-clock UTC timestamps for persistence.
+
+### Storage & Schema (progress.db)
+- Store per-session metrics:
+  - `conversation_start_at` (UTC ISO-8601)
+  - `conversation_end_at` (UTC ISO-8601)
+  - `conversation_elapsed_ms` (INTEGER)
+  - `conversation_active_ms` (INTEGER)
+  - `conversation_idle_ms` (INTEGER)
+  - `conversation_turns` (INTEGER)
+- Optional: per-invocation spans kept ephemeral in logs; avoid schema bloat unless needed for audits.
+- All timestamps stored in UTC; ensure consistency with `last_progress_at` and existing runner updates.
+
+### Reporting
+- Per-session: extend `out/run_<id>/hypotheses.jsonl` entries with the conversation metrics.
+- Run summary: emit `out/run_<id>/summary.json` with aggregates: mean/median/p95 for elapsed/active/idle, distribution of turns, and counts by terminal state.
+- Logs: one-line summary per session at completion, e.g., `CONV_TIME total=..., active=..., idle=..., turns=..., status=...`.
+
+### Validation Plan (pre-instrumentation and post)
+- Phase 0: Post-hoc compute from existing logs to validate definitions, compare against runner-observed windows, and tune boundary rules.
+- Phase 1: With instrumentation, cross-check stored metrics against recomputation from logs on a sample of runs (tolerance ±1s).
+
+### Rollout Plan
+- Phase 0: Land definitions and doc-only plan (this file).
+- Phase 1: Add runner instrumentation under a guarded code path; keep default behavior unchanged.
+- Phase 2: Enable metrics persistence and JSONL reporting by default.
+- Phase 3: Add run-level summary and dashboards (if desired).
+
+### Risks and Mitigations
+- **Boundary ambiguity** (start/end): Prefer persisted message timestamps; fall back to terminal event time; assert invariants in code.
+- **Clock skew**: Use a single process clock; rely on monotonic deltas for durations.
+- **Double counting active spans**: Interval-union merge of overlapping spans; test coverage on overlap cases.
+- **Missing data**: If spans are missing, compute elapsed and turns; leave `active_ms` null/0 with a warning flag.
+
+### Acceptance Criteria
+- Metrics appear in `progress.db` and `out/run_*/hypotheses.jsonl` for every terminal session.
+- Aggregates present in `summary.json`; values consistent with log-derived recomputation within tolerance.
+- No >2% runtime overhead on the runner; no change in pass/fail outcomes.
+
+### Open Questions
+- Should backoff delays be counted as idle (proposed: yes)?
+- Do we include tool network time as active (proposed: yes)?
+- How to treat partial sessions on crash/restart (proposed: compute window on re-finalization only)?
+
 # Conversation Time Implementation Plan
 
 ## Overview

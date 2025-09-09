@@ -11,20 +11,20 @@ def create_mcp_client(
     server_name: str = "mycelian-memory-streamable"
 ) -> MultiServerMCPClient:
     """Create a configured MCP client.
-    
+
     This is a utility function to create MCP clients that can be shared
     between multiple components (AgentBuilder, MemoryManager, etc.)
-    
+
     Args:
         server_url: Optional MCP server URL (defaults to env var or localhost)
         server_name: Name of the MCP server (default: mycelian-memory-streamable)
-        
+
     Returns:
         Configured MultiServerMCPClient instance
     """
     DEFAULT_MCP_URL = "http://localhost:11546/mcp"
     url = server_url or os.environ.get("MYCELIAN_MCP_URL", DEFAULT_MCP_URL)
-    
+
     return MultiServerMCPClient({
         server_name: {
             "url": url,

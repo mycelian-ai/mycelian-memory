@@ -10,7 +10,7 @@ The official LongMemEval dataset specification states that answers should be str
 
 **Distribution by question type:**
 - `multi-session`: 22 questions with integer answers
-- `temporal-reasoning`: 8 questions with integer answers  
+- `temporal-reasoning`: 8 questions with integer answers
 - `knowledge-update`: 2 questions with integer answers
 
 These are typically counting questions like:

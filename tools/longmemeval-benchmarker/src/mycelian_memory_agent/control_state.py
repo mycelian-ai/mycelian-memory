@@ -5,7 +5,7 @@ from enum import Enum
 
 class ControlState(Enum):
     """Control states for agent execution.
-    
+
     These control states determine the operation sequence the agent will perform.
     """
     START_SESSION = "start_session"

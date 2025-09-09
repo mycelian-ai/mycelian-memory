@@ -26,18 +26,18 @@ results = []
 for q in dataset[:2]:  # First 2 questions that were ingested
     qid = q["question_id"]
     question_text = q.get("question", "No question provided")
-    
+
     if qid not in MEMORY_MAP:
         print(f"Skipping {qid} - no memory found")
         continue
-    
+
     memory_id = MEMORY_MAP[qid]
     print(f"\n{'='*60}")
     print(f"Question ID: {qid}")
     print(f"Memory ID: {memory_id}")
     print(f"Question: {question_text}")
     print(f"{'='*60}")
-    
+
     try:
         result = search_and_qa(
             memory_id=memory_id,
@@ -46,15 +46,15 @@ for q in dataset[:2]:  # First 2 questions that were ingested
             model=MODEL,
             use_two_pass=USE_TWO_PASS
         )
-        
+
         print(f"\nAnswer: {result['answer']}")
-        
+
         # Store result in LongMemEval format
         results.append({
             "question_id": qid,
             "hypothesis": result['answer']
         })
-        
+
     except Exception as e:
         print(f"Error processing {qid}: {e}")
         results.append({

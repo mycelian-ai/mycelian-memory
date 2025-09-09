@@ -3,7 +3,7 @@ DEPRECATED: This module is currently unused in favor of LangChain's built-in ret
 
 We are using LangChain's built-in retry handling (max_retries parameter) which is configured
 on all model initializations. We will evaluate if this default handling is sufficient for our
-needs. If we encounter issues with rate limiting or need more sophisticated retry logic 
+needs. If we encounter issues with rate limiting or need more sophisticated retry logic
 (exponential backoff, custom error detection, retry logging), we may reactivate and use this
 module based on our results.
 
@@ -36,7 +36,7 @@ RETRYABLE_LLM_PATTERNS = {
     "rate_limit",
     "429",
     "500",
-    "502", 
+    "502",
     "503",
     "504",
     "timeout",
@@ -70,7 +70,7 @@ def backoff_schedule_from_env(env_key: str = "LME_LLM_BACKOFF_SCHEDULE") -> List
 
 def is_retryable_llm_error(exc: Exception) -> bool:
     """Check if an exception is a retryable LLM error (OpenAI or Vertex AI).
-    
+
     Checks for:
     - OpenAI RateLimitError (from openai package)
     - Google/Vertex AI exceptions (ResourceExhausted, ServiceUnavailable, etc.)
@@ -80,11 +80,11 @@ def is_retryable_llm_error(exc: Exception) -> bool:
     """
     exc_type = type(exc).__name__
     exc_str = str(exc).lower()
-    
+
     # Check for LangChain model provider inference error (likely transient/throttling)
     if "unable to infer model provider" in exc_str:
         return True
-    
+
     # Check for Google/Vertex AI exception types
     google_retryable_types = [
         "ResourceExhausted",  # 429 equivalent
@@ -96,7 +96,7 @@ def is_retryable_llm_error(exc: Exception) -> bool:
     ]
     if any(err_type in exc_type for err_type in google_retryable_types):
         return True
-    
+
     # Check for OpenAI-specific exception types
     if "ratelimiterror" in exc_type.lower():
         return True
@@ -106,13 +106,13 @@ def is_retryable_llm_error(exc: Exception) -> bool:
         return True
     if "apierror" in exc_type.lower() and any(p in exc_str for p in ["500", "502", "503", "504"]):
         return True
-    
+
     # Check for HTTP status codes in the error message
     if "429" in exc_str or "rate" in exc_str and "limit" in exc_str:
         return True
     if any(f"50{i}" in exc_str for i in range(5)):  # 500-504
         return True
-    
+
     # Check for common error patterns (excluding insufficient_quota here)
     for pattern in RETRYABLE_LLM_PATTERNS:
         if pattern in exc_str:
@@ -120,13 +120,13 @@ def is_retryable_llm_error(exc: Exception) -> bool:
     # Treat insufficient_quota as non-retryable (or handle with one-off long delay in caller)
     if "insufficient_quota" in exc_str:
         return False
-    
+
     # Check for openai.APIStatusError with retryable status codes
     if hasattr(exc, 'status_code'):
         status = getattr(exc, 'status_code', 0)
         if status == 429 or (500 <= status < 600):
             return True
-    
+
     # Check for response attribute (some OpenAI errors have this)
     if hasattr(exc, 'response'):
         try:
@@ -137,13 +137,13 @@ def is_retryable_llm_error(exc: Exception) -> bool:
                     return True
         except Exception:
             pass
-    
+
     return False
 
 
 def invoke_with_backoff(call_fn: Callable[[], Any], debug: bool = False, log: Optional[Callable[[str], None]] = None) -> Any:
     """DEPRECATED: Invoke call_fn with LLM-aware backoff (OpenAI and Vertex AI).
-    
+
     This function is currently unused. We're using LangChain's built-in retry via max_retries.
     Keeping this for potential future use if we need more sophisticated retry logic.
 
@@ -158,14 +158,14 @@ def invoke_with_backoff(call_fn: Callable[[], Any], debug: bool = False, log: Op
         except Exception as e:
             if not is_retryable_llm_error(e) or attempt > len(schedule):
                 raise
-            
+
             base_wait = schedule[attempt - 1]
             jitter = 1.0 + _random.uniform(-0.15, 0.15)
             sleep_for = max(0.1, base_wait * jitter)
-            
+
             # Log retries unconditionally when a logger is supplied
             if log is not None:
                 error_type = type(e).__name__
                 log(f"[agent][llm] retryable error ({error_type}): retry {attempt}/{len(schedule)+1} after {sleep_for:.2f}s")
-            
+
             _time.sleep(sleep_for)

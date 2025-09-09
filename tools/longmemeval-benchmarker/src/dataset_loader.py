@@ -80,13 +80,13 @@ def _normalize_record(rec: Dict[str, Any]) -> DatasetQuestion:
 
 def load_longmemeval_file(dataset_file_path: str) -> Iterable[DatasetQuestion]:
     """Yield questions from a specific LongMemEval dataset file.
-    
+
     Args:
         dataset_file_path: Direct path to the dataset file (JSON or JSONL)
     """
     if not dataset_file_path or not os.path.isfile(dataset_file_path):
         raise ValueError(f"Dataset file not found: {dataset_file_path}")
-    
+
     def _iter() -> Iterator[DatasetQuestion]:
         if dataset_file_path.endswith(".jsonl"):
             for rec in _read_jsonl(dataset_file_path):
@@ -94,7 +94,7 @@ def load_longmemeval_file(dataset_file_path: str) -> Iterable[DatasetQuestion]:
         else:
             for rec in _read_json_array(dataset_file_path):
                 yield _normalize_record(rec)
-    
+
     return _iter()
 
 

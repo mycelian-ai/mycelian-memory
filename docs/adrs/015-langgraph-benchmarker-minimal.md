@@ -1,7 +1,7 @@
 # ADR-015: Minimal LangGraph-based LongMemEval Benchmarker
 
-**Status**: Accepted  
-**Date**: 2025-08-28  
+**Status**: Accepted
+**Date**: 2025-08-28
 **Supersedes**: ADR-013, ADR-014
 
 ## Context
@@ -24,4 +24,3 @@ We need a simple, reproducible benchmarker for evaluating Mycelian’s long-memo
 ## References
 - Design: `docs/designs/langgraph_longmemeval_benchmarker.md`
 - LangGraph prebuilt agent (memory & custom prompt): https://langchain-ai.github.io/langgraph/agents/agents/#5-add-memory
-

@@ -166,5 +166,3 @@ networks:
   memory-network:
     driver: bridge
     name: mycelian-memory-network
-
-

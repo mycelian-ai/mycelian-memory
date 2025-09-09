@@ -8,10 +8,10 @@ The MycelianMemoryAgent protocol uses an Invoker pattern to encapsulate message 
 
 ```python
 class MycelianMemoryAgent:
-    def invoke(self, control: ControlState, thread_id: str, 
+    def invoke(self, control: ControlState, thread_id: str,
                to_process: Optional[ChatMessage] = None) -> None:
         """Execute based on control state.
-        
+
         Uses checkpointer for state persistence across invocations.
         Thread_id identifies the conversation thread for the checkpointer.
         """
@@ -24,31 +24,31 @@ class MycelianMemoryAgent:
 ```python
 class MycelianAgentInvoker:
     """Encapsulates message building and control determination."""
-    
+
     def __init__(self, agent: MycelianMemoryAgent):
         self.agent = agent
         self.msg_count = 0
-    
+
     def start_session(self, thread_id: str) -> None:
         """Start a new session."""
         self.msg_count = 0
         self.agent.invoke(control=ControlState.START_SESSION, thread_id=thread_id)
-    
+
     def process_conversation_message(self, role: str, content: str, thread_id: str) -> None:
         """Process a conversation message, handling flush automatically."""
         self.msg_count += 1
-        
+
         # Build message internally
         message = ChatMessage(role=role, content=content)
-        
+
         # Determine control internally using enum
         if self.msg_count % 6 == 0:
             control = ControlState.PROCESS_MESSAGE_AND_FLUSH
         else:
             control = ControlState.PROCESS_MESSAGE
-        
+
         self.agent.invoke(control=control, thread_id=thread_id, to_process=message)
-    
+
     def end_session(self, thread_id: str) -> None:
         """End the session."""
         self.agent.invoke(control=ControlState.END_SESSION, thread_id=thread_id)
@@ -66,8 +66,8 @@ invoker.start_session(thread_id)
 # Process messages - invoker handles everything
 for m in session.get("messages", []):
     invoker.process_conversation_message(
-        role=m["role"], 
-        content=m["content"], 
+        role=m["role"],
+        content=m["content"],
         thread_id=thread_id
     )
 
@@ -114,7 +114,7 @@ class AgentState(TypedDict):
 
 - **conversation_history**: Only `ChatMessage` instances (role="user", "assistant", etc.)
 - **to_process**: Single `ChatMessage` being processed
-- **tool_history**: 
+- **tool_history**:
   - `AIMessage` with tool_calls
   - `ToolMessage` with results
 - **control**: ControlState enum value (START_SESSION, PROCESS_MESSAGE, etc.)
@@ -172,7 +172,7 @@ Retrieved context from tools is integrated into `conversation_history`:
    ```python
    # Tool returns previous session's context
    context_text = tool_result.content
-   
+
    # Add to conversation_history as system message
    context_msg = ChatMessage(
        role="system",
@@ -185,7 +185,7 @@ Retrieved context from tools is integrated into `conversation_history`:
    ```python
    # Tool returns recent entries
    entries_text = tool_result.content
-   
+
    # Add to conversation_history as system message
    entries_msg = ChatMessage(
        role="system",
@@ -252,15 +252,15 @@ class MycelianMemoryAgent:
     def __init__(self, ...):
         self.checkpointer = MemorySaver()  # Create checkpointer
         self.graph = self._build_graph()
-    
+
     def _build_graph(self):
         workflow = StateGraph(AgentState)
         # ... add nodes and edges ...
         return workflow.compile(checkpointer=self.checkpointer)
-    
+
     def invoke(self, control: ControlState, thread_id: str, to_process: Optional[ChatMessage] = None):
         config = {"configurable": {"thread_id": thread_id}}
-        
+
         # Initial state for this invocation
         state = {
             "control": control,
@@ -268,7 +268,7 @@ class MycelianMemoryAgent:
             "conversation_history": [to_process] if to_process else [],  # Also add to history
             "tool_history": []  # Starts fresh each invocation
         }
-        
+
         return self.graph.invoke(state, config)
 ```
 
@@ -306,12 +306,12 @@ def observe(self, state):
     control = state.get("control")
     conversation_history = state.get("conversation_history", [])  # Has accumulated messages from checkpointer
     to_process = state.get("to_process", [])  # Just current message
-    
+
     # Determine last tool executed
     last_tool = None
     if tool_history and isinstance(tool_history[-1], ToolMessage):
         last_tool = tool_history[-1].name
-    
+
     # START_SESSION: Direct tool calls (no LLM needed)
     if control == ControlState.START_SESSION:
         # Direct execution without LLM - these are deterministic calls
@@ -319,22 +319,22 @@ def observe(self, state):
             vault_id=vault_id,
             memory_id=memory_id
         )
-        
+
         entries_result = tools["list_entries"](
             vault_id=vault_id,
             memory_id=memory_id,
             limit=10
         )
-        
+
         # Add results to conversation_history
         context_msg = ChatMessage(role="system", content=f"Previous context:\n{context_result}")
         entries_msg = ChatMessage(role="system", content=f"Recent entries:\n{entries_result}")
-        
+
         return {
             "conversation_history": [context_msg, entries_msg],
             "tool_history": []  # No tool history needed for direct calls
         }
-    
+
     # PROCESS_MESSAGE sequence: add_entry only
     elif control == ControlState.PROCESS_MESSAGE:
         if last_tool is None:
@@ -343,7 +343,7 @@ def observe(self, state):
         elif last_tool == "add_entry":
             # Complete
             return {"tool_history": [AIMessage(content="Message processed.")]}
-    
+
     # PROCESS_MESSAGE_AND_FLUSH sequence: add_entry → await_consistency → put_context
     elif control == ControlState.PROCESS_MESSAGE_AND_FLUSH:
         if last_tool is None:
@@ -357,7 +357,7 @@ def observe(self, state):
         elif last_tool == "put_context":
             # Complete
             return {"tool_history": [AIMessage(content="Flushed to context.")]}
-    
+
     # END_SESSION sequence: await_consistency → put_context
     elif control == ControlState.END_SESSION:
         if last_tool is None:
@@ -368,13 +368,13 @@ def observe(self, state):
         elif last_tool == "put_context":
             # Complete
             return {"tool_history": [AIMessage(content="Session ended.")]}
-    
+
     # Call LLM with the generated prompt
     response = llm_with_tools.invoke([
         {"role": "system", "content": prompt},
         {"role": "user", "content": "Execute the required operation."}
     ])
-    
+
     # Special handling for context updates
     if control == ControlState.START_SESSION and last_tool == "get_context":
         context_text = tool_history[-1].content
@@ -383,7 +383,7 @@ def observe(self, state):
             "conversation_history": [context_msg],
             "tool_history": [response]
         }
-    
+
     return {"tool_history": [response]}
 ```
 
@@ -416,18 +416,18 @@ def build_add_entry_prompt(vault_id, memory_id, conversation_history, to_process
     # Validate we have context (should always be present after START_SESSION)
     if not conversation_history:
         raise ValueError("No conversation history found - START_SESSION may have failed")
-    
+
     # Validate current message
     if not to_process:
         raise ValueError("No message to process")
-    
+
     # Get prompts from MCP
     entry_capture_prompt = prompts.get("entry_capture_prompt")
     summary_prompt = prompts.get("summary_prompt")
-    
+
     # Format previous conversation for context
     context = format_messages(conversation_history[:-1])  # All except current
-    
+
     prompt = f"""{AGENT_PREFIX}
 
 Current Operation: PROCESS_MESSAGE
@@ -463,13 +463,13 @@ def build_put_context_prompt(vault_id, memory_id, conversation_history, prompts)
     # Validate we have conversation history
     if not conversation_history:
         raise ValueError("No conversation history to synthesize")
-    
+
     # Get the context prompt from MCP
     context_prompt = prompts.get("context_prompt")
-    
+
     # Format all conversation messages
     full_conversation = format_messages(conversation_history)
-    
+
     prompt = f"""{AGENT_PREFIX}
 
 Current Operation: CONTEXT_SYNTHESIS
@@ -504,7 +504,7 @@ The agent uses a hybrid approach for tool calls:
 
 **Direct Tool Calls (No LLM or Prompts)**:
 - `get_context` - Simple retrieval with fixed parameters
-- `list_entries` - Simple retrieval with fixed parameters  
+- `list_entries` - Simple retrieval with fixed parameters
 - `await_consistency` - Simple synchronization call
 
 **LLM-Driven Tool Calls (Require Prompts)**:

@@ -46,5 +46,3 @@ class WorkerManager:
             for f in futs:
                 results.append(f.result())
         return results
-
-

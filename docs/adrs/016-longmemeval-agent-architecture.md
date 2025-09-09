@@ -1,7 +1,7 @@
 # ADR-016: LongMemEval Three-Class Agent Architecture
 
-**Status**: Proposed  
-**Date**: 2025-01-01  
+**Status**: Proposed
+**Date**: 2025-01-01
 **Superseded by**: N/A
 
 Immutability Policy: Once an ADR is Accepted, it becomes an immutable record of that decision. Future changes to the decision must be captured in a new ADR that references and supersedes this one. Do not edit Accepted ADRs beyond correcting typos or adding the Superseded by link.
@@ -103,21 +103,21 @@ This three-class design provides optimal separation where:
 ## Alternatives Considered
 
 ### Alternative 1: Two-Class Design (Builder + Agent)
-**Description**: Combine Agent and AgentMessageProcessor into a single class  
-**Pros**: Fewer classes, simpler file structure  
-**Cons**: Agent class becomes large, mixes graph definition with runtime logic  
+**Description**: Combine Agent and AgentMessageProcessor into a single class
+**Pros**: Fewer classes, simpler file structure
+**Cons**: Agent class becomes large, mixes graph definition with runtime logic
 **Why rejected**: Violates single responsibility principle, makes testing harder
 
 ### Alternative 2: Keep Current Architecture
-**Description**: Maintain the existing MycelianMemoryAgent + GraphBuilder structure  
-**Pros**: No migration needed, team familiar with current code  
-**Cons**: Continues terminology confusion, poor separation of concerns  
+**Description**: Maintain the existing MycelianMemoryAgent + GraphBuilder structure
+**Pros**: No migration needed, team familiar with current code
+**Cons**: Continues terminology confusion, poor separation of concerns
 **Why rejected**: Technical debt continues to accumulate, misalignment with LangGraph
 
 ### Alternative 3: Four+ Class Design
-**Description**: Further separate concerns (e.g., separate SessionManager, MessageValidator)  
-**Pros**: Even more focused classes, maximum flexibility  
-**Cons**: Over-engineering for current needs, too many small classes  
+**Description**: Further separate concerns (e.g., separate SessionManager, MessageValidator)
+**Pros**: Even more focused classes, maximum flexibility
+**Cons**: Over-engineering for current needs, too many small classes
 **Why rejected**: Adds complexity without proportional benefit
 
 ## Implementation Notes

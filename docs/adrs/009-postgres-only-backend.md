@@ -1,6 +1,6 @@
 # ADR-009: PostgreSQL-Only Backend
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-08-09
 
 ## Context
@@ -15,7 +15,7 @@ Previous architecture supported multiple storage backends (Spanner/SQLite/Postgr
 ## Scope
 
 - Delete legacy database adapters, tests, and schema files
-- Remove associated docker-compose stacks and setup scripts  
+- Remove associated docker-compose stacks and setup scripts
 - Simplify configuration: default and only supported `DB_DRIVER=postgres`
 - Update factory to error on unsupported drivers
 - Adjust tests to run on PostgreSQL only
@@ -24,7 +24,7 @@ Previous architecture supported multiple storage backends (Spanner/SQLite/Postgr
 
 ### Positive Consequences
 - Reduced complexity in code, tests, and operations
-- Single SQL dialect (PostgreSQL) simplifies development and maintenance  
+- Single SQL dialect (PostgreSQL) simplifies development and maintenance
 - Eliminates configuration drift between environments
 - Faster CI pipeline with fewer test matrix combinations
 
@@ -41,7 +41,7 @@ Previous architecture supported multiple storage backends (Spanner/SQLite/Postgr
 - Skipped/removed tests dependent on legacy database harnesses
 - Maintained search/outbox functionality (PostgreSQL as source of truth)
 
-### Tooling & Compose Changes  
+### Tooling & Compose Changes
 - Deleted legacy docker-compose files and setup scripts
 - Simplified Makefiles to PostgreSQL-only targets
 - Updated developer documentation to reflect single-stack approach

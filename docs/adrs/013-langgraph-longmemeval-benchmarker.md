@@ -1,14 +1,14 @@
 # ADR-013: LangGraph-Based LongMemEval Benchmarker
 
-**Status**: Superseded  
-**Date**: 2025-08-26  
+**Status**: Superseded
+**Date**: 2025-08-26
 **Superseded by**: ADR-015
 
 ## Context
 
 The current LongMemEval benchmarker (`tools/benchmarker/`) has grown to over 2000 lines with significant architectural complexity:
 
-- **SessionSimulator**: Complex state management with manual flags (`_boot_seen_get_context`, `_boot_seen_list_entries`) 
+- **SessionSimulator**: Complex state management with manual flags (`_boot_seen_get_context`, `_boot_seen_list_entries`)
 - **Custom message routing**: Prefix-based routing system (`benchmark_conversation:speaker_1`, `control:test_harness`)
 - **Manual tool orchestration**: Direct Anthropic API calls with custom tool dispatch logic
 - **State tracking complexity**: Manual conversation state management and bootstrap sequences
@@ -34,7 +34,7 @@ We will replace the current Python-based SessionSimulator with a LangGraph-based
 ### Search Guidance Integration:
 Added to `context_summary_rules.md` protocol - use `search_memories` only when:
 - Contradictory information (updates/corrections to previous facts)
-- References to specific past events ("as we discussed before", "like last time") 
+- References to specific past events ("as we discussed before", "like last time")
 - Direct questions about memory content
 - Information that may exist in older context shards (beyond current 5000-char limit)
 
@@ -48,7 +48,7 @@ Added to `context_summary_rules.md` protocol - use `search_memories` only when:
 - **Benchmark Baseline**: Establishes memory quality metrics for future improvements
 - **Maintainability**: Clear separation of concerns between stateless processing and stateful memory management
 
-### Negative Consequences  
+### Negative Consequences
 - **New Dependency**: Adds LangGraph as a required dependency for benchmarking
 - **Learning Curve**: Team needs to understand LangGraph concepts (Agents vs Nodes, State Management)
 - **Search Strategy Risk**: Frugal search approach may initially miss some memory retrieval opportunities
@@ -60,21 +60,21 @@ Added to `context_summary_rules.md` protocol - use `search_memories` only when:
 ## Alternatives Considered
 
 ### Alternative 1: Refactor Current SessionSimulator
-**Description**: Clean up existing Python-based SessionSimulator architecture  
-**Pros**: No new dependencies, familiar codebase  
-**Cons**: Maintains architectural complexity, missing native MCP support, limited reusability  
+**Description**: Clean up existing Python-based SessionSimulator architecture
+**Pros**: No new dependencies, familiar codebase
+**Cons**: Maintains architectural complexity, missing native MCP support, limited reusability
 **Why rejected**: Doesn't address core complexity issues and provides less customer value
 
-### Alternative 2: Multi-Agent Cost-Optimization Architecture  
-**Description**: Complex multi-agent system optimizing for API call costs with batch processing  
-**Pros**: Lower API costs for large-scale benchmarking  
-**Cons**: Significantly more complex, compromises memory quality for cost optimization  
+### Alternative 2: Multi-Agent Cost-Optimization Architecture
+**Description**: Complex multi-agent system optimizing for API call costs with batch processing
+**Pros**: Lower API costs for large-scale benchmarking
+**Cons**: Significantly more complex, compromises memory quality for cost optimization
 **Why rejected**: User feedback prioritized memory quality over cost reduction: "lets not worry about cost reduction"
 
 ### Alternative 3: Role Assumption Pattern
-**Description**: Memory agent assumes it is the original conversation participant  
-**Pros**: More immersive context building  
-**Cons**: Potential confusion in multi-participant scenarios, harder to maintain conversation boundaries  
+**Description**: Memory agent assumes it is the original conversation participant
+**Pros**: More immersive context building
+**Cons**: Potential confusion in multi-participant scenarios, harder to maintain conversation boundaries
 **Why rejected**: User feedback: "This won't work" followed by preference for observer pattern
 
 ## Implementation Notes
@@ -90,7 +90,7 @@ Added to `context_summary_rules.md` protocol - use `search_memories` only when:
 
 ### Success Criteria:
 - Successful processing of all 500 LongMemEval questions
-- Memory quality metrics (precision/recall) baseline established  
+- Memory quality metrics (precision/recall) baseline established
 - Significant reduction in codebase complexity vs current SessionSimulator
 - Reusable pattern documentation for customer implementations
 

@@ -1,8 +1,8 @@
 # ADR-014: LangGraph Benchmarker Architecture Refinements
 
-**Status**: Superseded  
-**Date**: 2025-08-27  
-**Superseded by**: ADR-015  
+**Status**: Superseded
+**Date**: 2025-08-27
+**Superseded by**: ADR-015
 **Amends**: ADR-013
 
 ## Context
@@ -55,7 +55,7 @@ We are refining the LangGraph benchmarker architecture with the following amendm
 ### 5. Error Handling Strategy
 - **NEW**: Retry with exponential backoff, then fail
 - **Special Case**: Bedrock throttling requires longer backoff periods
-- **Implementation**: 
+- **Implementation**:
   - Max 3 retries with exponential backoff
   - 2x longer wait times for Bedrock-specific errors
   - Recursion limit errors retry once with higher limit
@@ -97,7 +97,7 @@ We are refining the LangGraph benchmarker architecture with the following amendm
    ```python
    # OLD: Instruct to fetch prompts
    "Use the get_default_prompts tool to fetch..."
-   
+
    # NEW: Pre-load and embed
    f"Here are the rules you must follow:\n{prompts_data['context_summary_rules']}"
    ```

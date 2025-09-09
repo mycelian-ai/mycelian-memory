@@ -38,7 +38,7 @@ except ImportError:
 
 def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
     """Get a chat model from a model specification.
-    
+
     Args:
         model_spec: Model specification string
                    Format: "provider:model" or just "model" (defaults to OpenAI)
@@ -47,7 +47,7 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
                    - "vertex-ai:gemini-2.5-flash-lite"
                    - "gpt-5-nano-2025-08-07" (defaults to OpenAI)
         **kwargs: Additional arguments to pass to the model
-    
+
     Returns:
         Chat model instance with built-in retry
     """
@@ -57,18 +57,18 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
     else:
         # Backward compatibility - default to OpenAI
         provider, model_id = "openai", model_spec
-    
+
     # Set default max_retries if not provided
     if "max_retries" not in kwargs:
         kwargs["max_retries"] = 6
-    
+
     # Handle different providers
     if provider == "openai":
         # Ensure API key is set
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
-        
+
         # Use init_chat_model which will use langchain_openai.ChatOpenAI
         return init_chat_model(
             model_id,
@@ -76,20 +76,20 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
             api_key=api_key,
             **kwargs
         )
-    
+
     elif provider == "openrouter":
         # OpenRouter uses OpenAI-compatible API with different base URL
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
             raise ValueError("OPENROUTER_API_KEY environment variable not set")
-        
+
         # OpenRouter requires specific headers and base URL
         from langchain_openai import ChatOpenAI
-        
+
         # Get optional site name and app name for OpenRouter tracking
         site_name = os.getenv("OPENROUTER_SITE_NAME", "longmemeval-benchmarker")
         app_name = os.getenv("OPENROUTER_APP_NAME", "LongMemEval")
-        
+
         return ChatOpenAI(
             model=model_id,
             openai_api_key=api_key,
@@ -100,7 +100,7 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
             },
             **kwargs
         )
-    
+
     elif provider == "vertex-ai":
         # Check for required environment variables
         project_id = os.getenv("VERTEX_AI_PROJECT_ID") or os.getenv("GCP_PROJECT_ID")
@@ -109,7 +109,7 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
                 "VERTEX_AI_PROJECT_ID or GCP_PROJECT_ID environment variable not set. "
                 "Please set one of these to your Google Cloud project ID."
             )
-        
+
         # Import here to avoid requiring google-cloud libs if not using Vertex
         try:
             from langchain_google_vertexai import ChatVertexAI
@@ -118,7 +118,7 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
                 "langchain-google-vertexai not installed. "
                 "Install with: pip install langchain-google-vertexai"
             )
-        
+
         # Map model names to Vertex AI model IDs
         model_map = {
             "gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
@@ -126,7 +126,7 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
             "gemini-1.5-pro": "gemini-1.5-pro",
         }
         vertex_model_id = model_map.get(model_id, model_id)
-        
+
         # Create Vertex AI model
         return ChatVertexAI(
             model=vertex_model_id,
@@ -134,7 +134,7 @@ def get_chat_model(model_spec: str, **kwargs) -> BaseChatModel:
             location="global",  # Global endpoint
             **kwargs
         )
-    
+
     else:
         raise ValueError(
             f"Unknown provider: {provider}. "

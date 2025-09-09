@@ -45,7 +45,7 @@ bin:
 build-mycelian-cli: bin
 	cd tools/mycelianCli && go build -o ../../bin/mycelianCli .
 
-# Build MCP server to deterministic path  
+# Build MCP server to deterministic path
 build-mcp-server: bin
 	go build -o bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
 
@@ -175,7 +175,7 @@ start-mcp-streamable-server:
 mcp-streamable-down:
 	docker compose -f $(MCP_COMPOSE_FILE) down
 
-mcp-streamable-restart: mcp-streamable-down start-mcp-streamable-server 
+mcp-streamable-restart: mcp-streamable-down start-mcp-streamable-server
 
 .PHONY: client-coverage-check
 client-coverage-check:

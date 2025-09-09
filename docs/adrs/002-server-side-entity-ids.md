@@ -1,6 +1,6 @@
-# ADR-002: Server-Side Entity ID Generation  
+# ADR-002: Server-Side Entity ID Generation
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-07-20
 
 ## Context
@@ -31,7 +31,7 @@ Entity creation (users, memories, entries, contexts) requires unique identifiers
 
 ### Server ID Generation
 - Server generates UUID v4 for all new entities
-- IDs generated using cryptographically secure random number generator  
+- IDs generated using cryptographically secure random number generator
 - Primary key constraints ensure uniqueness at database level
 
 ### Client Behavior

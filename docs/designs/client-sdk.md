@@ -69,7 +69,7 @@ type executor interface {
 ```
 
 **Async Operations** (return `*EnqueueAck`):
-- `AddEntry` - Add content to memory  
+- `AddEntry` - Add content to memory
 - `PutContext` - Upload context snapshot
 - `DeleteEntry` - Remove entry (with consistency guarantee)
 - `DeleteContext` - Remove context (with consistency guarantee)
@@ -161,7 +161,7 @@ type EnqueueAck = types.EnqueueAck
 
 **Core Types**:
 - `User` - User account with ID, email, display name
-- `Vault` - Memory container with title, description  
+- `Vault` - Memory container with title, description
 - `Memory` - Individual memory with metadata and type
 - `Entry` - Content entries with text, metadata, timestamps
 
@@ -309,6 +309,6 @@ func (h *Handler) AddEntry(ctx context.Context, req AddEntryRequest) (*EnqueueAc
 ## References
 
 - **Concurrency Design**: `docs/designs/client-api-concurrency.md`
-- **ShardQueue Specification**: `docs/specs/shardqueue.md`  
+- **ShardQueue Specification**: `docs/specs/shardqueue.md`
 - **Memory Service API**: `docs/api-reference.md`
 - **MCP Integration**: `docs/designs/mcp-server.md`

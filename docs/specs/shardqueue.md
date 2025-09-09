@@ -1,9 +1,9 @@
 # ShardQueue Implementation Specification
 
-**Package**: `client/internal/shardqueue`  
-**Version**: 1.0  
-**Date**: January 2025  
-**Status**: Stable  
+**Package**: `client/internal/shardqueue`
+**Version**: 1.0
+**Date**: January 2025
+**Status**: Stable
 
 ## Overview
 
@@ -264,10 +264,10 @@ case errors.Is(err, shardqueue.ErrQueueFull):
         log.Printf("Shard %d full: %d/%d", qfe.Shard, qfe.Length, qfe.Capacity)
     }
     // Handle back-pressure (retry, drop, 429 response, etc.)
-    
+
 case errors.Is(err, shardqueue.ErrExecutorClosed):
     // Executor shutting down, stop submitting work
-    
+
 case err != nil:
     // Other error (likely context cancellation)
 }
@@ -300,7 +300,7 @@ The shardqueue serves as the execution engine for the **Ordered (SQ)** concurren
 
 ### Ordered Operations (via ShardQueue)
 - `add_entry` - Add memory entry
-- `delete_entry` - Delete memory entry  
+- `delete_entry` - Delete memory entry
 - `put_context` - Update memory context
 - `await_consistency` - Wait for pending operations
 

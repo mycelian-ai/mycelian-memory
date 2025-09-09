@@ -62,5 +62,3 @@ type ServiceHealthChecker struct {
 ### Startup behavior
 - At startup, component and service health checkers begin running. All checkers start in the unhealthy state until their first successful probe.
 - The server waits up to one health interval for the service to become healthy before serving. If still unhealthy after the deadline, it does not start and exits with an error.
-
-

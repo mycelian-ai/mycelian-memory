@@ -13,7 +13,7 @@ def _toml_text(tmp_dataset_dir: str) -> str:
     dataset_file = os.path.join(tmp_dataset_dir, "longmemeval_s.json")
     with open(dataset_file, "w") as f:
         f.write("[]")  # Empty dataset
-    
+
     return textwrap.dedent(
         f"""
         dataset_file_path = "{dataset_file}"

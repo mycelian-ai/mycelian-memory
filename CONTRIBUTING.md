@@ -110,7 +110,7 @@ sudo apt install jq
    ```bash
    make build-check
    ```
-   
+
    **Optional**: Run full quality gate (formatting, linting, tests, vulnerability scan):
    ```bash
    make quality-check
@@ -121,7 +121,7 @@ sudo apt install jq
    # This creates a venv, installs Python dependencies, and builds CLI tools
    source ./setup-env.sh
    ```
-   
+
    **For future sessions**, activate the environment:
    ```bash
    source venv/bin/activate
@@ -157,7 +157,7 @@ git pull --rebase upstream main
 git checkout -b feature/your-feature-name
 # or
 git checkout -b fix/issue-description
-# or  
+# or
 git checkout -b docs/update-name
 ```
 
@@ -341,7 +341,7 @@ Critical review is required:
 - [ ] For major changes: design documentation submitted and approved
 - [ ] Tests written and passing (unit + integration as applicable)
 - [ ] Race detector clean: `go test -race ./...` (from `server/` and relevant modules)
-- [ ] Quality gate: `make quality-check` 
+- [ ] Quality gate: `make quality-check`
 - [ ] Invariant tests passing: `go test ./tools/invariants-checker/...`
 - [ ] Failing tests are fixed, not disabled
 - [ ] Implementation aligns with relevant ADRs/specs

@@ -1,6 +1,6 @@
 # ADR-004: Go Client SDK Adoption
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-07-24
 
 ## Context
@@ -18,7 +18,7 @@ Implement a dedicated Go SDK in `client/` and migrate all MCP handlers and tools
 - Cleaner handler code across applications
 - Centralized error handling and logging
 
-### Negative Consequences  
+### Negative Consequences
 - Must delete legacy client code after full migration
 - Additional abstraction layer to maintain
 

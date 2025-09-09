@@ -92,7 +92,7 @@ func TestSearchWithRawEntries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create-vault failed: %v\noutput: %s", err, string(outV))
 	}
-	
+
 	reVault := regexp.MustCompile(`Vault created: ([a-f0-9\-]+)`)
 	vmatch := reVault.FindStringSubmatch(string(outV))
 	if len(vmatch) < 2 {
@@ -107,7 +107,7 @@ func TestSearchWithRawEntries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create-memory failed: %v\noutput: %s", err, string(outMem))
 	}
-	
+
 	reMem := regexp.MustCompile(`Memory created: ([a-f0-9\-]+) -`)
 	mmatch := reMem.FindStringSubmatch(string(outMem))
 	if len(mmatch) < 2 {
@@ -115,13 +115,13 @@ func TestSearchWithRawEntries(t *testing.T) {
 	}
 	memoryID := mmatch[1]
 
-	// Note: Since we can't easily add entries via CLI in this test, 
+	// Note: Since we can't easily add entries via CLI in this test,
 	// we're mainly testing that the flag is accepted and the limits work.
 	// The actual raw entry behavior is tested in the unit tests.
 
 	// 3) Test search with default (include_raw_entries=false)
-	cmdSearch1 := exec.Command(binPath, "search", 
-		"--memory-id", memoryID, 
+	cmdSearch1 := exec.Command(binPath, "search",
+		"--memory-id", memoryID,
 		"--query", "test",
 		"--ke", "5",
 		"--kc", "2")
@@ -138,8 +138,8 @@ func TestSearchWithRawEntries(t *testing.T) {
 	}
 
 	// 4) Test search with include_raw_entries=true
-	cmdSearch2 := exec.Command(binPath, "search", 
-		"--memory-id", memoryID, 
+	cmdSearch2 := exec.Command(binPath, "search",
+		"--memory-id", memoryID,
 		"--query", "test",
 		"--ke", "5",
 		"--kc", "2",

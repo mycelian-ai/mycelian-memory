@@ -31,7 +31,7 @@ Rigour:
 Example input message (user):
 {
   "type": "conversation",
-  "role": "user", 
+  "role": "user",
   "content": "Hi there, could you help me compare options for X?"
 }
 

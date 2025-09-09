@@ -11,7 +11,7 @@ mycelianCli [command] [flags]
 ## Commands
 
 - `create-vault` - Create a new vault
-- `create-memory` - Create a new memory in a vault  
+- `create-memory` - Create a new memory in a vault
 - `create-entry` - Create a new entry for a memory
 - `list-entries` - List entries for a memory
 - `get-prompts` - Get default prompt templates
@@ -79,7 +79,7 @@ Will output structured JSON logs like:
 ### Environment Variables
 
 - `MYCELIAN_DEBUG=true` - Enables HTTP request/response logging in the SDK
-- `DEBUG=true` - Alternative way to enable HTTP logging  
+- `DEBUG=true` - Alternative way to enable HTTP logging
 - `LOG_LEVEL=debug` - Alternative way to set log level
 - `MEMORY_SERVICE_URL` - Override the default service URL (default: http://localhost:8080)
 

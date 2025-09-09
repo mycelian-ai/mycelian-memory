@@ -1,6 +1,7 @@
 """Factory function to build the agent with invoker."""
 
 import asyncio
+import os
 from typing import Optional
 from src.model_providers import get_chat_model
 from .agent import MycelianMemoryAgent
@@ -40,32 +41,41 @@ def build_agent_with_invoker(
 
     tools = run_async(_get_tools())
 
-    # Load prompts from MCP server
-    async def _get_prompts():
-        # Get the get_default_prompts tool from MCP
-        for tool in tools:
-            if getattr(tool, "name", None) == "get_default_prompts":
-                result = await tool.ainvoke({"memory_type": "chat"})
-                if result and hasattr(result, "content"):
-                    import json
-                    prompts_data = json.loads(result.content[0].text)
-                    return {
-                        "entry_capture_prompt": prompts_data.get("entry_capture_prompt", ""),
-                        "summary_prompt": prompts_data.get("summary_prompt", ""),
-                        "context_prompt": prompts_data.get("context_prompt", "")
-                    }
-        return None
+    # Load prompts from the filesystem (fail fast if any are missing/empty)
+    # Resolve repo root from this file path
+    root_dir = os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.dirname(
+                    os.path.dirname(__file__)
+                )
+            )
+        )
+    )
+    prompts_dir = os.path.join(root_dir, "client", "prompts", "default", "chat")
 
-    # Try to get prompts from MCP
-    prompts = run_async(_get_prompts())
+    entry_path = os.path.join(prompts_dir, "entry_capture_prompt.md")
+    summary_path = os.path.join(prompts_dir, "summary_prompt.md")
+    context_path = os.path.join(prompts_dir, "context_prompt.md")
 
-    # Fallback to empty prompts if MCP fails
-    if not prompts:
-        prompts = {
-            "entry_capture_prompt": "",
-            "summary_prompt": "",
-            "context_prompt": ""
-        }
+    def _read_required(path: str, name: str) -> str:
+        if not os.path.exists(path):
+            raise RuntimeError(f"Required prompt file not found: {name} at {path}")
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        if not content:
+            raise RuntimeError(f"Required prompt file is empty: {name} at {path}")
+        return content
+
+    entry_capture_prompt = _read_required(entry_path, "entry_capture_prompt.md")
+    summary_prompt = _read_required(summary_path, "summary_prompt.md")
+    context_prompt = _read_required(context_path, "context_prompt.md")
+
+    prompts = {
+        "entry_capture_prompt": entry_capture_prompt,
+        "summary_prompt": summary_prompt,
+        "context_prompt": context_prompt,
+    }
 
     # Initialize LLM with built-in retry (supports multiple providers)
     llm = get_chat_model(model_id)  # max_retries=6 is default

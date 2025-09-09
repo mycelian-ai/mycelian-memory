@@ -32,6 +32,7 @@ from src.orchestrator.orchestrator_config import (
     QA_TIMEOUT_SEC,
     LOGS_DIR,
 )
+from src.paths import resolve_under_root
 
 logger = logging.getLogger('orchestrator.tasks')
 
@@ -146,6 +147,7 @@ def process_question(
             qa_status = (details.get('qa_status') or '').strip()
             if qa_status in ('pending', 'failed'):
                 logger.info(f"Question {question_id}: scheduling QA (status={qa_status})")
+                # Enqueue QA task immediately
                 run_qa(run_id, question_id)
             else:
                 logger.info(f"Question {question_id}: QA status is {qa_status or 'unknown'}; not scheduling")
@@ -249,10 +251,7 @@ def run_qa(
         if not config_path or not vault_id or not memory_id:
             raise RuntimeError(f"Missing QA prerequisites for {run_id}/{question_id}")
 
-        # Skip if already completed
-        if details.get('qa_status') == 'completed':
-            logger.info(f"Question {question_id} already QA-complete; skipping")
-            return {'status': 'success', 'question_id': question_id}
+        # Always run QA when requested (QA-only reruns supported)
 
         tracker.mark_qa_in_progress(run_id, question_id)
 
@@ -297,8 +296,9 @@ def _run_single_question_inprocess(
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / f"{memory_title}.log"
 
-    # Load config and build cfg object
-    with open(config_path, 'rb') as f:
+    # Load config and build cfg object (resolve relative path under bench root)
+    cfg_file = resolve_under_root(config_path)
+    with open(cfg_file, 'rb') as f:
         cfg_dict = tomllib.load(f)
     cfg = parse_config(cfg_dict)
     cfg.run_id = run_id
@@ -366,7 +366,8 @@ def _run_qa_inprocess(
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / f"{question_data.get('question_id', 'unknown')}_qa.log"
 
-    with open(config_path, 'rb') as f:
+    cfg_file = resolve_under_root(config_path)
+    with open(cfg_file, 'rb') as f:
         cfg_dict = tomllib.load(f)
     cfg = parse_config(cfg_dict)
     cfg.run_id = run_id

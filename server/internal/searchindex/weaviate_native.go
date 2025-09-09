@@ -120,7 +120,7 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 		if !includeRawEntries {
 			rawEntry = ""
 		}
-		
+
 		hit := model.SearchHit{
 			EntryID:      safeString(m["entryId"]),
 			ActorID:      safeString(m["actorId"]),

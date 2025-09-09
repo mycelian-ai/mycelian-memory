@@ -71,5 +71,3 @@ CREATE TABLE IF NOT EXISTS outbox (
   update_time    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS outbox_ready_idx ON outbox(status, next_attempt_at);
-
-

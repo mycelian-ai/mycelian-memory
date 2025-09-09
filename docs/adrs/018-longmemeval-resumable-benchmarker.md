@@ -88,12 +88,12 @@ pending = tracker.get_pending_questions(dataset)  # Returns pending AND failed q
 for question in pending:
     question_id = question['question_id']
     status = tracker.get_question_status(question_id)
-    
+
     if status['ingestion_status'] != 'completed':
         # Resume from next_session_index
         next_idx = status.get('next_session_index', 0)
         run_ingestion(question, start_from_session=next_idx)
-    
+
     if status['qa_status'] != 'completed':
         # Use stored vault_id and memory_id for QA
         vault_id = status['vault_id']
@@ -107,34 +107,34 @@ def run_ingestion(question, start_from_session=0):
     question_id = question['question_id']
     total_sessions = len(sessions)
     run_id = tracker.run_id
-    
+
     # Create memory with deterministic name, store returned UUIDs
     memory_title = f"{run_id}_{question_id}"
     vault_id, memory_id = create_or_get_memory(memory_title)
-    
+
     # Initialize or update question progress with Mycelian IDs
     tracker.init_or_update_question(question_id, total_sessions, vault_id, memory_id)
-    
+
     for idx in range(start_from_session, total_sessions):
         session = sessions[idx]
-        
+
         try:
             # Process all messages in the session
             for message in session.get('messages', []):
                 process_message(message)
-            
+
             # Update progress after successful session completion
             tracker.update_next_session_index(question_id, idx + 1)
             tracker.increment_sessions_completed(question_id)
-            
+
             # Log progress periodically
             if idx % 10 == 0:
                 log.info(f"Progress: {idx+1}/{total_sessions} sessions")
-                
+
         except Exception as e:
             tracker.set_error(question_id, str(e))
             raise  # Stop processing this question
-            
+
     tracker.update_status(question_id, 'ingestion_status', 'completed')
 ```
 
@@ -188,7 +188,7 @@ python -m src.benchmarker status --run-dir out/run_1733430000
 ### Progress Queries
 ```sql
 -- Overall progress
-SELECT 
+SELECT
     COUNT(*) as total_questions,
     SUM(sessions_completed) as total_sessions_done,
     SUM(total_sessions) as total_sessions_expected,
@@ -201,7 +201,7 @@ SELECT
 FROM benchmark_progress WHERE run_id = ?;
 
 -- Question-level progress
-SELECT 
+SELECT
     question_id,
     sessions_completed || '/' || total_sessions as session_progress,
     ROUND(CAST(sessions_completed AS FLOAT) / total_sessions * 100, 2) as percent_complete,
@@ -210,43 +210,43 @@ SELECT
     qa_status,
     ingestion_duration_seconds,
     qa_duration_seconds
-FROM benchmark_progress 
+FROM benchmark_progress
 WHERE run_id = ? AND question_id = ?;
 
 -- Ingestion performance breakdown
-SELECT 
+SELECT
     question_id,
     total_sessions,
     sessions_completed,
     ingestion_duration_seconds,
     ROUND(ingestion_duration_seconds / NULLIF(sessions_completed, 0), 2) as avg_seconds_per_session,
     agent_model
-FROM benchmark_progress 
+FROM benchmark_progress
 WHERE run_id = ? AND sessions_completed > 0
 ORDER BY ingestion_duration_seconds DESC;
 
 -- Questions needing resume
-SELECT 
+SELECT
     question_id,
     ingestion_status,
     qa_status,
     sessions_completed || '/' || total_sessions as progress,
     next_session_index,
     error_message
-FROM benchmark_progress 
-WHERE run_id = ? 
-  AND (ingestion_status IN ('pending', 'failed', 'running') 
+FROM benchmark_progress
+WHERE run_id = ?
+  AND (ingestion_status IN ('pending', 'failed', 'running')
        OR qa_status IN ('pending', 'failed', 'running'))
 ORDER BY question_id;
 
 -- Model performance comparison
-SELECT 
+SELECT
     agent_model,
     COUNT(*) as questions_processed,
     AVG(ingestion_duration_seconds) as avg_ingestion_time,
     AVG(CAST(sessions_completed AS FLOAT) / NULLIF(total_sessions, 0)) as avg_completion_rate
-FROM benchmark_progress 
-WHERE run_id = ? 
+FROM benchmark_progress
+WHERE run_id = ?
 GROUP BY agent_model;
 ```
 
