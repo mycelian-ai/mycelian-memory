@@ -129,12 +129,12 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
     )
 
     # Analyze first pass results
-    entries = first_results.get("entries", [])
-    contexts = first_results.get("contexts", [])
+    entries = (first_results.get("entries") or []) if isinstance(first_results, dict) else []
+    contexts = (first_results.get("contexts") or []) if isinstance(first_results, dict) else []
 
     # Log what we found
     logger.info("TWO_PASS_SEARCH pass=1 found entries=%d contexts=%d",
-                len(entries), len(contexts))
+                len(entries or []), len(contexts or []))
 
     # Build summary of what we found for analysis
     summaries_text = "\n".join([
@@ -498,9 +498,9 @@ class SingleQuestionRunner:
                 )
 
             # Log search results
-            entries_count = len(sr.get("entries", []) if isinstance(sr, dict) else [])
+            entries_count = len((sr.get("entries") or []) if isinstance(sr, dict) else [])
             has_latest = bool((sr.get("latestContext") or sr.get("latest_context")) if isinstance(sr, dict) else False)
-            contexts_count = len(sr.get("contexts", []) if isinstance(sr, dict) else [])
+            contexts_count = len((sr.get("contexts") or []) if isinstance(sr, dict) else [])
             runner_log.info("SEARCH_RESULT qid=%s entries=%d has_latest=%s contexts=%d",
                           qid, entries_count, has_latest, contexts_count)
 

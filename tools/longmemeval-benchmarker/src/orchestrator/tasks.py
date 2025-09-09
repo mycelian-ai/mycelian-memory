@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from datetime import datetime
+import time
 import tomllib
 from typing import Dict, Optional, Tuple
 import fcntl
@@ -374,6 +375,17 @@ def _run_qa_inprocess(
 
     with open(log_path, 'a', encoding='utf-8') as qlog:
         mcp_client = create_mcp_client()
+        # Ensure pending writes for this memory are visible before QA
+        try:
+            mm = MemoryManager(mcp_client, debug=False)
+            qlog.write(f"AWAIT_CONSISTENCY (orchestrator) memory_id={memory_id}\n")
+            mm._call_tool("await_consistency", {"memory_id": memory_id})
+            qlog.write("SLEEP_BEFORE_QA seconds=5\n")
+            qlog.flush()
+            time.sleep(5)
+        except Exception:
+            # Best-effort; continue even if await_consistency is unavailable
+            pass
         # Vault is provided; build runner in QA mode
         runner = SingleQuestionRunner(cfg, mcp_client=mcp_client, mode="qa")
         result = runner.run_question(question_data, vault_id=vault_id, run_id=run_id, log=qlog, memory_id=memory_id)
