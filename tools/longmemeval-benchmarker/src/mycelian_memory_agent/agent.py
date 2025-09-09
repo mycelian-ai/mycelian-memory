@@ -375,7 +375,8 @@ class MycelianMemoryAgent:
 
                 # Mark complete and update conversation history
                 return {
-                    "conversation_history": [context_msg, entries_msg],
+                    # FIX: Append to existing conversation_history instead of replacing it
+                    "conversation_history": conversation_history + [context_msg, entries_msg],
                     # Return with updated tool_history
                     "tool_history": tool_history + [AIMessage(content="Session started.")]
                 }
@@ -866,6 +867,91 @@ SUMMARY GENERATION RULES:
     return prompt
 
 
+def build_structured_conversation(messages: Sequence[ChatMessage],
+                                 prompts: Dict[str, str]) -> list:
+    """Separate messages into typed sections for clear context synthesis.
+
+    Args:
+        messages: Conversation messages potentially containing previous context
+        prompts: Dictionary containing MCP prompt templates
+
+    Returns:
+        List of typed sections with clear boundaries
+    """
+    sections = []
+
+    # Always add system prompt section first
+    context_prompt = prompts.get("context_prompt", "")
+    sections.append({
+        "type": "system_prompt",
+        "content": f"{AGENT_PREFIX}\n\n{context_prompt}" if context_prompt else AGENT_PREFIX
+    })
+
+    # Separate previous context from current session messages
+    previous_messages = []
+    current_messages = []
+
+    for msg in messages:
+        # Check if message contains the [previous_context] tag
+        if "[previous_context]" in msg.content:
+            previous_messages.append(msg)
+        else:
+            # Messages without the tag are current session
+            # Only include user and assistant messages in current session
+            if msg.role in ["user", "assistant"]:
+                current_messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            elif msg.role == "system" and not "[previous_context]" in msg.content:
+                # System messages that aren't previous context go to previous section
+                # (like "Recent entries" messages)
+                previous_messages.append(msg)
+
+    # Add previous context section if we have any
+    if previous_messages:
+        sections.append({
+            "type": "previous_context",
+            "content": format_messages(previous_messages)
+        })
+
+    # Add current session section if we have any
+    if current_messages:
+        sections.append({
+            "type": "current_session_messages",
+            "content": current_messages
+        })
+
+    return sections
+
+
+def format_structured_prompt(sections: list) -> str:
+    """Format typed sections into final prompt with clear markers.
+
+    Args:
+        sections: List of typed conversation sections
+
+    Returns:
+        Formatted prompt string with clear section boundaries
+    """
+    parts = []
+
+    for section in sections:
+        if section["type"] == "system_prompt":
+            parts.append(f"=== SYSTEM INSTRUCTIONS ===\n{section['content']}")
+
+        elif section["type"] == "previous_context":
+            parts.append(f"=== PREVIOUS CONTEXT ===\n{section['content']}")
+
+        elif section["type"] == "current_session_messages":
+            parts.append("=== CURRENT SESSION ===")
+            # Format each message in the current session
+            for msg in section["content"]:
+                parts.append(f"Role: {msg['role']}\nContent: {msg['content']}")
+
+    return "\n\n".join(parts)
+
+
 def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
                             prompts: Dict[str, str],
                             vault_id: str,
@@ -883,11 +969,11 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
     if not conversation_history:
         raise ValueError("No conversation history to synthesize")
 
-    # Get the context prompt from MCP
-    context_prompt = prompts.get("context_prompt", "")
+    # Build structured conversation sections
+    sections = build_structured_conversation(conversation_history, prompts)
 
-    # Format all conversation messages
-    full_conversation = format_messages(conversation_history)
+    # Format into final prompt with clear markers
+    structured_prompt = format_structured_prompt(sections)
 
     # Log the conversation being sent to LLM for context synthesis
     logger.info(json.dumps({
@@ -895,31 +981,29 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
         "timestamp": datetime.utcnow().isoformat(),
         "memory_id": memory_id,
         "conversation_count": len(conversation_history),
-        "conversation_length": len(full_conversation),
-        "conversation_preview": full_conversation[:1000] if full_conversation else "[empty]"
+        "structured_sections": len(sections),
+        "section_types": [s["type"] for s in sections]
     }))
 
-    prompt = f"""{AGENT_PREFIX}
+    # Build the final prompt with structured conversation
+    prompt = f"""{structured_prompt}
 
+=== OPERATION DETAILS ===
 Current Operation: CONTEXT_SYNTHESIS
 Vault ID: {vault_id}
 Memory ID: {memory_id}
 
-Full conversation to synthesize into context:
-{full_conversation}
-
-CRITICAL INSTRUCTION: You MUST call ONLY the put_context tool - no other tools.
+=== CRITICAL INSTRUCTIONS ===
+You MUST call ONLY the put_context tool - no other tools.
 - Call put_context with vault_id="{vault_id}" and memory_id="{memory_id}"
 - Do NOT call add_entry, await_consistency, or any other tools
 - Return ONLY a single put_context tool call
 
+=== OUTPUT RULES ===
 STRICT OUTPUT RULES FOR put_context.content:
 - Return ONLY the context body. Do NOT include any headings, titles, or prefaces such as "Context synthesized...", "Summary:", or similar.
 - Do NOT include meta commentary or labels. Start directly with the synthesized context content.
 - Use clear paragraphs or bullet points as needed, but avoid a leading label line.
-
----
-CONTEXT MAINTENANCE RULES:
-{context_prompt}"""
+- IMPORTANT: Prioritize information from CURRENT SESSION over PREVIOUS CONTEXT when topics differ"""
 
     return prompt
