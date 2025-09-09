@@ -110,7 +110,7 @@ def search_and_qa(memory_id: str, vault_id: str, question: str, model: str = "op
     logger.info("=" * 60)
 
     from src.single_question_runner import _build_qa_context
-    context = _build_qa_context(search_result, 10)
+    context = _build_qa_context(search_result)
 
     if context:
         logger.info(f"Built context of {len(context)} characters")
@@ -173,7 +173,7 @@ def interactive_chat(memory_id: str, vault_id: str, initial_question: str,
         search_result = mm.search_memories(memory_id, query=initial_question, top_ke=5, top_kc=3)
 
     from src.single_question_runner import _build_qa_context, _run_qa
-    context = _build_qa_context(search_result, 10)
+    context = _build_qa_context(search_result)
 
     if not context:
         logger.warning("No context built from search results; follow-ups will proceed without extra context.")

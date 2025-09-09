@@ -29,7 +29,7 @@ def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
     return first_user
 
 
-def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
+def _build_qa_context(search_result: Dict[str, Any]) -> str:
     import json
 
     # Get latestContext - handle JSON-encoded strings
@@ -54,18 +54,20 @@ def _build_qa_context(search_result: Dict[str, Any], top_k: int) -> str:
     latest_ctx = latest_ctx.strip()
 
     # Get context shards from contexts array (new API format)
+    # Use all contexts returned by search (already limited by kc parameter)
     contexts = search_result.get("contexts") or []
     context_texts: list[str] = []
-    for ctx in contexts[:3]:  # Get top context shards
+    for ctx in contexts:  # Use all context shards returned
         if isinstance(ctx, dict):
             ctx_text = ctx.get("context", "")
             if ctx_text:
                 context_texts.append(str(ctx_text))
 
     # Get entry summaries
+    # Use all entries returned by search (already limited by ke parameter)
     entries = search_result.get("entries") or []
     entries_text: list[str] = []
-    for e in entries[: top_k]:
+    for e in entries:  # Use all entries returned
         if isinstance(e, dict):
             txt = e.get("summary") or ""
             if txt:
@@ -503,7 +505,7 @@ class SingleQuestionRunner:
                           qid, entries_count, has_latest, contexts_count)
 
             # Build context and log it
-            ctx = _build_qa_context(sr, self.cfg.params.top_k)
+            ctx = _build_qa_context(sr)
             ctx_preview = ctx[:500] if ctx else "(empty)"
             runner_log.info("QA_CONTEXT qid=%s context_len=%d preview='%s'",
                           qid, len(ctx) if ctx else 0, ctx_preview)
