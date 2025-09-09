@@ -892,8 +892,9 @@ def build_structured_conversation(messages: Sequence[ChatMessage],
     current_messages = []
 
     for msg in messages:
-        # Check if message contains the [previous_context] tag
-        if "[previous_context]" in msg.content:
+        # Check if message starts with [previous_context] tag (only for system messages)
+        # This prevents false positives from content that mentions the tag
+        if msg.role == "system" and msg.content.startswith("[previous_context]"):
             previous_messages.append(msg)
         else:
             # Messages without the tag are current session
@@ -903,8 +904,8 @@ def build_structured_conversation(messages: Sequence[ChatMessage],
                     "role": msg.role,
                     "content": msg.content
                 })
-            elif msg.role == "system" and not "[previous_context]" in msg.content:
-                # System messages that aren't previous context go to previous section
+            elif msg.role == "system":
+                # Other system messages go to previous section
                 # (like "Recent entries" messages)
                 previous_messages.append(msg)
 
