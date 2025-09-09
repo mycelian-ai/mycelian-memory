@@ -29,7 +29,7 @@ func TestDevEnv_Ingestion_BM25_Direct(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:11545")
-	weaviate := env("WEAVIATE_URL", "http://localhost:8082")
+	weaviate := env("WEAVIATE_URL", "http://localhost:11543")
 
 	// quick connectivity checks – skip if the stack isn't up
 	for _, url := range []string{memSvc + "/v0/health", weaviate + "/v1/meta"} {
@@ -181,7 +181,7 @@ func TestDevEnv_SearchAPI_Hybrid(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:11545")
-	weaviate := env("WEAVIATE_URL", "http://localhost:8082")
+	weaviate := env("WEAVIATE_URL", "http://localhost:11543")
 	ollama := env("OLLAMA_URL", "http://localhost:11434")
 	embedMod := env("EMBED_MODEL", "nomic-embed-text")
 

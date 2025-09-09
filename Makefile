@@ -44,7 +44,7 @@ bin:
 build-mycelian-cli: bin
 	cd tools/mycelianCli && go build -o ../../bin/mycelianCli .
 
-# Build MCP server to deterministic path  
+# Build MCP server to deterministic path
 build-mcp-server: bin
 	go build -o bin/mycelian-mcp-server ./cmd/mycelian-mcp-server
 
@@ -88,6 +88,7 @@ build-check:
 	@echo "Building tools/invariants-checker module..."
 	@cd tools/invariants-checker && go build .
 	@echo "All modules compiled successfully!"
+	@$(MAKE) assert-ports
 
 # Quality check - run full quality gate for release-ready code
 quality-check:
@@ -135,7 +136,23 @@ quality-check:
 	@cd tools/mycelianCli && govulncheck ./...
 	@cd tools/mycelian-service-tools && govulncheck ./...
 	@cd tools/invariants-checker && govulncheck ./...
+	@$(MAKE) assert-ports
 	@echo "All quality checks passed!"
+
+.PHONY: assert-ports
+assert-ports:
+	@set -eu; \
+	echo "Asserting authoritative port mappings..."; \
+	f1=deployments/docker/docker-compose.postgres.yml; \
+	f2=deployments/docker/docker-compose.streamable.yml; \
+	if ! grep -q '11544:5432' $$f1; then echo "ERROR: Postgres mapping 11544:5432 not found in $$f1" >&2; exit 1; fi; \
+	if ! grep -q '11543:8080' $$f1; then echo "ERROR: Weaviate mapping 11543:8080 not found in $$f1" >&2; exit 1; fi; \
+	if ! grep -q '11545:11545' $$f1; then echo "ERROR: Memory service mapping 11545:11545 not found in $$f1" >&2; exit 1; fi; \
+	if ! grep -q '11546:11546' $$f2; then echo "ERROR: MCP mapping 11546:11546 not found in $$f2" >&2; exit 1; fi; \
+	if ! grep -q 'default:"11545"' server/internal/config/config.go; then echo "ERROR: Default HTTP port 11545 not found in server/internal/config/config.go" >&2; exit 1; fi; \
+	if ! grep -q ':11546' mcp/server.go; then echo "ERROR: MCP server bind :11546 not found in mcp/server.go" >&2; exit 1; fi; \
+	if ! (grep -q '### Ports' README.md && grep -q '11546' README.md && grep -q '11545' README.md && grep -q '11544' README.md && grep -q '11543' README.md); then echo "ERROR: README ports section missing expected entries" >&2; exit 1; fi; \
+	echo "Port assertions passed."
 
 # Clean built binaries
 clean-bin:
@@ -174,7 +191,7 @@ start-mcp-streamable-server:
 mcp-streamable-down:
 	docker compose -f $(MCP_COMPOSE_FILE) down
 
-mcp-streamable-restart: mcp-streamable-down start-mcp-streamable-server 
+mcp-streamable-restart: mcp-streamable-down start-mcp-streamable-server
 
 .PHONY: client-coverage-check
 client-coverage-check:

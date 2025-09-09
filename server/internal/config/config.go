@@ -141,7 +141,7 @@ func NewForTesting() *Config {
 	cfg.EmbedProvider = "ollama"
 	cfg.EmbedModel = "nomic-embed-text"
 	cfg.SearchAlpha = 0.6
-	cfg.SearchIndexURL = "localhost:8082"
+	cfg.SearchIndexURL = "localhost:11543"
 
 	cfg.BuildTarget = "cloud-dev"
 	cfg.DBDriver = "auto"

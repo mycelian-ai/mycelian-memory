@@ -157,7 +157,7 @@ func TestDevEnv_HybridRelevance_AlphaSweep(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:11545")
-	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
+	weaviateURL := env("WEAVIATE_URL", "http://localhost:11543")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
 	// connectivity checks
@@ -267,7 +267,7 @@ func TestDevEnv_HybridRelevance_TagFilter(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:11545")
-	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
+	weaviateURL := env("WEAVIATE_URL", "http://localhost:11543")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
 	waitForHealthy(t, memSvc, 3*time.Second)
@@ -357,7 +357,7 @@ func TestDevEnv_HybridRelevance_MetadataFilter(t *testing.T) {
 	}
 
 	memSvc := env("MEMORY_API", "http://localhost:11545")
-	weaviateURL := env("WEAVIATE_URL", "http://localhost:8082")
+	weaviateURL := env("WEAVIATE_URL", "http://localhost:11543")
 	ollamaURL := env("OLLAMA_URL", "http://localhost:11434")
 
 	waitForHealthy(t, memSvc, 3*time.Second)

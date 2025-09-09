@@ -1,10 +1,10 @@
 <div align="center">
   <img src="logo/image.png" alt="Mycelian Memory" width="200"/>
-  
+
   # Mycelian Memory
-  
+
   Mycelian Memory is an open source framework that aims to provide simple, reliable, and cost-effective long-term memory and context to AI Agents.
-  
+
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian-ai/mycelian-memory?style=social)](https://github.com/mycelian-ai/mycelian-memory/stargazers)
   [![License](https://img.shields.io/github/license/mycelian-ai/mycelian-memory)](https://github.com/mycelian-ai/mycelian-memory/blob/main/LICENSE)
   [![Go Version](https://img.shields.io/badge/Go-1.24.6-00ADD8?logo=go&logoColor=white)](https://github.com/mycelian-ai/mycelian-memory)
@@ -18,9 +18,9 @@ Mycelian aims to provide AI agents with persistent memory through a simple, reli
 
 When an agent interacts with users, it builds deep contextual understanding within a session, but forgets everything when the session ends. Mycelian provides a framework for agents to directly persist their working context and memories, capturing high‑fidelity information as they process it during conversations.
 
-The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections. 
+The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections.
 
-The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [the architecture document](docs/designs/001_mycelian_memory_architecture.md). 
+The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [the architecture document](docs/designs/001_mycelian_memory_architecture.md).
 
 ### Architecture (high-level design)
 
@@ -33,7 +33,7 @@ flowchart TD
     Vector[(Vector DB)] --> Service
     Postgres <--> Worker[Outbox<br/>Worker]
     Worker --> Vector
-    
+
     %% Add label to Postgres
     Postgres -.- Tables["`**Key Tables:**
     vaults
@@ -41,12 +41,12 @@ flowchart TD
     entries
     context
     tx_outbox`"]
-    
+
     classDef primary fill:#dbeafe,stroke:#1e40af,stroke-width:3px,color:#000
     classDef storage fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#000
     classDef async fill:#e9d5ff,stroke:#7c3aed,stroke-width:3px,color:#000
     classDef note fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#000
-    
+
     class Agent,MCP,Service primary
     class Postgres,Vector storage
     class Worker async
@@ -79,7 +79,7 @@ Mycelian takes inspiration from this natural interconnectedness for AI agents. T
 
 As of 08-24-2024, I've been actively developing this project for ~5 weeks. I worked on problem disambiguation, architecture, specs, designs and provided oversight to the models for producing functional and good quality code. I did one quick pass to get it ready for this early open source release to gather developer feedback. The next step is to perform a thorough code review to improve the code quality.
 
- Majority of the code was written by o3 and gpt5-high models, followed by Claude Sonnet 4. 
+ Majority of the code was written by o3 and gpt5-high models, followed by Claude Sonnet 4.
 
 📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but far from perfect, I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
 
@@ -91,8 +91,8 @@ You'll find detailed AI development methodologies and techniques that have worke
 
 ### Server Setup
 
-Prerequisites (please refer to [CONTRIBUTING.md](CONTRIBUTING.md)): 
-1. Docker Desktop 
+Prerequisites (please refer to [CONTRIBUTING.md](CONTRIBUTING.md)):
+1. Docker Desktop
 2. Ollama
 3. Make & jq
 
@@ -110,6 +110,19 @@ curl -s http://localhost:11545/v0/health | jq
 ```
 
 The stack exposes the API on `http://localhost:11545`.
+
+---
+
+### Ports
+
+| Service | Port | Notes |
+| --- | --- | --- |
+| MCP server | 11546 | Streamable HTTP endpoint at `/mcp` |
+| Memory service (HTTP API) | 11545 | Base URL `http://localhost:11545` |
+| Database (Postgres, dev) | 11544 | Host port mapped to container `5432` |
+| Vector DB (Weaviate, dev) | 11543 | Host port mapped to container `8080` |
+
+These are authoritative host ports for local/dev. Other databases or vector stores can be used, but should respect these host port assignments for consistency.
 
 ---
 
@@ -131,7 +144,7 @@ make start-mcp-streamable-server
       "url": "http://localhost:11546/mcp",
       "alwaysAllow": [
         "add_entry",
-        "list_entries", 
+        "list_entries",
         "create_vault",
         "list_vaults",
         "list_memories",
@@ -168,7 +181,7 @@ make build-mcp-server
   }
 }
 ```
- 
+
 
 ---
 
