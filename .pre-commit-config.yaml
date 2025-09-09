@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=10240']  # 10MB limit
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: check-forbidden-files
+        name: Check for forbidden file patterns
+        entry: bash -c 'if git diff --cached --name-only | grep -E "\.(db|db-wal|db-shm)$|longmemeval_[ms]\.json$|/(memory-service|mycelian-mcp-server|outbox-worker|mycelianCli|synapse|memoryctl|mycelian-service-tools|waviate-tool)$"; then echo "❌ Forbidden files detected!"; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.54.2
+    hooks:
+      - id: golangci-lint

@@ -1,3 +1,4 @@
+out/run_*/
 # macOS Finder metadata
 .DS_Store
 
@@ -41,6 +42,13 @@ go.work.sum
 .vscode/
 *.iml
 
+# IntelliJ IDEA specific (from .idea/.gitignore)
+.idea/shelf/
+.idea/workspace.xml
+.idea/httpRequests/
+.idea/dataSources/
+.idea/dataSources.local.xml
+
 # Build output
 build/
 dist/
@@ -51,6 +59,9 @@ dist/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Process ID files
+*.pid
 
 # Temporary files
 *.tmp
@@ -70,8 +81,12 @@ clients/go/venv/
 __pycache__/
 *.py[cod]
 *.pyc
+*.pyo
 *$py.class
 *.so
+
+# Python test cache
+.pytest_cache/
 
 # Configuration files with secrets (keep example files)
 configs/config.local.yaml
@@ -92,10 +107,22 @@ credentials*.json
 /dist/
 /build/
 
+# Compiled Go binaries (should be built, not committed)
+cmd/*/memory-service
+cmd/*/mycelian-mcp-server
+cmd/*/outbox-worker
+tools/*/mycelianCli
+tools/*/synapse
+tools/*/memoryctl
+tools/*/mycelian-service-tools
+tools/*/waviate-tool
+
 .obsidian/
 
 # Local database files
 *.db
+*.db-shm
+*.db-wal
 memory.db
 .kiro/
 
@@ -109,9 +136,26 @@ config.local.yaml
 # Test coverage
 coverage.out
 coverage.html
+.coverage
 
 # Data
 data/
+
+# LongMemEval Benchmarker specific
+tools/longmemeval-benchmarker/out/
+tools/longmemeval-benchmarker/huey_orchestrator/out/
+tools/longmemeval-benchmarker/data/*.db*
+tools/longmemeval-benchmarker/huey_orchestrator/data/*.db*
+tools/longmemeval-benchmarker/huey_orchestrator.log
+tools/longmemeval-benchmarker/todo
+tools/longmemeval-benchmarker/logs/*/
+
+# Large dataset files (keep only small test datasets in git)
+tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
+tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
+
+# Root level files that should be ignored
+huey_orchestrator.log
 
 memory-bank/
 .cursor/
