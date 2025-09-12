@@ -91,7 +91,7 @@ def search_and_qa(memory_id: str, vault_id: str, question: str, model: str = "op
             logger.info("\nNo best context found (deprecated field)")
 
         # Check for context shards (new)
-        contexts = search_result.get("contexts", [])
+        contexts = search_result.get("contexts", []) or []
         logger.info(f"\nContext Shards: Found {len(contexts)} shards")
         for i, ctx in enumerate(contexts[:3], 1):  # Show up to 3
             if isinstance(ctx, dict):
