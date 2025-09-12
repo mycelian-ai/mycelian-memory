@@ -1,0 +1,35 @@
+[
+  {
+    "question_id": "durable_edu_001",
+    "question_type": "multi-session",
+    "question": "What did I graduate with?",
+    "answer": "Business Administration",
+    "question_date": "2025-09-12",
+    "haystack_session_ids": ["session_001", "session_002"],
+    "haystack_dates": ["2025-09-11T14:31:10Z", "2025-09-11T14:34:15Z"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I graduated with a degree in Business Administration, which has helped in my new role.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Congratulations on your degree in Business Administration! Let's also set up a system for paperwork and documentation."
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "I just got a new Instant Pot and some kitchen knives—can you give me beginner recipe ideas and cleaning tips?"
+        },
+        {
+          "role": "assistant",
+          "content": "Great! Start with simple soups and rice dishes. For cleaning, follow the manufacturer's care instructions and avoid abrasive pads on knife blades."
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_001"]
+  }
+]
