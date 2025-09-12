@@ -1,0 +1,68 @@
+[
+  {
+    "question_id": "e47becba_rigorous",
+    "question_type": "multi-session",
+    "question": "What did I graduate with?",
+    "answer": "Business Administration",
+    "question_date": "2025-09-11",
+    "haystack_session_ids": [
+      "session_045", "session_046", "session_047", "session_048", "session_049",
+      "session_050", "session_051", "session_052", "session_053", "session_054"
+    ],
+    "haystack_dates": [
+      "2025-09-11T21:30:00Z",
+      "2025-09-11T21:31:00Z",
+      "2025-09-11T21:32:00Z",
+      "2025-09-11T21:33:00Z",
+      "2025-09-11T21:34:00Z",
+      "2025-09-11T21:35:00Z",
+      "2025-09-11T21:36:00Z",
+      "2025-09-11T21:37:00Z",
+      "2025-09-11T21:38:00Z",
+      "2025-09-11T21:39:00Z"
+    ],
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I'm exploring task management apps to prioritize work and personal tasks. I'm considering Todoist and Trello—thoughts?"},
+        {"role": "assistant", "content": "Both are solid—start with Todoist for lists and Trello for kanban. Try each for a week and compare friction."}
+      ],
+      [
+        {"role": "user", "content": "I recently started a 9-to-5 job and need a consistent daily routine."},
+        {"role": "assistant", "content": "Let's define AM/PM anchors, timebox deep work blocks, and set a shutdown checklist to protect evenings."}
+      ],
+      [
+        {"role": "user", "content": "I want to track expenses and reimbursements better. What's a simple setup?"},
+        {"role": "assistant", "content": "Create folders for Receipts, Reimbursements, Taxes; add a monthly CSV tracker; capture photos from phone to a single inbox."}
+      ],
+      [
+        {"role": "user", "content": "I'm planning to try Mint and Personal Capital to monitor personal expenses."},
+        {"role": "assistant", "content": "Good plan—start with read-only connections, categorize weekly, and set alerts for large or recurring charges."}
+      ],
+      [
+        {"role": "user", "content": "I'm interested in meal prep to save time and money—any starting tips?"},
+        {"role": "assistant", "content": "Pick 2 proteins + 2 starches + 3 veggies; batch on Sunday; use airtight containers; plan 3 simple dinners."}
+      ],
+      [
+        {"role": "user", "content": "What containers/tools should I buy to make meal prep easier?"},
+        {"role": "assistant", "content": "Get BPA-free containers (3 sizes), sheet pans, a rice cooker or IP, and labels for dates."}
+      ],
+      [
+        {"role": "user", "content": "I also need to organize paperwork and documentation for reimbursements and benefits."},
+        {"role": "assistant", "content": "Use a 3-level system: inbox (capture), action (this week), archive (done). Automate import from email if possible."}
+      ],
+      [
+        {"role": "user", "content": "Can we refine my home office setup so I can process receipts faster?"},
+        {"role": "assistant", "content": "Add a scanning station, a single capture tray, and a weekly 20-minute admin block on your calendar."}
+      ],
+      [
+        {"role": "user", "content": "I graduated with a degree in Business Administration, which has definitely helped in my new role.", "has_answer": true},
+        {"role": "assistant", "content": "Congrats on your Business Administration degree! We'll reflect that as a durable fact and continue optimizing your workflow and paperwork systems."}
+      ],
+      [
+        {"role": "user", "content": "I just got a new Instant Pot and kitchen knives—can you give me beginner recipe ideas and cleaning tips?"},
+        {"role": "assistant", "content": "Start with soups, rice, and pulled chicken in the IP; wash knives by hand, dry immediately, and hone weekly."}
+      ]
+    ],
+    "answer_session_ids": ["session_053"]
+  }
+]
