@@ -9,9 +9,7 @@ from langchain_core.messages import ChatMessage
 from .control_state import ControlState
 from .agent import MycelianMemoryAgent
 
-# Setup logger for audit trail
-# Using "lme.agent" to integrate with benchmarker's logging system
-logger = logging.getLogger("lme.agent")
+DEFAULT_INVOKER_LOGGER = "lme.agent.invoker"
 
 
 class MycelianAgentInvoker:
@@ -24,13 +22,14 @@ class MycelianAgentInvoker:
     - Provides simple methods: start_session, process_conversation_message, end_session
     """
 
-    def __init__(self, agent: MycelianMemoryAgent):
+    def __init__(self, agent: MycelianMemoryAgent, logger: Optional[logging.Logger] = None):
         """Initialize the invoker with an agent.
 
         Args:
             agent: The MycelianMemoryAgent to wrap
         """
         self.agent = agent
+        self.logger = logger or logging.getLogger(f"{DEFAULT_INVOKER_LOGGER}.{getattr(agent, 'memory_id', 'unknown')}")
         self.msg_count = 0
     def start_session(self, thread_id: str) -> None:
         """Start a new session.
@@ -42,7 +41,7 @@ class MycelianAgentInvoker:
         """
         self.msg_count = 0
 
-        logger.info(json.dumps({
+        self.logger.info(json.dumps({
                 "event": "invoker_start_session",
                 "timestamp": datetime.utcnow().isoformat(),
                 "thread_id": thread_id,
@@ -69,7 +68,7 @@ class MycelianAgentInvoker:
         message = ChatMessage(role=role, content=content)
 
         # Always process the message first
-        logger.info(json.dumps({
+        self.logger.info(json.dumps({
                 "event": "invoker_process_message",
                 "timestamp": datetime.utcnow().isoformat(),
                 "thread_id": thread_id,
@@ -87,7 +86,7 @@ class MycelianAgentInvoker:
 
         # Then flush if needed (every 6 messages)
         if self.msg_count % 6 == 0:
-            logger.info(json.dumps({
+            self.logger.info(json.dumps({
                     "event": "invoker_flush",
                     "timestamp": datetime.utcnow().isoformat(),
                     "thread_id": thread_id,
@@ -109,7 +108,7 @@ class MycelianAgentInvoker:
         Args:
             thread_id: Unique identifier for this conversation thread
         """
-        logger.info(json.dumps({
+        self.logger.info(json.dumps({
                 "event": "invoker_end_session",
                 "timestamp": datetime.utcnow().isoformat(),
                 "thread_id": thread_id,

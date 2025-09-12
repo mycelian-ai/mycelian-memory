@@ -20,6 +20,7 @@ from src.async_utils import run as run_async
 # Setup logger for audit trail
 # Using "lme.agent" to integrate with benchmarker's logging system
 logger = logging.getLogger("lme.agent")
+DEFAULT_AGENT_LOGGER = "lme.agent"
 
 # Define allowed tools for each control state and last tool combination
 ALLOWED_TOOLS = {
@@ -62,7 +63,8 @@ class MycelianMemoryAgent:
     """
 
     def __init__(self, llm, tools: list, prompts: Dict[str, str],
-                 vault_id: str, memory_id: str, context_only: bool = True):
+                 vault_id: str, memory_id: str, context_only: bool = True,
+                 logger: Optional[logging.Logger] = None):
         """Initialize the agent.
 
         Args:
@@ -79,8 +81,9 @@ class MycelianMemoryAgent:
         self.vault_id = vault_id
         self.memory_id = memory_id
         self.context_only = context_only
+        self.logger = logger or logging.getLogger(f"{DEFAULT_AGENT_LOGGER}.{memory_id}")
         try:
-            logger.info(json.dumps({
+            self.logger.info(json.dumps({
                 "event": "agent_init",
                 "timestamp": datetime.utcnow().isoformat(),
                 "vault_id": vault_id,
@@ -233,7 +236,7 @@ class MycelianMemoryAgent:
             if isinstance(msg, ToolMessage) and msg not in tool_history:
                 tool_history.append(msg)
 
-        logger.info(json.dumps({
+        self.logger.info(json.dumps({
                 "event": "observe_start",
                 "timestamp": datetime.utcnow().isoformat(),
                 "control": control.value if control else None,
@@ -261,7 +264,7 @@ class MycelianMemoryAgent:
                 # First tool: await_consistency to ensure previous writes are complete
                 args = {"memory_id": self.memory_id}
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "creating_tool_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "tool": "await_consistency",
@@ -290,7 +293,7 @@ class MycelianMemoryAgent:
                     "memory_id": self.memory_id
                 }
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "creating_tool_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "tool": "get_context",
@@ -320,7 +323,7 @@ class MycelianMemoryAgent:
                     "limit": 10
                 }
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "creating_tool_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "tool": "list_entries",
@@ -353,7 +356,7 @@ class MycelianMemoryAgent:
                         if msg.name == "get_context":
                             context_text = msg.content
                             # Log the retrieved context content
-                            logger.info(json.dumps({
+                            self.logger.info(json.dumps({
                                 "event": "get_context_retrieved",
                                 "timestamp": datetime.utcnow().isoformat(),
                                 "memory_id": self.memory_id,
@@ -388,7 +391,7 @@ class MycelianMemoryAgent:
                 if not to_process:
                     raise ValueError("No message to process in PROCESS_MESSAGE state")
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                     "event": "context_only_accumulate",
                     "timestamp": datetime.utcnow().isoformat(),
                     "message_role": to_process[0].role if to_process else None,
@@ -413,7 +416,7 @@ class MycelianMemoryAgent:
                 if not to_process:
                     raise ValueError("No message to process in PROCESS_MESSAGE state")
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "llm_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "add_entry",
@@ -431,7 +434,7 @@ class MycelianMemoryAgent:
                 ]
                 # Log the full message array being sent to the model (add_entry)
                 try:
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "llm_input_messages_full",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "add_entry",
@@ -442,7 +445,7 @@ class MycelianMemoryAgent:
                     }))
                 except (TypeError, ValueError):
                     # Fallback: omit messages if they are not JSON serializable in unexpected cases
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "llm_input_messages_full",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "add_entry",
@@ -467,7 +470,7 @@ class MycelianMemoryAgent:
         elif control == ControlState.FLUSH:
             # Skip flush entirely in context_only mode
             if self.context_only:
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                     "event": "flush_skipped",
                     "timestamp": datetime.utcnow().isoformat(),
                     "reason": "context_only_mode"
@@ -488,7 +491,7 @@ class MycelianMemoryAgent:
                 # First tool: await_consistency
                 args = {"memory_id": self.memory_id}
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "creating_tool_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "tool": "await_consistency",
@@ -512,7 +515,7 @@ class MycelianMemoryAgent:
 
             elif last_tool == "await_consistency":
                 # Second tool: put_context (needs LLM for synthesis)
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "llm_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "put_context",
@@ -521,7 +524,7 @@ class MycelianMemoryAgent:
 
                 prompt = build_put_context_prompt(
                     conversation_history, self.prompts,
-                    self.vault_id, self.memory_id
+                    self.vault_id, self.memory_id, self.logger
                 )
                 llm_messages = [
                     {"role": "system", "content": prompt},
@@ -529,7 +532,7 @@ class MycelianMemoryAgent:
                 ]
                 # Log the full message array being sent to the model (put_context during FLUSH)
                 try:
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "llm_input_messages_full",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "put_context",
@@ -539,7 +542,7 @@ class MycelianMemoryAgent:
                         "messages": llm_messages
                     }))
                 except (TypeError, ValueError):
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "llm_input_messages_full",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "put_context",
@@ -575,7 +578,7 @@ class MycelianMemoryAgent:
                 # First tool: await_consistency
                 args = {"memory_id": self.memory_id}
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "creating_tool_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "tool": "await_consistency",
@@ -599,7 +602,7 @@ class MycelianMemoryAgent:
 
             elif last_tool == "await_consistency":
                 # Second tool: put_context (needs LLM for synthesis)
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                         "event": "llm_call",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "put_context_final",
@@ -608,7 +611,7 @@ class MycelianMemoryAgent:
 
                 prompt = build_put_context_prompt(
                     conversation_history, self.prompts,
-                    self.vault_id, self.memory_id
+                    self.vault_id, self.memory_id, self.logger
                 )
                 llm_messages = [
                     {"role": "system", "content": prompt},
@@ -616,7 +619,7 @@ class MycelianMemoryAgent:
                 ]
                 # Log the full message array being sent to the model (final put_context)
                 try:
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "llm_input_messages_full",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "put_context_final",
@@ -626,7 +629,7 @@ class MycelianMemoryAgent:
                         "messages": llm_messages
                     }))
                 except (TypeError, ValueError):
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "llm_input_messages_full",
                         "timestamp": datetime.utcnow().isoformat(),
                         "purpose": "put_context_final",
@@ -702,7 +705,7 @@ class MycelianMemoryAgent:
 
                 # Enhanced logging for put_context to see what content is being stored
                 if tool_name == 'put_context' and 'content' in args:
-                    logger.info(json.dumps({
+                    self.logger.info(json.dumps({
                         "event": "put_context_content",
                         "timestamp": datetime.utcnow().isoformat(),
                         "invocation_id": invocation_id,
@@ -711,7 +714,7 @@ class MycelianMemoryAgent:
                         "content_preview": args['content'][:1000] if args['content'] else "[empty]"
                     }))
 
-                logger.info(json.dumps({
+                self.logger.info(json.dumps({
                     "event": "llm_tool_call",
                     "timestamp": datetime.utcnow().isoformat(),
                     "invocation_id": invocation_id,
@@ -736,7 +739,7 @@ class MycelianMemoryAgent:
         Returns:
             The result of the graph execution
         """
-        logger.info(json.dumps({
+        self.logger.info(json.dumps({
                 "event": "agent_invoke",
                 "timestamp": datetime.utcnow().isoformat(),
                 "control": control.value,
@@ -770,7 +773,7 @@ class MycelianMemoryAgent:
 
         result = run_async(_run_graph())
 
-        logger.info(json.dumps({
+        self.logger.info(json.dumps({
                 "event": "agent_complete",
                 "timestamp": datetime.utcnow().isoformat(),
                 "control": control.value,
@@ -956,7 +959,8 @@ def format_structured_prompt(sections: list) -> str:
 def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
                             prompts: Dict[str, str],
                             vault_id: str,
-                            memory_id: str) -> str:
+                            memory_id: str,
+                            logger: Optional[logging.Logger] = None) -> str:
     """Build prompt for put_context tool call.
 
     Args:
@@ -977,7 +981,7 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
     structured_prompt = format_structured_prompt(sections)
 
     # Log the conversation being sent to LLM for context synthesis
-    logger.info(json.dumps({
+    (logger or logging.getLogger(f"{DEFAULT_AGENT_LOGGER}.{memory_id}")).info(json.dumps({
         "event": "put_context_llm_input",
         "timestamp": datetime.utcnow().isoformat(),
         "memory_id": memory_id,

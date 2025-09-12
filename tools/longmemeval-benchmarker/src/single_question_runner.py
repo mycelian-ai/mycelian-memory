@@ -244,7 +244,7 @@ class SingleQuestionRunner:
         mem_title = (self.cfg.memory_title_template or "{question_id}__{run_id}").format(
             question_id=qid, run_id=run_id
         )
-        runner_log = logging.getLogger("lme.runner")
+        runner_log = logging.getLogger(f"lme.runner.{qid}")
         runner_log.info("RUN qid=%s run_id=%s vault_id=%s ingest=%s qa=%s",
                         qid, run_id, vault_id, self.cfg.models.ingest, self.cfg.models.qa)
 
@@ -284,12 +284,14 @@ class SingleQuestionRunner:
         try:
             qhandler = logging.StreamHandler(log)
             qhandler.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
-            for lg_name in ["lme.runner", "lme.agent"]:
-                lg = logging.getLogger(lg_name)
-                logger_snapshots.append((lg, list(lg.handlers), lg.propagate, lg.level))
-                lg.setLevel(logging.INFO)
-                lg.addHandler(qhandler)
-                lg.propagate = False
+            # Attach handler only to per-question runner logger
+            lg = logging.getLogger(f"lme.runner.{qid}")
+            logger_snapshots.append((lg, list(lg.handlers), lg.propagate, lg.level))
+            lg.setLevel(logging.INFO)
+            lg.addHandler(qhandler)
+            lg.propagate = False
+            # Defer agent logger handler until memory_id is known
+            qhandler_agent = None
         except Exception:
             pass
 
@@ -359,6 +361,17 @@ class SingleQuestionRunner:
                 max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
                 context_only=context_only
             )
+            # Attach agent logger for this memory_id only
+            try:
+                qhandler_agent = logging.StreamHandler(log)
+                qhandler_agent.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
+                agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
+                logger_snapshots.append((agent_logger, list(agent_logger.handlers), agent_logger.propagate, agent_logger.level))
+                agent_logger.setLevel(logging.INFO)
+                agent_logger.addHandler(qhandler_agent)
+                agent_logger.propagate = False
+            except Exception:
+                pass
         else:
             # Use MemoryManager to ensure memory exists
             mm = MemoryManager(self.mcp_client, debug=False)
@@ -378,6 +391,17 @@ class SingleQuestionRunner:
                 max_tool_calls_per_turn=self.cfg.params.max_tool_calls_per_turn,
                 context_only=context_only
             )
+            # Attach agent logger for this memory_id only
+            try:
+                qhandler_agent = logging.StreamHandler(log)
+                qhandler_agent.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
+                agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
+                logger_snapshots.append((agent_logger, list(agent_logger.handlers), agent_logger.propagate, agent_logger.level))
+                agent_logger.setLevel(logging.INFO)
+                agent_logger.addHandler(qhandler_agent)
+                agent_logger.propagate = False
+            except Exception:
+                pass
 
             # Optionally set log stream (for compatibility)
             try:
@@ -543,6 +567,12 @@ class SingleQuestionRunner:
                     try:
                         if qhandler:
                             lg.removeHandler(qhandler)
+                        try:
+                            qhandler_agent  # may be undefined if attach failed
+                        except NameError:
+                            qhandler_agent = None
+                        if qhandler_agent:
+                            lg.removeHandler(qhandler_agent)
                     except Exception:
                         pass
                     lg.propagate = prop
@@ -552,5 +582,10 @@ class SingleQuestionRunner:
                         qhandler.flush()
                     except Exception:
                         pass
+                try:
+                    if qhandler_agent:
+                        qhandler_agent.flush()
+                except Exception:
+                    pass
             except Exception:
                 pass

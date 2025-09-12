@@ -81,17 +81,23 @@ def build_agent_with_invoker(
     llm = get_chat_model(model_id)  # max_retries=6 is default
 
     # Create the agent (logging is always enabled)
+    # Create per-instance loggers for agent and invoker
+    import logging
+    agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
+
     agent = MycelianMemoryAgent(
         llm=llm,
         tools=tools,  # Use MCP tools directly with async execution
         prompts=prompts,
         vault_id=vault_id,
         memory_id=memory_id,
-        context_only=context_only
+        context_only=context_only,
+        logger=agent_logger
     )
 
-    # Wrap with invoker
-    invoker = MycelianAgentInvoker(agent)
+    # Wrap with invoker, using a per-instance logger
+    invoker_logger = logging.getLogger(f"lme.agent.invoker.{memory_id}")
+    invoker = MycelianAgentInvoker(agent, logger=invoker_logger)
 
     # Store some metadata for compatibility
     invoker._mcp = mcp_client  # For QA search later
