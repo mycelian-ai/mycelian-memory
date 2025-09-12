@@ -25,7 +25,6 @@ def _toml_text(tmp_dataset_dir: str) -> str:
         agent = "gpt-4o-mini"
         qa = "gpt-4o-mini"
         [params]
-        top_k = 10
         max_tool_calls_per_turn = 5
         """
     ).strip()

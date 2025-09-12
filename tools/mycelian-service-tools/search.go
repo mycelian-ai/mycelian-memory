@@ -9,13 +9,11 @@ import (
 	"net/http"
 )
 
-func runSearch(apiURL, userID, memoryID, query string, topK int, out io.Writer) error {
+func runSearch(apiURL, userID, memoryID, query string, topKE int, out io.Writer) error {
 	if query == "" {
 		return fmt.Errorf("query cannot be empty")
 	}
 	// Note: userID is no longer in the request body, it's handled via authorization
-	// For now, we'll use the new parameter names with reasonable defaults
-	topKE := topK
 	if topKE <= 0 {
 		topKE = 5 // default
 	}

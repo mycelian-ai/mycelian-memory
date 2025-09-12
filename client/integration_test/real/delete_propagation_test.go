@@ -53,8 +53,9 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 	// 3) Poll search until the entry appears
 	var appeared bool
 	deadline := time.Now().Add(15 * time.Second)
+	topKE := 3
 	for time.Now().Before(deadline) {
-		sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopK: 3})
+		sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopKE: &topKE})
 		if sr != nil && sr.Count > 0 {
 			appeared = true
 			break
@@ -80,15 +81,17 @@ func TestDeleteEntryPropagationE2E(t *testing.T) {
 
 	// 5) Poll search until the entry disappears
 	deadline = time.Now().Add(15 * time.Second)
+	topKE2 := 3
 	for time.Now().Before(deadline) {
-		sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopK: 3})
+		sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopKE: &topKE2})
 		if sr != nil && sr.Count == 0 {
 			break // success
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopK: 3})
+	topKE3 := 3
+	sr, _ := c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: uniqueText, TopKE: &topKE3})
 	if sr != nil && sr.Count > 0 {
 		t.Fatalf("entry still present in search after delete: %+v", sr)
 	}

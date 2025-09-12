@@ -30,8 +30,8 @@ type MockIndex struct {
 	mock.Mock
 }
 
-func (m *MockIndex) Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
-	args := m.Called(ctx, actorID, memoryID, query, vec, topK, alpha, includeRawEntries)
+func (m *MockIndex) Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topKE int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
+	args := m.Called(ctx, actorID, memoryID, query, vec, topKE, alpha, includeRawEntries)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -43,8 +43,8 @@ func (m *MockIndex) LatestContext(ctx context.Context, actorID, memoryID string)
 	return args.String(0), args.Get(1).(time.Time), args.Error(2)
 }
 
-func (m *MockIndex) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
-	args := m.Called(ctx, actorID, memoryID, query, vec, topK, alpha)
+func (m *MockIndex) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topKC int, alpha float32) ([]model.ContextHit, error) {
+	args := m.Called(ctx, actorID, memoryID, query, vec, topKC, alpha)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

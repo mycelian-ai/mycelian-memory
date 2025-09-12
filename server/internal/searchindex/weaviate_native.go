@@ -34,8 +34,8 @@ func NewWeaviateNativeIndex(baseURL string) (Index, error) {
 	return &weavNative{client: cl, baseURL: baseURL}, nil
 }
 
-func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query string, vec []float32, topK int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
-	log.Info().Str("memoryId", memoryID).Str("query", query).Str("actorID", actorID).Int("topK", topK).Float32("alpha", alpha).Int("vectorLength", len(vec)).Msg("weaviate search starting")
+func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query string, vec []float32, topKE int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
+	log.Info().Str("memoryId", memoryID).Str("query", query).Str("actorID", actorID).Int("topKE", topKE).Float32("alpha", alpha).Int("vectorLength", len(vec)).Msg("weaviate search starting")
 
 	// helper to safely extract strings
 	safeString := func(v interface{}) string {
@@ -55,7 +55,7 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 		WithClassName("MemoryEntry").
 		WithWhere(where).
 		WithHybrid(hy).
-		WithLimit(topK).
+		WithLimit(topKE).
 		WithFields(
 			gql.Field{Name: "entryId"},
 			gql.Field{Name: "actorId"},
@@ -183,7 +183,7 @@ func (w *weavNative) LatestContext(ctx context.Context, actorID string, memoryID
 }
 
 // SearchContexts returns top-K matching context shards for a query.
-func (w *weavNative) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
+func (w *weavNative) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topKC int, alpha float32) ([]model.ContextHit, error) {
 	hy := (&gql.HybridArgumentBuilder{}).
 		WithQuery(query).
 		WithVector(vec).
@@ -195,7 +195,7 @@ func (w *weavNative) SearchContexts(ctx context.Context, actorID, memoryID, quer
 		WithClassName("MemoryContext").
 		WithWhere(where).
 		WithHybrid(hy).
-		WithLimit(topK).
+		WithLimit(topKC).
 		WithFields(
 			gql.Field{Name: "context"},
 			gql.Field{Name: "creationTime"},

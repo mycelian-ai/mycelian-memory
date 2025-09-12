@@ -47,7 +47,7 @@ func TestCreateUserAndMemory(t *testing.T) {
 	// Note: Using dev mode auth - no user creation needed
 
 	// 1) create vault
-	vaultTitle := "it-vault"
+	vaultTitle := fmt.Sprintf("it-vault-%d", os.Getpid())
 	cmdVault := exec.Command(binPath, "create-vault", "--title", vaultTitle)
 	cmdVault.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
 	outV, err := cmdVault.CombinedOutput()

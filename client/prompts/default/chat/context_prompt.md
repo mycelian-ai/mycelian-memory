@@ -7,19 +7,8 @@ shards. This allows the memory to ensure that we have high fidelity context avai
 
 **Core Rules:**
 
-Context Sharding and Pruning Rules: You MUST limit a materialized context to be under 5000 words or 1000 tokens, whichever is smaller. If it is larger than that this limit then you have to prune some information. Prioritize pruning information that is from an older part of the conversation that you didn't observe in this specific session.
+Context Sharding and Pruning Rules: You MUST limit a materialized context to be under 5000 words, whichever is smaller. If it is larger than that this limit then you have to prune some information. Prioritize pruning information that is from an older part of the conversation that you didn't observe in this specific session.
 
-**Durability Criteria (domain‑agnostic):**
-- Treat a fact as durable if ANY of the following hold:
-  - The user explicitly asks to remember it
-  - It is low‑volatility (likely stable over months)
-  - It is repeated across sessions
-  - It is used by the assistant across different topics/tasks
-- Use these criteria to infer durability; examples (if mentioned) are illustrative, not exhaustive.
-
-**Pinned Durable Facts (Latest Context):**
-- Keep a small, compressed set (≤12 one‑line items) of the most durable facts in the latest context.
-- Under token pressure, compress or demote the least‑used durable facts to older snapshots/entries; do not drop high‑value durable facts that meet the criteria above.
 
 **CRITICAL CONTEXT REPLACEMENT RULES:**
 - If an input message begins with the exact tag `[previous_context]`, treat everything after the tag as OLD context from previous sessions
@@ -35,9 +24,17 @@ Data Extraction Rule:
   - For example: Preserve quantities and counts explicitly,
     determine details of a transaction happening between two entities, etc
 - Be specific, enrich the information with NER where-ever possible.
-- Facts: Put current actionable items first. Don't overwrite past facts. For e.g.: user may have adidas shoes at time t1 then they have nike at time t2. Both facts must be recorded with time (if available).
 - Timeline: Keep detailed timeline of event in `YYYY‑MM‑DD – event` format.
 - Include dates when helpful in ISO format (YYYY‑MM‑DD). Add pointers to which information is old vs new to help with pruning old information, when needed.
+
+Factual information extraction rules. For each fact:
+1. Express it as a complete, standalone statement
+2. Include temporal markers if relevant
+3. Mark confidence as certain/probable/possible
+4. Resolve all pronouns to specific entities
+5. Separate facts from interpretations
+
+Format: [Entity] [Relationship] [Value/Entity] [Confidence] [Timestamp if applicable]
 
 **Knowledge Updates:**
 - When a durable fact changes, record an update instead of deleting the prior:
@@ -59,6 +56,3 @@ Use these section headings. You can add additional sections if the conversation 
 `# Notes` - Free-form nuance that doesn't fit above (use sparingly)
 `# Timeline` - YYYY-MM-DD – succinct event
 `# Diagram` - Optional Mermaid diagram (≤10 nodes, ≤600 chars, only if clarifying)
-
-**Output Constraints:**
-- If headings are forbidden by the caller, emit the same content as labeled bullet blocks in this order (omit empty): durable:, facts:, preferences:, updates:, topics:, entities:, notes:, timeline:

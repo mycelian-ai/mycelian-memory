@@ -26,7 +26,7 @@ type mockSearch struct {
 	empty bool
 }
 
-func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, k int, a float32, includeRawEntries bool) ([]model.SearchHit, error) {
+func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, kE int, a float32, includeRawEntries bool) ([]model.SearchHit, error) {
 	m.calls++
 	if m.empty {
 		return []model.SearchHit{}, nil
@@ -38,9 +38,9 @@ func (m *mockSearch) LatestContext(ctx context.Context, uid, mid string) (string
 	return "ctx", time.Now(), nil
 }
 
-func (m *mockSearch) SearchContexts(ctx context.Context, uid, mid, q string, v []float32, k int, a float32) ([]model.ContextHit, error) {
-	out := make([]model.ContextHit, 0, k)
-	for i := 0; i < k; i++ {
+func (m *mockSearch) SearchContexts(ctx context.Context, uid, mid, q string, v []float32, kC int, a float32) ([]model.ContextHit, error) {
+	out := make([]model.ContextHit, 0, kC)
+	for i := 0; i < kC; i++ {
 		out = append(out, model.ContextHit{Context: "ctx", Timestamp: time.Now(), Score: 0.8})
 	}
 	return out, nil

@@ -19,7 +19,7 @@ func (f fakeIndex) Search(context.Context, string, string, string, []float32, in
 func (f fakeIndex) LatestContext(context.Context, string, string) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f fakeIndex) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
+func (f fakeIndex) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topKC int, alpha float32) ([]model.ContextHit, error) {
 	return []model.ContextHit{}, nil
 }
 func (f fakeIndex) UpsertEntry(context.Context, string, []float32, map[string]interface{}) error {
@@ -43,7 +43,7 @@ func (f fallbackIdx) Search(context.Context, string, string, string, []float32, 
 func (f fallbackIdx) LatestContext(context.Context, string, string) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f fallbackIdx) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.ContextHit, error) {
+func (f fallbackIdx) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topKC int, alpha float32) ([]model.ContextHit, error) {
 	return nil, f.delErr
 }
 func (f fallbackIdx) UpsertEntry(context.Context, string, []float32, map[string]interface{}) error {
