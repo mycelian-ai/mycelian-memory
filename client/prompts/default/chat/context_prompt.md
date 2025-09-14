@@ -9,9 +9,10 @@ Context is organized in sections. Add additional section IF AND ONLY IF they cov
 `# Facts` - definition covered later
 `# Preferences` - definition covered later
 `# Decisions` - Specific decisions made with brief rationale (e.g., "Will try Todoist for one week") and time
-`# Recommendations`
+`# Recommendations` - Advice and suggestions PROVIDED TO the user by the assistant
 `# Topics` - Main themes/subjects discussed (not facts, just areas of conversation)
-`# Entities`
+`# Entities` - Specific named things (people, products, organizations, tools) that could match search queries
+`# Notes` - Important contextual details that don't fit other sections
 `# Timeline` - Events in chronological order. Use minimum granularity needed:
   YYYY-MM-DD for single daily events, add HH:MM for multiple same-day events,
   add :SS for rapid sequences. Goal: clear sequence without excess precision.
@@ -22,29 +23,40 @@ Context is organized in sections. Add additional section IF AND ONLY IF they cov
 - If an input message begins with the exact tag `[previous_context]`, treat everything after the tag as OLD context from previous sessions
 - Messages WITHOUT the `[previous_context]` tag are the NEW conversation from the current session
 - Strip the `[previous_context]` tag itself and do not persist the tag or its raw content verbatim in shards
-- You MUST limit a materialized context to be under 10000 tokens. If it exceeds this limit, only then prune information. When pruning, prioritize removing old topic-specific details from sections OTHER than Facts. The Facts section should remain durable and complete.
-- The Facts section is DURABLE. For  sections (Description, Topics, Entities, etc.), prefer information from CURRENT SESSION when topics differ and you meet the pruning condition.
+- You MUST limit a materialized context to be under 10000 tokens. If it exceeds this limit, only then prune information. When pruning, prioritize removing old topic-specific details from sections OTHER than Facts, Preferences, Decisions, and Recommendations.
+- Facts, Preferences, Decisions, and Recommendations sections are DURABLE and must be preserved across sessions.
+- For other sections (Topics, Entities, Timeline, Notes), prefer information from CURRENT SESSION when topics differ and you meet the pruning condition.
+
+### CRITICAL: Answer-Oriented Information Extraction
+Extract information that could answer "who, what, when, where, why, how" questions:
+- Identity attributes (credentials, relationships, affiliations)
+- States and possessions (what user has, owns, is)
+- Temporal events (when things happened)
+- Quantifiable information (numbers, amounts, counts)
+- Decisions and their outcomes
+- Recommendations and advice given
 
 ### Data Extraction Rule
 
 - Extract and categorize information into the appropriate sections.
 - Do not duplicate information across sections. Each piece of information should appear in exactly ONE section based on its type.
 - Be specific, enrich the information with NER where-ever possible.
-- Include dates in Facts when timing is part of what happened:
-  * Explicit dates: "started job in March 2023"
-  * Implicit today: "returned Zara boots" → "returned Zara boots on 2025-09-14"
-  * Events/actions are temporal facts and should include when they occurred
+- Include events with dates in Timeline, derive current state for Facts:
+  * Events go in Timeline with dates
+  * Current state derived from events goes in Facts
+  * Implicit "today" should use current date
 - Omit dates for atemporal attributes (has MBA, has 2 siblings) but include date for temporal facts (e.g., 'got MBA on 2019-05-15')
 - Timeline section tracks when topics were discussed and when you learned things
 
 #### Factual extraction rules
 
 STRICT definition of a Fact:
-An item can ONLY be in Facts if it passes ALL FOUR tests:
+An item can ONLY be in Facts if it passes ALL THREE tests:
   1. Is this objectively verifiable? (not opinion/preference/feeling)
-  2. Is this a permanent attribute? (not a temporary state/activity)
-  3. Does this describe what IS? (not plans/intentions/possibilities)
-  4. Would this remain true without any action? (not dependent on future events)
+  2. Does this describe what IS currently true? (not plans/intentions/possibilities)
+  3. Is this a state or attribute, not an action? (states, not activities)
+
+Note: Facts can change over time - that's what Timeline tracks changes for.
 
 For each fact:
 - Express it as a complete, standalone statement
@@ -62,15 +74,21 @@ Fact Update Rules:
 - When adding new facts, simply add them to the list:
   - Format: `- [Complete fact statement] [Timestamp if known]`
   - Example: `- User graduated with Business Administration degree [date unknown]`
+- Derive current state from past events:
+  - Past actions → Current state
+  - Acquisitions → Possessions
+  - Achievements → Attributes
+  - Changes → New status
+  Apply this pattern broadly to all events, not just specific categories
 
-  Examples that PASS all tests: "has MBA degree", "born in Texas", "has 2 siblings"
-  Examples that FAIL: "is evaluating apps" (temporary), "plans to try Todoist" (intention),
+  Examples that PASS all tests: "has MBA degree", "owns an Instant Pot", "is employed", "lives in NYC"
+  Examples that FAIL: "is evaluating apps" (activity not state), "plans to try Todoist" (intention),
   "prefers simple tools" (preference), "should implement scanning" (recommendation),
-  "goal is to prioritize tasks" (intention), "open to trying X" (preference)
+  "wants to save money" (intention), "is considering options" (activity)
 
   If it fails ANY test → it MUST go in another section.
   Common mistakes to AVOID putting in Facts:
-  - Current activities or states ("is evaluating", "is trying", "is considering")
+  - Current activities ("is evaluating", "is trying", "is considering") - these are actions not states
   - Goals, aims, or objectives ("goal is to", "aims to", "wants to")
   - Plans or intentions ("plans to", "will try", "intends to")
   - Preferences or openness ("prefers", "likes", "open to", "comfortable with")
@@ -89,6 +107,32 @@ Fact Update Rules:
   - "Favors minimalist design"
   - "Prefers working from home"
 
+### Section-Specific Merge Rules:
+- **Facts**: MERGE all valid facts from previous context with new facts
+- **Preferences**: ACCUMULATE all preferences unless explicitly contradicted
+- **Decisions**: PRESERVE all decisions with timestamps
+- **Recommendations**: ACCUMULATE all recommendations given to user
+- **Timeline**: Keep all events when possible
+
+### Strategic Information Preservation
+When approaching token limits, preserve information by searchability:
+- Keep specific names, numbers, and credentials
+- Keep decisions and recommendations
+- Compress verbose text while preserving searchable terms
+- Remove filler words but keep entities and key concepts
+Focus: Maintain information that could match future search queries
+
 ## Temporal Normalization:
 - For temporal facts (events, achievements with dates), include the date when known; otherwise note "(date unknown)".
 - When facts change, update the fact and add a Timeline entry showing the change.
+
+### CRITICAL: Validate Before Outputting
+Before returning your context, pause and verify:
+1. Did I follow ALL the instructions in this prompt?
+2. Did I extract ALL relevant information into appropriate sections?
+3. Did I preserve ALL durable sections from previous context?
+4. Is EVERY section properly formatted in markdown?
+5. For each event mentioned, did I derive the resulting state?
+6. For each recommendation given, is it captured?
+
+If any answer is "no", revise before outputting.
