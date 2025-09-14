@@ -1009,6 +1009,6 @@ STRICT OUTPUT RULES FOR put_context.content:
 - Return ONLY the context body. Do NOT include any headings, titles, or prefaces such as "Context synthesized...", "Summary:", or similar.
 - Do NOT include meta commentary or labels. Start directly with the synthesized context content.
 - Use clear paragraphs or bullet points as needed, but avoid a leading label line.
-- IMPORTANT: Prioritize information from CURRENT SESSION over PREVIOUS CONTEXT when topics differ"""
+- IMPORTANT: Always preserve ALL facts from the Facts section of PREVIOUS CONTEXT, even when topics differ"""
 
     return prompt
