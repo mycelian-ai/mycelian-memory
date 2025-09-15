@@ -43,12 +43,12 @@ def build_agent_with_invoker(
 
     # Load prompts from the filesystem (fail fast if any are missing/empty)
     # Resolve repo root from this file path
+    # From: longmemeval-benchmarker/src/mycelian_memory_agent/build.py
+    # Go up 4 levels to get to mycelian-memory/
     root_dir = os.path.dirname(
         os.path.dirname(
             os.path.dirname(
-                os.path.dirname(
-                    os.path.dirname(__file__)
-                )
+                os.path.dirname(__file__)
             )
         )
     )
