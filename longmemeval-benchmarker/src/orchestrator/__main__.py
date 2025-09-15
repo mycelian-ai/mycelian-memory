@@ -401,12 +401,11 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("Error: dataset_file_path missing in config TOML")
         return 1
 
-    # Resolve dataset path (relative to config file directory)
+    # Resolve dataset path (relative to current working directory)
     ds_path_obj = Path(dataset_path)
     if not ds_path_obj.is_absolute():
-        # Resolve relative to config file directory
-        config_dir = Path(config_path).parent
-        ds_path_obj = config_dir / ds_path_obj
+        # Resolve relative to current working directory (benchmarker root)
+        ds_path_obj = Path.cwd() / ds_path_obj
 
     # Convert to absolute path for consistency
     dataset_abs_path = str(ds_path_obj.resolve())
