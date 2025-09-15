@@ -32,9 +32,10 @@ This script will:
 - Install all dependencies
 - Set up the environment
 
-**Then activate and use:**
+**Then run the benchmarker:**
 ```bash
-poetry shell  # Activate the environment
+# All commands must be run from the longmemeval-benchmarker directory
+poetry run python -m src.orchestrator config/config.smoke.toml --auto -w 5
 ```
 
 ## Prerequisites
@@ -155,34 +156,35 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
 
 2. **Run the benchmark with the Orchestrator**:
    ```bash
-   source venv/bin/activate
+   # Make sure you're in the longmemeval-benchmarker directory
+   cd longmemeval-benchmarker
 
    # Auto mode (recommended): Start, monitor, and shutdown automatically
-   python -m src.orchestrator run.toml --auto --workers 3
+   poetry run python -m src.orchestrator config/config.smoke.toml --auto --workers 3
 
    # Or run with custom run ID
-   python -m src.orchestrator run.toml --auto --workers 3 --run-id my_benchmark_run
+   poetry run python -m src.orchestrator config/config.smoke.toml --auto --workers 3 --run-id my_benchmark_run
 
    # Process only first N questions
-   python -m src.orchestrator run.toml --auto --workers 3 --num-questions 10
+   poetry run python -m src.orchestrator config/config.smoke.toml --auto --workers 3 --num-questions 10
    ```
 
 3. **Resume a failed/incomplete run**:
    ```bash
    # Resume from where it left off (default behavior)
-   python -m src.orchestrator run.toml --resume --run-id my_benchmark_run
+   poetry run python -m src.orchestrator config/config.smoke.toml --resume --run-id my_benchmark_run
 
    # Force retry failed questions
-   python -m src.orchestrator run.toml --resume --run-id my_benchmark_run --force
+   poetry run python -m src.orchestrator config/config.smoke.toml --resume --run-id my_benchmark_run --force
 
    # Restart questions from beginning (clears memory)
-   python -m src.orchestrator run.toml --resume --run-id my_benchmark_run \
+   poetry run python -m src.orchestrator config/config.smoke.toml --resume --run-id my_benchmark_run \
      --resume-mode restart-from-first-session
    ```
 
 4. **Monitor progress** (separate terminal):
    ```bash
-   python -m src.orchestrator run.toml --monitor --run-id my_benchmark_run
+   poetry run python -m src.orchestrator config/config.smoke.toml --monitor --run-id my_benchmark_run
    ```
 
 5. **Check results**:
