@@ -25,6 +25,19 @@ All other runner scripts are deprecated and should not be used.
    # Or: pip install poetry
    ```
 
+   **Optional - Install pyenv** (if you need Python 3.9+):
+   ```bash
+   # macOS
+   brew install pyenv
+   pyenv install 3.11.0
+   pyenv local 3.11.0
+
+   # Linux
+   curl https://pyenv.run | bash
+   pyenv install 3.11.0
+   pyenv local 3.11.0
+   ```
+
 1. **Start Mycelian services** (from repo root):
    ```bash
    # Start the backend memory service
