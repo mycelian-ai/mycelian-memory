@@ -23,7 +23,7 @@ Context is organized in sections. Add additional section IF AND ONLY IF they cov
 - If an input message begins with the exact tag `[previous_context]`, treat everything after the tag as OLD context from previous sessions
 - Messages WITHOUT the `[previous_context]` tag are the NEW conversation from the current session
 - Strip the `[previous_context]` tag itself and do not persist the tag or its raw content verbatim in shards
-- You MUST limit a materialized context to be under 10000 tokens. If it exceeds this limit, only then prune information. When pruning, prioritize removing old topic-specific details from sections OTHER than Facts, Preferences, Decisions, and Recommendations.
+- You MUST limit a materialized context to be under 5000 characters. If it exceeds this limit, only then prune information. When pruning, prioritize removing old topic-specific details from sections OTHER than Facts, Preferences, Decisions, and Recommendations.
 - Facts, Preferences, Decisions, and Recommendations sections are DURABLE and must be preserved across sessions.
 - For other sections (Topics, Entities, Timeline, Notes), prefer information from CURRENT SESSION when topics differ and you meet the pruning condition.
 
@@ -130,6 +130,7 @@ Focus: Maintain information that could match future search queries
 Before returning your context, pause and verify:
 1. Did I follow ALL the instructions in this prompt?
 2. Did I extract ALL relevant information into appropriate sections?
+2. Did I extract ALL Facts?
 3. Did I preserve ALL durable sections from previous context?
 4. Is EVERY section properly formatted in markdown?
 5. For each event mentioned, did I derive the resulting state?
