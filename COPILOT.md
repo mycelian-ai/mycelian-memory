@@ -89,7 +89,7 @@ Mycelian Memory is an open-source framework for providing long-term, high-fideli
 
 ## 7. LongMemEval Benchmarker
 
-The LongMemEval benchmarker (in `tools/longmemeval-benchmarker/`) is used to evaluate Mycelian Memory's performance and scalability for long-term memory tasks. It runs the LongMemEval benchmark, which simulates large-scale, multi-session conversational memory workloads.
+The LongMemEval benchmarker (in `longmemeval-benchmarker/`) is used to evaluate Mycelian Memory's performance and scalability for long-term memory tasks. It runs the LongMemEval benchmark, which simulates large-scale, multi-session conversational memory workloads.
 
 **Key features:**
 - Uses a task queue orchestrator for robust, resumable, and parallelized benchmarking.
@@ -100,12 +100,12 @@ The LongMemEval benchmarker (in `tools/longmemeval-benchmarker/`) is used to eva
 
 **Quickstart:**
 1. Start Mycelian backend and MCP server (`make start-dev-mycelian-server` and `make start-mcp-streamable-server`).
-2. Set up Python venv and install requirements in `tools/longmemeval-benchmarker/`.
+2. Set up Python venv and install requirements in `longmemeval-benchmarker/`.
 3. Configure model provider credentials and dataset path in TOML config.
 4. Run the orchestrator: `python -m src.orchestrator run.toml --auto --workers 3`
 5. Monitor progress and evaluate results as described in the benchmarker's README.
 
-See `tools/longmemeval-benchmarker/README.md` for full details, troubleshooting, and advanced usage.
+See `longmemeval-benchmarker/README.md` for full details, troubleshooting, and advanced usage.
 
 ---
 

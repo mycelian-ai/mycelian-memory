@@ -22,5 +22,3 @@ def resolve_under_root(path_like: Union[str, Path]) -> Path:
     """
     p = Path(path_like)
     return p if p.is_absolute() else (BENCH_ROOT / p).resolve()
-
-

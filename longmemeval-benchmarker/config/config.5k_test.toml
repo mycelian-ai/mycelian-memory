@@ -1,7 +1,7 @@
 # Configuration for testing 5K question with fix
 
 # Path to dataset file
-dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_5k_test.json"
+dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_5k_test.json"
 
 # Vault configuration
 vault_title = "longmemeval-5k-test"

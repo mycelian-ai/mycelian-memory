@@ -11,7 +11,7 @@ A full LongMemEval run can span many hours across hundreds of questions. We need
 ## Decision
 
 1. Use Huey with `SqliteHuey` (async-only) for task queueing and retries, with per-run isolation by setting `HUEY_QUEUE_NAME=huey-{run_id}` and `HUEY_RUN_ID={run_id}`.
-2. Persist progress in SQLite at `tools/longmemeval-benchmarker/data/progress.db` (WAL mode). Tables: `runs`, `question_progress` (includes `vault_id`, `memory_id`, counters, timestamps, `last_progress_at`).
+2. Persist progress in SQLite at `longmemeval-benchmarker/data/progress.db` (WAL mode). Tables: `runs`, `question_progress` (includes `vault_id`, `memory_id`, counters, timestamps, `last_progress_at`).
 3. Resume strategy: on resume, gather `pending`, `resumable`, stuck-in-progress, and QA-stuck rows. Depending on `resume-mode`, restart from session 0 (clearing `memory_id`, preserving `vault_id`) or continue from `completed_sessions`. `--force` re-enqueues previously failed items.
 4. Tasks wrap existing runner:
    - `process_question(run_id, question_id)`: loads question/config from DB, computes start index, runs `SingleQuestionRunner` ingestion in-process, persists IDs, schedules QA if done.

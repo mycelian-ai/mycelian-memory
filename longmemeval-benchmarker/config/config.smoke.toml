@@ -1,7 +1,7 @@
 # Smoke test configuration - minimal test to verify automation works
 
 # Path to dataset file
-dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_smoke.json"
+dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_smoke.json"
 
 # Vault configuration
 vault_title = "longmemeval-smoke-test"

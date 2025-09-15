@@ -142,20 +142,20 @@ coverage.html
 data/
 
 # LongMemEval Benchmarker specific
-tools/longmemeval-benchmarker/out/
-tools/longmemeval-benchmarker/huey_orchestrator/out/
-tools/longmemeval-benchmarker/data/
-tools/longmemeval-benchmarker/data/*.db*
-tools/longmemeval-benchmarker/huey_orchestrator/data/*.db*
-tools/longmemeval-benchmarker/huey_orchestrator.log
-tools/longmemeval-benchmarker/todo
-tools/longmemeval-benchmarker/logs/
-tools/longmemeval-benchmarker/logs/*/
-tools/longmemeval-benchmarker/*.log
+longmemeval-benchmarker/out/
+longmemeval-benchmarker/huey_orchestrator/out/
+longmemeval-benchmarker/data/
+longmemeval-benchmarker/data/*.db*
+longmemeval-benchmarker/huey_orchestrator/data/*.db*
+longmemeval-benchmarker/huey_orchestrator.log
+longmemeval-benchmarker/todo
+longmemeval-benchmarker/logs/
+longmemeval-benchmarker/logs/*/
+longmemeval-benchmarker/*.log
 
 # Large dataset files (keep only small test datasets in git)
-tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
-tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
+longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
+longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
 
 # Root level files that should be ignored
 huey_orchestrator.log
@@ -163,3 +163,12 @@ huey_orchestrator.log
 memory-bank/
 .cursor/
 .cursorignore
+
+# Ignore large dataset files
+longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
+longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
+
+# Ignore log files
+*.log
+logs/
+**/*.log

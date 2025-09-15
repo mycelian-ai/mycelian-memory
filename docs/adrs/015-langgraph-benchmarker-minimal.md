@@ -13,7 +13,7 @@ We need a simple, reproducible benchmarker for evaluating Mycelian’s long-memo
 - Expose Mycelian MCP tools directly to the agent: `add_entry`, `put_context`, `get_context`, `list_entries`, `await_consistency`, `search_memories`.
 - Control runs via a TOML config (provider, models for agent/qa/eval, dataset path, vault title/ID, memory title template, top_k, safety caps).
 - Orchestrate via a single CLI (`mycelian-longmemeval`) with three modes: ingestion, qa, eval. Default execution is per-question end-to-end.
-- Split code into `dataset_loader`, `graph/agent builder`, and `runner/controller` modules under `tools/longmemeval-benchmarker/`.
+- Split code into `dataset_loader`, `graph/agent builder`, and `runner/controller` modules under `longmemeval-benchmarker/`.
 
 ## Consequences
 - Simpler implementation: minimal code, faster iteration, easier debugging.

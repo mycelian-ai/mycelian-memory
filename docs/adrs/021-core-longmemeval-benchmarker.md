@@ -6,7 +6,7 @@
 
 ## Context
 
-The LongMemEval benchmarker evolved from earlier LangGraph-based prototypes (ADR-013/014 → ADR-015). We now have a consolidated, production-ready runner under `tools/longmemeval-benchmarker/` that:
+The LongMemEval benchmarker evolved from earlier LangGraph-based prototypes (ADR-013/014 → ADR-015). We now have a consolidated, production-ready runner under `longmemeval-benchmarker/` that:
 - Uses a clean agent implementation with MCP tools to interact with Mycelian Memory
 - Defaults to context-only ingestion for performance
 - Adds a two-pass search strategy to improve QA retrieval
@@ -50,16 +50,16 @@ This ADR records the present, implemented decisions for the core runner and clar
 
 ## Implementation Details
 
-- Runner: `tools/longmemeval-benchmarker/src/benchmarker.py`
+- Runner: `longmemeval-benchmarker/src/benchmarker.py`
   - Loads TOML, runs model healthchecks, resolves vault with `MemoryManager`, delegates to `SingleQuestionRunner`.
-- Single-question execution: `tools/longmemeval-benchmarker/src/single_question_runner.py`
+- Single-question execution: `longmemeval-benchmarker/src/single_question_runner.py`
   - Builds the agent/invoker, runs sequential sessions per question, writes incremental progress to `data/progress.db` (ingested message counts, completed sessions, `vault_id`, `memory_id`).
   - Two-pass QA search and context assembly prior to answer generation.
-- Dataset loader: `tools/longmemeval-benchmarker/src/dataset_loader.py`
+- Dataset loader: `longmemeval-benchmarker/src/dataset_loader.py`
   - Normalizes input formats (`sessions` vs `haystack_sessions`).
-- Memory utilities: `tools/longmemeval-benchmarker/src/memory_manager.py`
+- Memory utilities: `longmemeval-benchmarker/src/memory_manager.py`
   - Vault creation/lookup, memory creation (via MCP `create_memory_in_vault`), and `search_memories` invocation.
-- Context-only agent notes: `tools/longmemeval-benchmarker/CONTEXT_ONLY_AGENT.md`.
+- Context-only agent notes: `longmemeval-benchmarker/CONTEXT_ONLY_AGENT.md`.
 
 ## Consequences
 
@@ -86,4 +86,4 @@ Notes / Deviations to reconcile:
 - ADR-015: Minimal LangGraph-based LongMemEval Benchmarker
 - ADR-018: LongMemEval Resumable Benchmarker (progress DB design)
 - ADR-017, ADR-020: Search API parameter naming and range expansion
-- Runner and components under `tools/longmemeval-benchmarker/src/`
+- Runner and components under `longmemeval-benchmarker/src/`

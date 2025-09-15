@@ -30,7 +30,7 @@ All other runner scripts are deprecated and should not be used.
 
 2. **Set up Python environment**:
    ```bash
-   cd tools/longmemeval-benchmarker
+   cd longmemeval-benchmarker
    python -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
@@ -120,7 +120,7 @@ Then set `dataset_file_path` in your TOML config to point to the dataset file.
 For testing, you can create a smaller subset from the full LongMemEval dataset:
 
 ```bash
-cd tools/longmemeval-benchmarker
+cd longmemeval-benchmarker
 
 # Option 1: Point to directory (auto-finds longmemeval_s.json, longmemeval_m.json, etc.)
 python -m src.lme_sampler /path/to/LongMemEval --num-questions 10 --copy-as-s
@@ -136,7 +136,7 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
 
 1. **Create a config file**:
    ```bash
-   cd tools/longmemeval-benchmarker
+   cd longmemeval-benchmarker
    cp config.example.toml run.toml
    # Edit run.toml to set dataset_file_path, provider/models, vault_title
    ```
@@ -183,14 +183,14 @@ This creates `longmemeval_s_10.json` with 10 questions (one from each question t
    ```bash
    cd /path/to/LongMemEval/src/evaluation
    python3 evaluate_qa.py gpt-4o \
-     /path/to/mycelian-memory/tools/longmemeval-benchmarker/out/run_<RUN_ID>/hypotheses.jsonl \
+     /path/to/mycelian-memory/longmemeval-benchmarker/out/run_<RUN_ID>/hypotheses.jsonl \
      ../../data/longmemeval_oracle.json
    ```
 
 ## Project Structure
 
 ```
-tools/longmemeval-benchmarker/
+longmemeval-benchmarker/
 ├── src/
 │   ├── orchestrator/               # 🎯 MAIN: Orchestration layer (USE THIS)
 │   │   ├── orchestrator.py         # Main CLI for running benchmarks

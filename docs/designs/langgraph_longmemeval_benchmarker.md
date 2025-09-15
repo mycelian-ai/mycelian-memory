@@ -98,7 +98,7 @@ memory_title_template = "{question_id}__{run_id}"
 ### CLI contract (high-level)
 - Invocation: `mycelian-longmemeval run /path/to/run.toml`
 - The runner reads the TOML, prepares the provider clients, sets up the vault, and executes the pipeline. No other CLI flags are required for a normal run.
-- A minimal test config is provided at `tools/longmemeval-benchmarker/config.test.toml` (edit paths/models as needed).
+- A minimal test config is provided at `longmemeval-benchmarker/config.test.toml` (edit paths/models as needed).
 
 ---
 
@@ -149,7 +149,7 @@ All policies are prompt‑ and budget‑driven; no rigid orchestration branching
 - Runner/controller: reads TOML, selects run mode, creates vault/memory names, streams messages to the agent (reset between sessions), enforces caps (`max_tool_calls_per_turn`), calls `await_consistency` as needed, runs `search_memories` (consume latestContext + bestContext + entries) + QA model, invokes the judge if configured, and writes JSONL results.
 
 ### Separation of code
-- Keep these as small modules under `tools/longmemeval-benchmarker/`:
+- Keep these as small modules under `longmemeval-benchmarker/`:
   - `dataset_loader.py` – parsing/splitting into question/session/message
   - `graph.py` (or `agent.py`) – builds the LangGraph agent
   - `runner.py` – orchestrates phases per TOML (`mode` or `phases`), holds main loop

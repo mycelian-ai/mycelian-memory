@@ -1,4 +1,4 @@
-## Conversation Time – Implementation Plan (tools/longmemeval-benchmarker)
+## Conversation Time – Implementation Plan (longmemeval-benchmarker)
 
 ### TL;DR
 - **Goal**: Define, instrument, compute, and report conversation-time metrics per session/question and per run, without altering benchmark semantics.
@@ -312,7 +312,7 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 
 #### Dataset Loader
 
-**File: `tools/longmemeval-benchmarker/src/dataset_loader.py`**
+**File: `longmemeval-benchmarker/src/dataset_loader.py`**
 
 Add date parsing and attachment:
 ```python
@@ -357,7 +357,7 @@ def normalize_question(rec):
 
 #### Single Question Runner
 
-**File: `tools/longmemeval-benchmarker/src/single_question_runner.py`**
+**File: `longmemeval-benchmarker/src/single_question_runner.py`**
 
 Pass conversation_time through pipeline (around line 345):
 ```python
@@ -389,7 +389,7 @@ for s_idx, s in enumerate(q.get("sessions", []), start=1):
 
 #### Agent Invoker
 
-**File: `tools/longmemeval-benchmarker/src/mycelian_memory_agent/invoker.py`**
+**File: `longmemeval-benchmarker/src/mycelian_memory_agent/invoker.py`**
 
 Update process_conversation_message:
 ```python
@@ -471,7 +471,7 @@ Ensure search results include conversation_time so it's available for context bu
 
 #### Update Context Building
 
-**File: `tools/longmemeval-benchmarker/src/single_question_runner.py`**
+**File: `longmemeval-benchmarker/src/single_question_runner.py`**
 
 In `_build_qa_context`, ensure Timeline is built from conversation_time:
 ```python

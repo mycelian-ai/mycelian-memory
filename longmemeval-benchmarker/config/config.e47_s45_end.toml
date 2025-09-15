@@ -1,6 +1,6 @@
 # Rigorous subset: sessions 45..end around BA mention (session 53)
 
-dataset_file_path = "/Users/deesam/workspace/mycelian/mycelian-memory/tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_e47becba_s45_end.json"
+dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_e47becba_s45_end.json"
 
 vault_title = "longmemeval-e47-s45-end"
 
