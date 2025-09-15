@@ -33,7 +33,7 @@ All other runner scripts are deprecated and should not be used.
    cd longmemeval-benchmarker
    python -m venv venv
    source venv/bin/activate
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 3. **Provider credentials**: See Model Provider Setup section below for detailed instructions.
