@@ -189,11 +189,8 @@ def _run_preflight_checks(config_path: str, dataset_abs_path: str) -> bool:
     """Preflight validation of environment and inputs before enqueueing tasks."""
     ok = True
     click.echo("\nPreflight checks:")
-    # Dataset path must be absolute and exist
-    if not Path(dataset_abs_path).is_absolute():
-        click.echo("  [FAIL] dataset_file_path is not absolute")
-        ok = False
-    elif not Path(dataset_abs_path).exists():
+    # Dataset path must exist
+    if not Path(dataset_abs_path).exists():
         click.echo(f"  [FAIL] dataset file not found: {dataset_abs_path}")
         ok = False
     else:
@@ -404,11 +401,15 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo("Error: dataset_file_path missing in config TOML")
         return 1
 
-    # Require absolute dataset path (no implicit resolution)
+    # Resolve dataset path (relative to config file directory)
     ds_path_obj = Path(dataset_path)
     if not ds_path_obj.is_absolute():
-        click.echo(f"Error: dataset_file_path must be an absolute path. Got: {dataset_path}")
-        return 1
+        # Resolve relative to config file directory
+        config_dir = Path(config_path).parent
+        ds_path_obj = config_dir / ds_path_obj
+
+    # Convert to absolute path for consistency
+    dataset_abs_path = str(ds_path_obj.resolve())
 
     # Preflight checks
     if not _run_preflight_checks(config_path, str(ds_path_obj)):

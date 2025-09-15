@@ -1,5 +1,5 @@
 # Integration test config - single question dataset for quick validation
-dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_integ.json"
+dataset_file_path = "longmemeval-datasets/longmemeval_integ.json"
 vault_title = "longmemeval-benchmarks"
 
 [models]

@@ -1,5 +1,5 @@
 # Full 5-question benchmark run
-dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_5s.json"
+dataset_file_path = "longmemeval-datasets/longmemeval_5s.json"
 vault_title = "longmemeval-benchmarks"
 
 [models]

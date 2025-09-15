@@ -1,7 +1,7 @@
 # BA durable-fact smoke config
 
 # Absolute path to dataset
-dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_ba_smoke.json"
+dataset_file_path = "longmemeval-datasets/longmemeval_ba_smoke.json"
 
 # Vault configuration
 vault_title = "longmemeval-ba-smoke"

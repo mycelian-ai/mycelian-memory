@@ -1,5 +1,5 @@
 # Single question test - Question 2 (0a995998) dataset
-dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_0a995998.json"
+dataset_file_path = "longmemeval-datasets/longmemeval_0a995998.json"
 vault_title = "longmemeval-benchmarks"
 
 [models]

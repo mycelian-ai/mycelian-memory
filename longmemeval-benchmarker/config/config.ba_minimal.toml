@@ -1,7 +1,7 @@
 # Minimal 3-session test configuration for Business Administration fact extraction
 # Tests context preservation and fact extraction with just the critical sessions
 
-dataset_file_path = "/abs/path/to/mycelian-memory/longmemeval-benchmarker/longmemeval-datasets/longmemeval_ba_minimal.json"
+dataset_file_path = "longmemeval-datasets/longmemeval_ba_minimal.json"
 
 vault_title = "longmemeval-ba-minimal"
 
