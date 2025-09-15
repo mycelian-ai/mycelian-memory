@@ -1,12 +1,12 @@
 """Setup script for LongMemEval integration."""
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="longmemeval-integration",
     version="0.1.0",
     description="Clean LongMemEval integration with Mycelian Memory",
-    py_modules=["runner", "dataset_loader", "mycelian_memory_agent", "eval"],
+    packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
         "langgraph>=0.2.0",
