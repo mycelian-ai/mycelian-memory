@@ -17,35 +17,29 @@ Note: Running many questions in parallel can hit provider rate limits. The sampl
 
 All other runner scripts are deprecated and should not be used.
 
+## Quick Setup
+
+**One-command setup:**
+```bash
+cd longmemeval-benchmarker
+./setup.sh
+```
+
+This script will:
+- Install pyenv (Python version management)
+- Install Poetry (dependency management)
+- Install Python 3.11.9 for this project
+- Install all dependencies
+- Set up the environment
+
+**Then activate and use:**
+```bash
+poetry shell  # Activate the environment
+```
+
 ## Prerequisites
 
-1. **Install Python environment tools**:
-   ```bash
-   # Install pyenv for Python version management
-   # macOS
-   brew install pyenv
-
-   # Linux
-   curl https://pyenv.run | bash
-
-   # Install Poetry for dependency management
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
-
-2. **Set up dedicated Python environment**:
-   ```bash
-   cd longmemeval-benchmarker
-
-   # Install and use Python 3.11 for this project
-   pyenv install 3.11.9
-   pyenv local 3.11.9
-
-   # Install dependencies with Poetry
-   poetry install
-   poetry shell
-   ```
-
-3. **Start Mycelian services** (from repo root):
+1. **Start Mycelian services** (from repo root):
    ```bash
    # Start the backend memory service
    make start-dev-mycelian-server
@@ -54,7 +48,7 @@ All other runner scripts are deprecated and should not be used.
    make start-mcp-streamable-server
    ```
 
-4. **Provider credentials**: See Model Provider Setup section below for detailed instructions.
+2. **Provider credentials**: See Model Provider Setup section below for detailed instructions.
 
 ## Model Provider Setup
 
