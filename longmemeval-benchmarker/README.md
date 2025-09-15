@@ -19,26 +19,33 @@ All other runner scripts are deprecated and should not be used.
 
 ## Prerequisites
 
-0. **Install Poetry** (if using Option A):
+1. **Install Python environment tools**:
    ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
-   # Or: pip install poetry
-   ```
-
-   **Optional - Install pyenv** (if you need Python 3.9+):
-   ```bash
+   # Install pyenv for Python version management
    # macOS
    brew install pyenv
-   pyenv install 3.11.0
-   pyenv local 3.11.0
 
    # Linux
    curl https://pyenv.run | bash
-   pyenv install 3.11.0
-   pyenv local 3.11.0
+
+   # Install Poetry for dependency management
+   curl -sSL https://install.python-poetry.org | python3 -
    ```
 
-1. **Start Mycelian services** (from repo root):
+2. **Set up dedicated Python environment**:
+   ```bash
+   cd longmemeval-benchmarker
+
+   # Install and use Python 3.11 for this project
+   pyenv install 3.11.9
+   pyenv local 3.11.9
+
+   # Install dependencies with Poetry
+   poetry install
+   poetry shell
+   ```
+
+3. **Start Mycelian services** (from repo root):
    ```bash
    # Start the backend memory service
    make start-dev-mycelian-server
@@ -47,21 +54,7 @@ All other runner scripts are deprecated and should not be used.
    make start-mcp-streamable-server
    ```
 
-2. **Set up Python environment**:
-   ```bash
-   cd longmemeval-benchmarker
-
-   # Option A: Using Poetry (recommended)
-   poetry install
-   poetry shell
-
-   # Option B: Using traditional venv + pip
-   python -m venv venv
-   source venv/bin/activate
-   pip install -e .
-   ```
-
-3. **Provider credentials**: See Model Provider Setup section below for detailed instructions.
+4. **Provider credentials**: See Model Provider Setup section below for detailed instructions.
 
 ## Model Provider Setup
 
