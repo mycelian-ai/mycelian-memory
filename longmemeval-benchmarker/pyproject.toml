@@ -6,7 +6,7 @@ authors = ["Mycelian Team"]
 packages = [{include = "*", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 langgraph = ">=0.2.0"
 langchain = ">=0.3.0"
 langchain-openai = ">=0.2.0"

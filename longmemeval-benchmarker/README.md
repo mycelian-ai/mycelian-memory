@@ -28,7 +28,7 @@ cd longmemeval-benchmarker
 This script will:
 - Install pyenv (Python version management)
 - Install Poetry (dependency management)
-- Install Python 3.11.9 for this project
+- Install Python 3.11.9 for this project (requires Python 3.10+)
 - Install all dependencies
 - Set up the environment
 
