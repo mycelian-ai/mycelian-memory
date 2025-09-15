@@ -41,9 +41,9 @@ if 'haystack_dates' in subset_question:
 if 'answer_session_ids' in subset_question:
     # For this specific question, we know session 40 has the answer
     # Check if any answer_session_ids are in our retained haystack_session_ids
-    valid_answer_ids = [aid for aid in subset_question['answer_session_ids'] 
+    valid_answer_ids = [aid for aid in subset_question['answer_session_ids']
                         if aid in subset_question.get('haystack_session_ids', [])]
-    
+
     # If no valid IDs, we need to identify which session has the answer
     if not valid_answer_ids:
         # Session 40 (index 5 in our subset) has the answer

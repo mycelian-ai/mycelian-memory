@@ -33,7 +33,7 @@ logger = logging.getLogger('orchestrator.main')
 
 BENCHMARKER_ROOT = Path(__file__).resolve().parents[2]  # Go up 2 levels: orchestrator -> src -> benchmarker
 DATA_DIR = BENCHMARKER_ROOT / 'data'
-HUEY_DB_PATH = str(DATA_DIR / 'huey_tasks.db')
+HUEY_DB_PATH = str(DATA_DIR / 'orchestrator.db')
 
 # Lazily imported tasks module bound to the per-run queue
 _TASKS_MOD = None
@@ -166,8 +166,8 @@ def _state_paths() -> List[Path]:
     data_dir = BENCHMARKER_ROOT / 'data'
     return [
         Path(HUEY_DB_PATH),
-        data_dir / 'huey_tasks.db-shm',
-        data_dir / 'huey_tasks.db-wal',
+        data_dir / 'orchestrator.db-shm',
+        data_dir / 'orchestrator.db-wal',
         data_dir / 'progress.db',
         data_dir / 'progress.db-shm',
         data_dir / 'progress.db-wal',
@@ -273,7 +273,7 @@ def generate_run_id() -> str:
 @click.option('--auto', is_flag=True,
               help='Automatically start worker, monitor progress, and shut down on completion')
 @click.option('--clear-state', is_flag=True,
-              help='Delete all orchestrator state (huey_tasks.db*, progress.db*) and exit')
+              help='Delete all orchestrator state (orchestrator.db*, progress.db*) and exit')
 @click.option('--stop', is_flag=True,
               help='Stop all running benchmarker processes (workers and orchestrators) and exit')
 @click.option('--force', is_flag=True,
@@ -323,7 +323,7 @@ def main(config_path: str, num_questions: Optional[int],
             click.echo("Aborted. No changes made.")
             return 1
         _clear_orchestrator_state()
-        click.echo("State cleared: huey_tasks.db* and progress.db* removed.")
+        click.echo("State cleared: orchestrator.db* and progress.db* removed.")
         return 0
 
     # Initialize progress tracker

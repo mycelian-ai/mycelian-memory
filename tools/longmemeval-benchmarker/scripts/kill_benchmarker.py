@@ -111,9 +111,9 @@ def _kill_group(pgid: int, timeout: float = 5.0) -> str:
 def _state_paths() -> List[Path]:
     data_dir = BENCH_ROOT / "data"
     return [
-        data_dir / "huey_tasks.db",
-        data_dir / "huey_tasks.db-shm",
-        data_dir / "huey_tasks.db-wal",
+        data_dir / "orchestrator.db",
+        data_dir / "orchestrator.db-shm",
+        data_dir / "orchestrator.db-wal",
         data_dir / "progress.db",
         data_dir / "progress.db-shm",
         data_dir / "progress.db-wal",

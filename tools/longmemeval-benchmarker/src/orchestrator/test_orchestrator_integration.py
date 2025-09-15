@@ -67,7 +67,7 @@ qa = "openai:gpt-5-nano"
 
     def cleanup(self):
         """Clean up test files."""
-        files_to_remove = ['huey_tasks.db', 'progress.db']
+        files_to_remove = ['orchestrator.db', 'progress.db']
         for file in files_to_remove:
             if os.path.exists(file):
                 os.remove(file)

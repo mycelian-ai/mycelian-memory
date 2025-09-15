@@ -17,7 +17,8 @@ _BASE_DIR = Path(__file__).resolve().parents[2]  # Go up 2 levels: orchestrator 
 _DATA_DIR = _BASE_DIR / 'data'
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-HUEY_DB_PATH = str(_DATA_DIR / 'huey_tasks.db')
+# Task queue (Huey) SQLite DB under data/
+HUEY_DB_PATH = str(_DATA_DIR / 'orchestrator.db')
 # Timeouts are configured in the benchmarker config file; provide sane defaults here.
 INGEST_TIMEOUT_SEC = 7200  # 2 hours per question
 QA_TIMEOUT_SEC = 900       # 15 minutes per QA

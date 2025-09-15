@@ -212,7 +212,7 @@ tools/longmemeval-benchmarker/
 │   └── config.5s.toml              # 5-question test config
 ├── data/                           # Runtime databases
 │   ├── progress.db                 # Progress tracking
-│   └── huey_tasks.db               # Task queue
+│   └── orchestrator.db             # Task queue (Huey)
 ├── debug_qa.py                     # QA debugging tool
 ├── requirements.txt                # Python dependencies
 └── README.md                       # This file

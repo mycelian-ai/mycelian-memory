@@ -144,11 +144,14 @@ data/
 # LongMemEval Benchmarker specific
 tools/longmemeval-benchmarker/out/
 tools/longmemeval-benchmarker/huey_orchestrator/out/
+tools/longmemeval-benchmarker/data/
 tools/longmemeval-benchmarker/data/*.db*
 tools/longmemeval-benchmarker/huey_orchestrator/data/*.db*
 tools/longmemeval-benchmarker/huey_orchestrator.log
 tools/longmemeval-benchmarker/todo
+tools/longmemeval-benchmarker/logs/
 tools/longmemeval-benchmarker/logs/*/
+tools/longmemeval-benchmarker/*.log
 
 # Large dataset files (keep only small test datasets in git)
 tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
