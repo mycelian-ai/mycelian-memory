@@ -22,5 +22,3 @@ COPY --from=builder /app/mycelian-mcp-server .
 EXPOSE 11546
 
 CMD ["./mycelian-mcp-server"]
-
-

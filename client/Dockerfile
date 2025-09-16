@@ -55,4 +55,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 ENV MEMORY_SERVICE_URL=http://localhost:11545
 
 # Run the binary
-ENTRYPOINT ["./mycelian-mcp-server"] 
+ENTRYPOINT ["./mycelian-mcp-server"]

@@ -6,6 +6,7 @@
 # ==============================================================================
 
 MCP_COMPOSE_FILE := deployments/docker/docker-compose.streamable.yml
+BACKEND_COMPOSE_FILE := deployments/docker/docker-compose.postgres.yml
 API_HEALTH_URL := http://localhost:11545/v0/health
 
 # ------------------------------------------------------------------------------
@@ -16,20 +17,20 @@ API_HEALTH_URL := http://localhost:11545/v0/health
 
 
 start-dev-mycelian-server:
-	$(MAKE) -C server run-postgres
+	docker compose -f $(BACKEND_COMPOSE_FILE) up -d --build
 
 backend-down:
-	$(MAKE) -C server docker-stop
+	docker compose -f $(BACKEND_COMPOSE_FILE) down
 # Data cleanup wrappers (explicit destructive actions)
 backend-clean-postgres:
 	$(MAKE) -C server clean-postgres-data
 
 
 backend-status:
-	$(MAKE) -C server docker-status
+	docker compose -f $(BACKEND_COMPOSE_FILE) ps
 
 backend-logs:
-	$(MAKE) -C server docker-logs
+	docker compose -f $(BACKEND_COMPOSE_FILE) logs -f
 
 # ------------------------------------------------------------------------------
 # Binary building
@@ -175,7 +176,7 @@ help:
 	@echo "  start-mcp-streamable-server      Start (or rebuild) the Mycelian MCP server container (streamable HTTP for Cursor)"
 	@echo "  mcp-streamable-down    Stop and remove the Mycelian MCP server container"
 	@echo "  mcp-streamable-restart Shortcut for mcp-streamable-down then start-mcp-streamable-server"
-	@echo "  start-dev-mycelian-server    Start backend stack (Postgres)"
+	@echo "  start-dev-mycelian-server    Start backend stack (Postgres, Weaviate, Memory Service, Outbox Worker)"
 	@echo "  backend-down           Stop backend stack containers"
 	@echo "  backend-status         Show backend container status"
 	@echo "  backend-logs           Tail backend container logs"

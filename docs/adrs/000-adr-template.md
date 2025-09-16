@@ -1,7 +1,7 @@
 # ADR-000: [Decision Title]
 
-**Status**: [Proposed | Accepted | Deprecated | Superseded]  
-**Date**: YYYY-MM-DD  
+**Status**: [Proposed | Accepted | Deprecated | Superseded]
+**Date**: YYYY-MM-DD
 **Superseded by**: [ADR number if deprecated]
 
 Immutability Policy: Once an ADR is Accepted, it becomes an immutable record of that decision. Future changes to the decision must be captured in a new ADR that references and supersedes this one. Do not edit Accepted ADRs beyond correcting typos or adding the Superseded by link.
@@ -47,15 +47,15 @@ What becomes easier or more difficult to do and any risks introduced by this cha
 What other options did we look at and why were they rejected?
 
 ### Alternative 1: [Name]
-**Description**: [Brief description]  
-**Pros**: [Benefits]  
-**Cons**: [Drawbacks]  
+**Description**: [Brief description]
+**Pros**: [Benefits]
+**Cons**: [Drawbacks]
 **Why rejected**: [Reasoning]
 
 ### Alternative 2: [Name]
-**Description**: [Brief description]  
-**Pros**: [Benefits]  
-**Cons**: [Drawbacks]  
+**Description**: [Brief description]
+**Pros**: [Benefits]
+**Cons**: [Drawbacks]
 **Why rejected**: [Reasoning]
 
 ## Implementation Notes

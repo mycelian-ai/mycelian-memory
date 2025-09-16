@@ -10,6 +10,7 @@ import (
 	respond "github.com/mycelian/mycelian-memory/server/internal/api/respond"
 	"github.com/mycelian/mycelian-memory/server/internal/auth"
 	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
+	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 )
 
@@ -53,7 +54,7 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("topK", req.TopK).Str("actorId", actorInfo.ActorID).Msg("search request received")
+	log.Info().Str("memoryId", req.MemoryID).Str("query", req.Query).Int("top_ke", *req.TopKE).Int("top_kc", *req.TopKC).Str("actorId", actorInfo.ActorID).Msg("search request received")
 
 	vec, err := h.emb.Embed(r.Context(), req.Query)
 	if err != nil {
@@ -63,38 +64,52 @@ func (h *SearchHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debug().Int("vectorLength", len(vec)).Msg("embedding generated")
 
-	hits, err := h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, req.TopK, h.alpha)
-	if err != nil {
-		log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
-		respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")
-		return
+	// Search for entries if top_ke > 0
+	var hits []model.SearchHit
+	if *req.TopKE > 0 {
+		hits, err = h.idx.Search(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, *req.TopKE, h.alpha, req.IncludeRawEntries)
+		if err != nil {
+			log.Error().Err(err).Str("memoryId", req.MemoryID).Str("query", req.Query).Msg("search failed")
+			respond.WriteError(w, http.StatusInternalServerError, "search service unavailable")
+			return
+		}
 	}
 	log.Info().Int("hitCount", len(hits)).Str("memoryId", req.MemoryID).Msg("search completed")
 
-	// Build response consistent with previous keys
-	resp := map[string]interface{}{
-		"entries": hits,
-		"count":   len(hits),
-	}
-
-	// Latest context
-	ctxStr, ts, err := h.idx.LatestContext(r.Context(), actorInfo.ActorID, req.MemoryID)
+	// Always fetch latest context
+	latestCtx, latestTs, err := h.idx.LatestContext(r.Context(), actorInfo.ActorID, req.MemoryID)
 	if err != nil {
+		log.Error().Err(err).Str("memoryId", req.MemoryID).Msg("latest context fetch failed")
 		respond.WriteError(w, http.StatusInternalServerError, "latest context unavailable")
 		return
 	}
-	resp["latestContext"] = ctxStr
-	resp["contextTimestamp"] = ts.Format(time.RFC3339)
 
-	// Best-matching context
-	best, bts, score, err := h.idx.BestContext(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, h.alpha)
+	// Search for context shards (always, since minimum is 1)
+	ctxHits, err := h.idx.SearchContexts(r.Context(), actorInfo.ActorID, req.MemoryID, req.Query, vec, *req.TopKC, h.alpha)
 	if err != nil {
-		respond.WriteError(w, http.StatusInternalServerError, "best context unavailable")
+		log.Error().Err(err).Str("memoryId", req.MemoryID).Msg("context search failed")
+		respond.WriteError(w, http.StatusInternalServerError, "context search unavailable")
 		return
 	}
-	resp["bestContext"] = best
-	resp["bestContextTimestamp"] = bts.Format(time.RFC3339)
-	resp["bestContextScore"] = score
+
+	// Build contexts array
+	contexts := make([]map[string]any, 0, len(ctxHits))
+	for _, ch := range ctxHits {
+		contexts = append(contexts, map[string]any{
+			"context":   ch.Context,
+			"timestamp": ch.Timestamp.Format(time.RFC3339),
+			"score":     ch.Score,
+		})
+	}
+
+	// Build response with consistent structure
+	resp := map[string]interface{}{
+		"entries":                hits,
+		"count":                  len(hits),
+		"latestContext":          latestCtx,
+		"latestContextTimestamp": latestTs.Format(time.RFC3339),
+		"contexts":               contexts,
+	}
 
 	respond.WriteJSON(w, http.StatusOK, resp)
 }

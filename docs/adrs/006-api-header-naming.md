@@ -1,6 +1,6 @@
 # ADR-006: API Header Naming Convention
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-07-27
 
 ## Context
@@ -33,10 +33,10 @@ Adopt modern, prefix-free names:
 - Clear, standardized naming across all interfaces
 
 ### Implementation Notes
-- Update SDK constants and middleware  
+- Update SDK constants and middleware
 - Backend must echo `Request-Id` in every response
 - Consistent naming between HTTP headers and JSON parameters
 
 ## References
-- RFC 6648 – Deprecating the "X-" prefix in HTTP header field names  
+- RFC 6648 – Deprecating the "X-" prefix in HTTP header field names
 - Stripe API Idempotency docs (uses `Idempotency-Key`)

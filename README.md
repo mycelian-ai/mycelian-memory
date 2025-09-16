@@ -77,12 +77,9 @@ Mycelian takes inspiration from this natural interconnectedness for AI agents. T
 
 🤖 **AI-Assisted Development**: I (@sam33rch) have created this codebase using AI development tools, specifically **Cursor**, **Claude Code**, and **Codex**. Part of the motivation is learning to build production-level code with AI while exploring what techniques work best.
 
-As of 09-11-2025, I worked on problem disambiguation, architecture, specs, designs and provided oversight to the models for producing functional and good quality code. I did one quick pass to get it ready for this early open source release to gather developer feedback. 
+As of 09-11-2025, I worked on problem disambiguation, architecture, specs, designs and provided oversight to the models for producing functional and good quality code. I did one quick pass to get it ready for this early open source release to gather developer feedback.
 
-The next highest priority task is to systematiclly improve projects design using LongMemEval as the North Star. Prioritizing this over a through code review because I believe it will help me identify critical unknown-unknowns that will have a major impact on the design. Don't want to productionize experimental code prematurely. Having said that I will keep the main branch stable to testing and experimentation.
-
-Majority of the code was written by o3 and gpt5-high models, followed by Claude Opus and Sonnet 4.1 series models.
- 
+ Majority of the code was written by o3 and gpt5-high models, followed by Claude Sonnet 4.
 📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but far from perfect, I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
 
 You'll find detailed AI development methodologies and techniques that have worked well documented in [docs/coding-stds/ai-coding-best-practices.md](docs/coding-stds/ai-coding-best-practices.md), and I'll continue updating these insights as the project evolves.
@@ -193,7 +190,7 @@ Base URL: `http://localhost:11545/v0`
 
 ```bash
 # Set dev mode API key for local development
-export API_KEY="LOCAL_DEV_MODE_NOT_FOR_PRODUCTION"
+export API_KEY="LOCAL_DEV_MODE_NOT_FOR_PRODUCTION"  # pragma: allowlist secret
 export MCP_PORT="11546"
 
 # Health (no auth required)

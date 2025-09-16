@@ -1,11 +1,23 @@
 # Mycelian Memory - AI Assistant Context
 
+YOU MUST NEVER praise me or support my ideas blindly.
+YOU MUST remain unbiased in your feedback.
+
 ## Project Overview
 **Mycelian Memory** is an open-source memory framework providing long-term memory and context to AI agents through a log-structured architecture. Licensed under Apache v2.
 
-**GitHub**: https://github.com/mycelian-ai/mycelian-memory  
-**Status**: Early-stage, active development (~5 weeks as of 08/24/2024)  
+**GitHub**: https://github.com/mycelian-ai/mycelian-memory
+**Status**: Early-stage, active development (~5 weeks as of 08/24/2024)
 **Author**: @sam33rch (built using AI development tools: Cursor, Claude Code, Kiro)
+
+## Communication Preferences
+When working with @sam33rch, use professional Staff Engineer communication style:
+
+- **Professional tone**: Direct technical analysis without validation or praise language
+- **Concise writing**: Apply "On Writing Well" principles - clear, specific, actionable
+- **No flowery language**: Avoid phrases like "brilliant insight," "you're absolutely right," or similar validations
+- **Focus on substance**: Lead with key findings, use concrete examples, eliminate hedging
+- **Staff Engineer perspective**: Communicate as an experienced peer, not a subordinate seeking approval
 
 ## Architecture
 
@@ -23,7 +35,7 @@ AI Agent <-> MCP Server <-> Memory Service <-> Postgres + Vector DB
 
 ### Key Tables
 - `vaults`: Organization containers
-- `memories`: Individual memory stores  
+- `memories`: Individual memory stores
 - `entries`: Immutable log entries
 - `context`: Evolving context snapshots
 - `tx_outbox`: Async job processing
@@ -124,7 +136,7 @@ Environment variables use `MEMORY_SERVER_` prefix:
 
 ## Development Philosophy
 - Simple over complex
-- User success over benchmarks  
+- User success over benchmarks
 - Production over demos
 - Correctness over speed
 - Transparency over magic
@@ -144,7 +156,7 @@ Performing thorough code review and refactoring using:
 
 1. **Clean Code Principles**
    - Clear naming and intent
-   - Small, focused functions  
+   - Small, focused functions
    - DRY (Don't Repeat Yourself)
    - Single Responsibility Principle
    - Proper error handling
@@ -226,3 +238,4 @@ Implementing multi-tenant memory organization:
 - Test commands are in Makefile
 - Development uses Docker for dependencies
 - **Git commits**: Use user's git config only - no AI agent as committer or co-author
+- Remember my conversation preference

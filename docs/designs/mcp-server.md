@@ -1,7 +1,7 @@
 # MCP Server
 
-**Type**: Component Documentation  
-**Status**: Active  
+**Type**: Component Documentation
+**Status**: Active
 
 ## Overview
 
@@ -37,7 +37,7 @@ The MCP server runs as a local process that:
 
 ### Handlers (`mcp/internal/handlers/`)
 - **Memory operations**: Create, list, delete memories
-- **Entry management**: Add entries, search, list with filters  
+- **Entry management**: Add entries, search, list with filters
 - **Context handling**: Upload/download context snapshots
 - **Vault operations**: Organize memories in vaults
 - **User management**: Create and manage user accounts
@@ -84,7 +84,7 @@ The server uses environment variables with command-line flag overrides:
 - `list_memories` - List memories for a user/vault
 - `delete_memory` - Remove memory and all entries
 
-### Entry Operations  
+### Entry Operations
 - `add_entry` - Add content to memory (async)
 - `search_entries` - Search across memories
 - `list_entries` - Get entries with optional filters
@@ -107,7 +107,7 @@ The server uses environment variables with command-line flag overrides:
 
 The server provides clean error translation:
 - **Validation errors** → Clear parameter feedback
-- **Backend errors** → Sanitized user messages  
+- **Backend errors** → Sanitized user messages
 - **Network errors** → Retry guidance
 - **Rate limiting** → Backoff suggestions
 
@@ -122,7 +122,7 @@ The server provides clean error translation:
       "command": "docker",
       "args": [
         "run",
-        "--rm", 
+        "--rm",
         "-i",
         "--network",
         "host",
@@ -201,4 +201,3 @@ go test -tags=integration ./...
 - **Client SDK**: `docs/designs/client-sdk.md`
 - **Memory Service API**: `docs/api-reference.md`
 - **MCP Specification**: https://modelcontextprotocol.io/
-

@@ -1,7 +1,7 @@
 # AI-Assisted Development Best Practices
 
-**Author**: Development Team  
-**Type**: Development Methodology Guide  
+**Author**: Development Team
+**Type**: Development Methodology Guide
 
 _This document targets developers working with AI coding assistants. Written following "On Writing Well" principles: clear, concise, factual, and free of unnecessary complexity._
 
@@ -26,7 +26,7 @@ This project employs a four-layer approach that builds quality into the developm
 ```
 1. ADRs (Capture Decisions)
    ↓
-2. Specifications (Define Behavior) 
+2. Specifications (Define Behavior)
    ↓
 3. TDD (Validate Implementation)
    ↓
@@ -84,7 +84,7 @@ Specifications define **what** the system should do before implementation begins
 #### Component Specifications
 Document internal system components with:
 - **Architecture overview** - high-level design
-- **API contracts** - interfaces and data structures  
+- **API contracts** - interfaces and data structures
 - **Configuration** - tuneable parameters
 - **Error handling** - failure modes and recovery
 - **Performance characteristics** - throughput, latency, resource usage
@@ -127,7 +127,7 @@ Use: *"Write tests for a retry mechanism that backs off exponentially and stops 
 
 #### Incremental Development
 - Start with **simple test cases**
-- Add **edge cases** progressively  
+- Add **edge cases** progressively
 - Let tests **guide API design**
 - Use tests to **validate AI-generated code**
 
@@ -139,7 +139,7 @@ Use: *"Write tests for a retry mechanism that backs off exponentially and stops 
 - **No external dependencies**
 - Example: `shardqueue_test.go`
 
-#### Integration Tests  
+#### Integration Tests
 - **Component interaction** validation
 - **Real dependencies** (databases, services)
 - **Separate test packages** for organization
@@ -163,7 +163,7 @@ Invariants define **fundamental system properties** that must never be violated,
 - **Consistency**: Related data remains synchronized
 - **Atomicity**: Operations complete fully or not at all
 
-#### Security & Isolation  
+#### Security & Isolation
 - **Access control**: Users only see their own data
 - **Data boundaries**: Strict tenant isolation
 - **Audit trails**: All changes are logged
@@ -191,19 +191,19 @@ type InvariantChecker struct {
 func (c *InvariantChecker) AssertDataImmutability(memoryID string) error {
     // 1. Create entry
     entry := c.AddEntry(memoryID, "test content")
-    
+
     // 2. Attempt modification (should fail)
     err := c.ModifyEntry(entry.ID, "changed content")
     if err == nil {
         return errors.New("invariant violation: entry was modified")
     }
-    
+
     // 3. Verify original content unchanged
     retrieved := c.GetEntry(entry.ID)
     if retrieved.Content != "test content" {
         return errors.New("invariant violation: content corrupted")
     }
-    
+
     return nil
 }
 ```
@@ -224,7 +224,7 @@ func (c *InvariantChecker) AssertDataImmutability(memoryID string) error {
 - **Document** decision with context and consequences
 - **Review** with team before implementation
 
-#### 2. Specification Phase  
+#### 2. Specification Phase
 - **Define** component behavior and contracts
 - **Document** API surfaces and error conditions
 - **Specify** performance and reliability requirements

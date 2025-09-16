@@ -67,14 +67,14 @@ func CreateVaultHandler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Unauthorized: "+err.Error(), 401)
         return
     }
-    
+
     // Authorize in one call
     actorInfo, err := authorizer.Authorize(r.Context(), apiKey, "vault.create", "default")
     if err != nil {
         http.Error(w, "Unauthorized: "+err.Error(), 401)
         return
     }
-    
+
     // Use actorInfo.ActorID for business logic
 }
 ```
@@ -124,7 +124,7 @@ client := mycelian.New("https://api.mycelian.com", "sk_act_real_api_key")
 
 ```go
 // Server side - no middleware, just authorizer
-factory := NewAuthorizerFactory(cfg) // Development mode  
+factory := NewAuthorizerFactory(cfg) // Development mode
 authorizer := factory.CreateAuthorizer() // Returns MockAuthorizer
 
 // In handlers:

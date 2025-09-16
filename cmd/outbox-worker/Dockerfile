@@ -10,5 +10,3 @@ RUN apk --no-cache add ca-certificates curl
 WORKDIR /root/
 COPY --from=builder /app/outbox-worker ./outbox-worker
 ENTRYPOINT ["./outbox-worker"]
-
-

@@ -1,6 +1,6 @@
 # ADR-008: Await Consistency Primitive
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-07-28
 
 ## Context
@@ -16,7 +16,7 @@ The system's local-first architecture writes immediately to local storage, then 
 Rename the primitive to `await_consistency` across all interfaces:
 
 1. MCP tool (`await_consistency <memory-id>`)
-2. Go SDK (`client.AwaitConsistency(ctx, memoryID, opts...)`)  
+2. Go SDK (`client.AwaitConsistency(ctx, memoryID, opts...)`)
 3. CLI aliases (`await` maps to the same call for convenience)
 
 Temporary alias `await_commit` kept for one release as deprecation shim with warning log.
@@ -28,7 +28,7 @@ Temporary alias `await_commit` kept for one release as deprecation shim with war
 - Eliminates confusion with database and Git terminology
 - Better describes the actual behavior to developers
 
-### Negative Consequences  
+### Negative Consequences
 - API naming change requires documentation updates
 - Temporary complexity during deprecation period
 - Existing tooling needs updates to use new naming

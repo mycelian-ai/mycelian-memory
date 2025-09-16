@@ -154,13 +154,6 @@ tools/longmemeval-benchmarker/logs/*/
 tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
 tools/longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
 
-# Root level files that should be ignored
-huey_orchestrator.log
-
-memory-bank/
-.cursor/
-.cursorignore
-
 # LongMemEval Benchmarker (top-level path) — ignore local outputs and datasets
 longmemeval-benchmarker/out/
 longmemeval-benchmarker/huey_orchestrator/out/
@@ -174,3 +167,18 @@ longmemeval-benchmarker/logs/*/
 longmemeval-benchmarker/*.log
 longmemeval-benchmarker/longmemeval-local-datasets/
 longmemeval-benchmarker/config-local/
+
+# Root level files that should be ignored
+huey_orchestrator.log
+
+memory-bank/
+.cursor/
+.cursorignore
+
+# Note: longmemeval-datasets/ contains small files for git commits
+# Large files are in longmemeval-local-datasets/ (ignored above)
+
+# Ignore log files
+*.log
+logs/
+**/*.log

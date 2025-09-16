@@ -69,4 +69,4 @@ echo "   Tools module: $tools_direct direct dependencies"
 
 echo
 echo -e "${CYAN}💡 Note: Only checking direct dependencies you actually import.${NC}"
-echo -e "${CYAN}   Transitive dependencies are managed automatically by Go modules.${NC}" 
+echo -e "${CYAN}   Transitive dependencies are managed automatically by Go modules.${NC}"

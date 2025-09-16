@@ -75,7 +75,9 @@ func TestSearchE2E(t *testing.T) {
 	var sr *client.SearchResponse
 	deadline := time.Now().Add(20 * time.Second)
 	for {
-		sr, err = c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: "fox", TopK: 3})
+		topKE := 3
+		topKC := 2
+		sr, err = c.Search(ctx, client.SearchRequest{MemoryID: mem.ID, Query: "fox", TopKE: &topKE, TopKC: &topKC})
 		if err == nil && sr.Count > 0 {
 			break
 		}
@@ -92,8 +94,8 @@ func TestSearchE2E(t *testing.T) {
 	if string(sr.LatestContext) != "\"integration context\"" && string(sr.LatestContext) != "integration context" {
 		t.Fatalf("latestContext mismatch: %s", string(sr.LatestContext))
 	}
-	if sr.ContextTimestamp == nil {
-		t.Fatalf("contextTimestamp nil")
+	if sr.LatestContextTimestamp == nil {
+		t.Fatalf("latestContextTimestamp nil")
 	}
 
 	t.Logf("search completed successfully: found %d results with valid context", sr.Count)

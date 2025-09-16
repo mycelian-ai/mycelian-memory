@@ -1,0 +1,24 @@
+[
+  {
+    "question_id": "smoke_001",
+    "question_type": "single-session-user",
+    "question": "What is my favorite color?",
+    "answer": "blue",
+    "question_date": "2024-01-15",
+    "haystack_session_ids": ["session_001"],
+    "haystack_dates": ["2024-01-10"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Hello! I wanted to let you know that my favorite color is blue."
+        },
+        {
+          "role": "assistant",
+          "content": "Thanks for sharing! I'll remember that your favorite color is blue. Is there anything specific you like about that color?"
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_001"]
+  }
+]

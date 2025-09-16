@@ -1,0 +1,18 @@
+# Integration test config - single question dataset for quick validation
+dataset_file_path = "longmemeval-datasets/longmemeval_integ.json"
+vault_title = "longmemeval-benchmarks"
+
+[models]
+# Ingest model for processing conversation sessions
+ingest = "openrouter:gpt-5-nano-2025-08-07"
+# QA model for answering questions based on retrieved context
+qa = "openrouter:gpt-5-mini-2025-08-07"
+
+[search]
+# Enable two-pass search for better retrieval (especially helpful for gpt-5-mini)
+use_two_pass = true
+
+[mycelian]
+# Mycelian API configuration
+api_url = "http://localhost:11545/v0"
+api_key = "LOCAL_DEV_MODE_NOT_FOR_PRODUCTION"

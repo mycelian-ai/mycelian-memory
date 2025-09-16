@@ -14,99 +14,74 @@
 
 **Tool Scoping** – If several tool-specific instruction blocks exist in the prompt window, obey **only** the block whose `### TOOL:` label matches the function you are currently executing; ignore all other blocks.
 
-1. **Source of truth** – The *context document* grows directly from NEW RAW ENTRIES only; never from summaries.
-2. **Context purpose** – Store lasting knowledge: participants, stable facts, timeline, decisions, open tasks. Size cap: **5000 chars**. Use Mermaid diagrams (≤10 nodes) when helpful.
-3. **Summary purpose** – Optimize vector search. Each stored entry has ONE context-aware summary capped at **512 characters** (≈80 tokens). Summaries must:
-   • resolve pronouns using current context
-   • follow Subject-Verb-Object past-tense
-   • keep names, dates, IDs; drop filler
-4. **No feedback loop** – Summaries must NOT be used to update the context.
-5. **Flow per incoming message** (await_consistency barrier)
-   1. Read current context → understand message.
-   2. Decide to store? If yes → generate summary & persist raw+summary.
-   3. Update context from raw entry (merge/trim rules).
-   4. Flush cadence – put_context is expensive: after you’ve stored ≈ 6 messages (user + assistant) with add_entry, **issue `await_consistency()` to ensure writes are durable, then call `put_context`**, and continue. Always repeat the sequence (`await_consistency` → `put_context`) once more just before exit.
+1. **Workflow scope** – This file defines WHEN to call tools, not WHAT to write. For content and formatting of context and summaries, see the prompt files referenced below.
+2. **Flow per incoming message** (await_consistency barrier)
+   1. Process the message.
+   2. You MUST call `add_entry` exactly once for every user and assistant message.
+   3. **Flush cadence (STRICT)** – `put_context` is expensive and MUST be batched:
+      • Do NOT call `put_context` after every message.
+      • Call `put_context` only after ≈ 6 messages (user + assistant) have been stored via `add_entry`.
+      • Before calling `put_context`, issue `await_consistency()` to ensure previous writes are durable.
+      • At session end, issue `await_consistency()` → `put_context` once to flush any remaining updates.
 
-6. **Overflow Handling**
-   1. Context ≤ 5 000 chars: Before writing: if new text would exceed the cap, delete the oldest low-value lines until the length is ≈ 4 800 chars. Keep core facts (participants, active tasks, decisions).
-   2. Summary ≤ 512 chars: Trim sentences with little factual content (greetings, filler) first. Keep the lines that name entities, dates, numbers, or other data-rich details that boost vector search. Continue pruning until the text fits within 512 characters, then append “…” if any content was removed.
+6. **TOOL: search_memories (STRICT)**
 
-7. **Session bootstrap**
-   1. You **MUST** call `get_context()` first. If the result is **exactly** the default placeholder string
-      `This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available.`
-      (inserted automatically when a memory is created), treat it as empty and immediately call `put_context`. Otherwise, keep the returned string as your working context.
-   2. Immediately afterwards you **MUST** call `list_entries(limit = 10)` and merge any facts that are missing from the working context **before** replying to the user.
+   • YOU MUST NOT call `search_memories` on assistant turns.
+   • YOU MUST call at most once per user turn.
+   • YOU MUST NOT search if the information is already in your current context, in the latest `list_entries(10)`, or was stated in THIS session.
+   • If your query equals or paraphrases the current user message and the answer is derivable from your working context, YOU MUST NOT call `search_memories`.
+   • If your working context already contains the answer, YOU MUST answer directly and MUST NOT call `search_memories`.
+   • If you already confirmed the fact in THIS session, YOU MUST answer directly and MUST NOT call `search_memories`.
+   • YOU MUST use `top_k=5` by default; increase ONLY if nothing relevant is found.
+   • YOU MUST NOT repeat a semantically similar query within the last 3 turns.
+   • YOU MAY search ONLY when:
+     – The user references prior discussion or specific past events, or
+     – The user asks about remembered facts, or
+     – There is a contradiction/update to a prior fact, or
+     – Needed facts likely sit beyond the 5,000‑char context window.
+   • QUERY STYLE: ≤8 tokens; include key entities/IDs/dates; avoid generic terms (e.g., NOT "sky color" if discussed this session).
+
+   For routine conversation turns, rely on current context and the recent entries.
+
+7. **TOOL: get_context (RESTRICTED)**
+
+   • DO NOT call `get_context` on every turn or automatically before processing messages.
+   • Call `get_context` only when:
+     – immediately after `put_context` followed by `await_consistency`, to verify the write; or
+     – resuming a previously paused session; or
+     – explicitly instructed by the user to reload the context.
+   • When adding retrieved context to the conversation history for synthesis, prefix it with `[previous_context]` to mark it as prior context for pruning. This tag MUST NOT be persisted in stored context.
+
+8. **References**
+   • Context content/format: `client/prompts/default/chat/context_prompt.md`
+   • Entry capture guidance: `client/prompts/default/chat/entry_capture_prompt.md`
+   • Summary content/format: `client/prompts/default/chat/summary_prompt.md`
+
+9. **Prompt usage**
+   • For `add_entry`: Generate the summary using `client/prompts/default/chat/summary_prompt.md` and construct tool inputs per `client/prompts/default/chat/entry_capture_prompt.md`. Do not include any `[SYSTEM_MSG]`/`[CONVERSATION_MSG]` markers or tag markers like `[previous_context]` in raw_entry or summary.
+   • For `put_context`: Produce the full context string using `client/prompts/default/chat/context_prompt.md`, then write it via `put_context`.
+     – If any input message begins with `[previous_context]`, treat everything after the tag as prior conversation context from earlier turns; use it to guide pruning per the context prompt; strip the tag and do not copy the raw prior context verbatim.
+
+10. **Creation procedures**
+   **Entry (per message):**
+   1) Take the incoming conversation turn (user/assistant). Use its text as `raw_entry` (strip any prompt markers; exclude system/control content).
+   2) Generate `summary` by invoking the summary template in `client/prompts/default/chat/summary_prompt.md` over the same text.
+   3) Call `add_entry` with `{ raw_entry, summary }` and, if supported, `tags` (e.g., `{ "role": "user" | "assistant" }`).
+   4) On success, increment the local counter for flush cadence; on failure, retry per tool policy.
+
+   **Context (on flush or session end):**
+   1) When cadence triggers (≈6 stored entries) or at session end, construct the full context by invoking `client/prompts/default/chat/context_prompt.md`.
+      - Previous context handling: If any input message begins with `[previous_context]`, treat the content after the tag as prior context. Use it to guide pruning according to the context prompt. Strip the `[previous_context]` tag and do not copy the raw prior context verbatim into the stored context.
+   2) Do NOT include any system/control text or prompt markers in the context.
+   3) Issue `await_consistency()`; then call `put_context` with the generated context.
 
 ### State machines
 
 **Entry Persistence (per message)**
 ```mermaid
 flowchart TD
-    NewMsg[New user / assistant message] --> Store?{Store this?}
-    Store? -- No --> Continue
-    Store? -- Yes --> Summ[Generate ≤512-char summary]
-    Summ --> Add[add_entry(raw_entry, summary)] --> Continue[Continue conversation]
+    NewMsg[New user / assistant message] --> Summ[Generate ≤512-char summary]
+    Summ --> Add[add_entry(raw_entry, summary)]
+    Add --> Continue[Continue conversation]
 ```
-
-**Session Lifecycle**
-```mermaid
-flowchart TD
-    Boot[get_context()]
-    Boot -->|plain-text placeholder| Base[put_context({})]
-    Boot -->|JSON context| Load[list_entries(10) → merge]
-    Base --> Load
-    Load --> Loop[Message loop]
-
-    %% per-message handling
-    Loop --> Store?[store this entry?]
-    Store? -- Yes --> Add[add_entry & track ≈6] --> Check
-    Store? -- No  --> Check
-    Check{≈6 stored?}
-    Check -- Yes / put_context; reset --> Loop
-    Check -- No  --> Loop
-
-    %% graceful exit
-    Loop --> Bye{<END_SESSION>?}
-    Bye -- Yes --> Finish[add_entry (any remaining)] --> Barrier[await_consistency()] --> Final[put_context] --> Exit[Session ends]
-```
-
-### Prompt loading
-
-Load memory-type-specific prompts from `prompts/default/{memory_type}/` directory. 
-
-For memory_type="chat", use prompts from `prompts/default/chat/` including:
-  1. `context_prompt.md` - for context maintenance
-  2. `entry_capture_prompt.md` - for entry persistence 
-  3. `summary_prompt.md` - for summary generation
-
-## Appendix A – Worked Examples
-
-#### Example A-1: New memory bootstrap
-
-```text
-// BEFORE
-get_context()  →  "NEW MEMORY – init context"
-
-// AGENT ACTION
-put_context("I am a helpful customer-support agent. Ready to greet customer.")"
-```
-
----
-
-#### Example A-2: Raw entry → summary → context update
-
-```text
-// NEW RAW MESSAGE
-USER: "Hi Sam, our Q3 launch date moved to 17 Aug 2025. Please update the tracker."
-
-// GENERATED SUMMARY  (≤ 512 chars)
-"User stated the Q3 launch date is rescheduled to 17 Aug 2025 and asked Sam to update the project tracker."
-
-// CONTEXT  (diff view)
---- before
-• 17 Aug 2025 – tentative Q3 launch
-+++ 
-• 17 Aug 2025 – **confirmed** Q3 launch date
---- after
-```
-
+<!-- See References above for canonical prompt files -->

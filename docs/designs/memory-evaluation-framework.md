@@ -89,9 +89,9 @@ The engineering effort and computational cost scale exponentially with quality t
 - **Key elements**: Proper chunking, reasonable embeddings, basic retrieval
 - **Timeline**: Days to weeks
 
-#### **70-85% Quality** 
+#### **70-85% Quality**
 - **What it takes**: Dedicated tuning and optimization
-- **Key elements**: 
+- **Key elements**:
   - Hybrid search strategies
   - Query expansion techniques
   - Careful index design

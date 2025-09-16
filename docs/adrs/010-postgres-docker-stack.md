@@ -1,6 +1,6 @@
 # ADR-010: Consolidated PostgreSQL Docker Stack
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-08-09
 
 ## Context
@@ -15,7 +15,7 @@ Following ADR-009 (PostgreSQL-only backend), multiple Docker stacks and database
 ## Scope
 
 - Delete legacy docker-compose files for other database systems
-- Remove database-specific setup scripts and runbook references  
+- Remove database-specific setup scripts and runbook references
 - Update Makefiles to use only PostgreSQL targets; drop legacy database targets
 - Update developer docs to reference PostgreSQL-only flow
 
@@ -23,7 +23,7 @@ Following ADR-009 (PostgreSQL-only backend), multiple Docker stacks and database
 
 ### Local Development
 - `make backend-up` brings up the PostgreSQL stack
-- Health checks use `/api/health` for memory-service and vector search endpoints  
+- Health checks use `/api/health` for memory-service and vector search endpoints
 - No additional database setup needed
 
 ### Makefile Targets (Final)
@@ -32,7 +32,7 @@ Following ADR-009 (PostgreSQL-only backend), multiple Docker stacks and database
 
 ## Consequences
 
-### Positive Consequences  
+### Positive Consequences
 - Simplified developer onboarding with single stack
 - Reduced maintenance overhead for Docker configurations
 - Consistent environment between local development and production
@@ -45,5 +45,5 @@ Following ADR-009 (PostgreSQL-only backend), multiple Docker stacks and database
 ## Migration Notes
 
 - Any scripts referencing legacy compose files must be updated
-- CI should rely on the PostgreSQL compose stack only  
+- CI should rely on the PostgreSQL compose stack only
 - Developer documentation updated to reflect single-stack workflow

@@ -20,5 +20,3 @@ COPY --from=builder /app/memory-service .
 
 EXPOSE 11545 9090
 CMD ["./memory-service"]
-
-

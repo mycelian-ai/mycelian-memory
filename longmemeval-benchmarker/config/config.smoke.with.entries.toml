@@ -1,0 +1,25 @@
+# Smoke test configuration with normal mode (entries + context)
+
+# Path to dataset file
+dataset_file_path = "longmemeval-datasets/longmemeval_smoke.json"
+
+# Vault configuration
+vault_title = "longmemeval-smoke-normal"
+
+# Model configuration - using fast, cheap models for testing
+[models]
+ingest = "openrouter:openai/gpt-5-nano-2025-08-07"
+qa = "openrouter:openai/gpt-5-nano-2025-08-07"
+
+# Search configuration
+[search]
+use_two_pass = false  # Faster for smoke test
+
+# Agent configuration
+[agent]
+context_only = false  # Use normal mode with add_entry calls
+
+# Mycelian API configuration
+[mycelian]
+api_url = "http://localhost:11545/v0"
+api_key = "LOCAL_DEV_MODE_NOT_FOR_PRODUCTION"

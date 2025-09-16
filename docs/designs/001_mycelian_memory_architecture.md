@@ -23,29 +23,29 @@ The rapid innovation in this space has created a clear need for an open-source m
 
 ### Functional Requirements
 
-* **Correct (P0)**: Maintain factual accuracy and data integrity.  
-* **Memory Scoping Primitives (P0)**: Enable users to organize memories across organizations, projects, and vaults.  
-* **High Performance (P1)**: Target strong precision and recall while maintaining cost efficiency.  
-* **Adaptive (P2)**: Automatically consolidate and refine memories through usage patterns.  
+* **Correct (P0)**: Maintain factual accuracy and data integrity.
+* **Memory Scoping Primitives (P0)**: Enable users to organize memories across organizations, projects, and vaults.
+* **High Performance (P1)**: Target strong precision and recall while maintaining cost efficiency.
+* **Adaptive (P2)**: Automatically consolidate and refine memories through usage patterns.
 * **Domain-Specific Metrics (P2)**: Enable measurement against customer-provided benchmarks.
 
 ### Non-functional Requirements
 
-* **Simple**: Straightforward API for storing and retrieving memories.  
-* **Cost-Effective**: Transparent pricing model without hidden charges.  
-* **Reliable**: Architecture designed for high availability, durability, scalability and security.  
-* **Open Source**: Full source code availability with self-hosting option.  
-* **Opinionated Defaults**: Strong defaults with configuration options for common use cases.  
+* **Simple**: Straightforward API for storing and retrieving memories.
+* **Cost-Effective**: Transparent pricing model without hidden charges.
+* **Reliable**: Architecture designed for high availability, durability, scalability and security.
+* **Open Source**: Full source code availability with self-hosting option.
+* **Opinionated Defaults**: Strong defaults with configuration options for common use cases.
 * **Observable**: Actionable metrics and logging for debugging and monitoring.
 
 ## Tenets
 
-* **Simple over complex**: Choose straightforward solutions even if complex ones offer marginal gains  
-* **User success over benchmarks**: Optimize for real user metrics, not synthetic leaderboards  
-* **Opinionated over configurable**: Reduce architectural entropy, every option adds maintenance and bugs  
-* **Production over demos**: Build for scale and reliability, not proof-of-concepts  
-* **Ownership over lock-in**: Never compromise data portability for features or performance  
-* **Correctness over speed**: Better to be slow and right than fast and wrong  
+* **Simple over complex**: Choose straightforward solutions even if complex ones offer marginal gains
+* **User success over benchmarks**: Optimize for real user metrics, not synthetic leaderboards
+* **Opinionated over configurable**: Reduce architectural entropy, every option adds maintenance and bugs
+* **Production over demos**: Build for scale and reliability, not proof-of-concepts
+* **Ownership over lock-in**: Never compromise data portability for features or performance
+* **Correctness over speed**: Better to be slow and right than fast and wrong
 * **Transparency over magic**: Users should understand what the system does and why
 
 ## Mental Model
@@ -69,7 +69,7 @@ flowchart TD
     Vector[(Vector DB)] --> Service
     Postgres <--> Worker[Outbox<br/>Worker]
     Worker --> Vector
-    
+
     %% Add label to Postgres
     Postgres -.- Tables["`**Key Tables:**
     vaults
@@ -77,12 +77,12 @@ flowchart TD
     entries
     context
     tx_outbox`"]
-    
+
     classDef primary fill:#dbeafe,stroke:#1e40af,stroke-width:3px,color:#000
     classDef storage fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#000
     classDef async fill:#e9d5ff,stroke:#7c3aed,stroke-width:3px,color:#000
     classDef note fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#000
-    
+
     class Agent,MCP,Service primary
     class Postgres,Vector storage
     class Worker async

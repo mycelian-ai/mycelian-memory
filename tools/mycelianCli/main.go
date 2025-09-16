@@ -22,7 +22,8 @@ var serviceURL string
 var debug bool
 
 const maxClientLimit = 50
-const defaultTopK = 10
+const defaultKE = 5
+const defaultKC = 2
 
 func dbg(v interface{}) {
 	if !debug {
@@ -455,7 +456,8 @@ func newGetContextCmd() *cobra.Command {
 
 func newSearchCmd() *cobra.Command {
 	var memoryID, query string
-	var topK int
+	var ke, kc int
+	var includeRawEntries bool
 
 	cmd := &cobra.Command{
 		Use:   "search",
@@ -468,14 +470,19 @@ func newSearchCmd() *cobra.Command {
 				return fmt.Errorf("--query is required")
 			}
 
-			if topK <= 0 || topK > 100 {
-				return fmt.Errorf("--top-k must be between 1 and 100")
+			if ke < 0 || ke > 25 {
+				return fmt.Errorf("--ke must be between 0 and 25")
+			}
+			if kc < 0 || kc > 10 {
+				return fmt.Errorf("--kc must be between 0 and 10")
 			}
 
 			log.Debug().
 				Str("memory_id", memoryID).
 				Str("query", query).
-				Int("top_k", topK).
+				Int("ke", ke).
+				Int("kc", kc).
+				Bool("include_raw_entries", includeRawEntries).
 				Str("service_url", serviceURL).
 				Msg("searching memories")
 
@@ -487,10 +494,22 @@ func newSearchCmd() *cobra.Command {
 			defer cancel()
 
 			start := time.Now()
+			// Convert int to pointer values for the request
+			topKEPtr := ke
+			if ke == 0 {
+				topKEPtr = defaultKE
+			}
+			topKCPtr := kc
+			if kc == 0 {
+				topKCPtr = defaultKC
+			}
+
 			resp, err := c.Search(ctx, client.SearchRequest{
-				MemoryID: memoryID,
-				Query:    query,
-				TopK:     topK,
+				MemoryID:          memoryID,
+				Query:             query,
+				TopKE:             &topKEPtr,
+				TopKC:             &topKCPtr,
+				IncludeRawEntries: includeRawEntries,
 			})
 			elapsed := time.Since(start)
 
@@ -517,7 +536,9 @@ func newSearchCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&query, "query", "", "Search query (required)")
-	cmd.Flags().IntVar(&topK, "top-k", defaultTopK, "Number of results to return (1-100)")
+	cmd.Flags().IntVar(&ke, "ke", 0, "Number of entries to return (0-25, default 5)")
+	cmd.Flags().IntVar(&kc, "kc", 0, "Number of context shards to return (0-10, default 2)")
+	cmd.Flags().BoolVar(&includeRawEntries, "include-raw-entries", false, "Include raw entry content in results (default: false)")
 
 	_ = cmd.MarkFlagRequired("memory-id")
 	_ = cmd.MarkFlagRequired("query")

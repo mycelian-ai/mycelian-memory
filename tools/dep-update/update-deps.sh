@@ -69,7 +69,7 @@ echo
 # Update main module - only direct dependencies
 if [ "$main_outdated" -gt 0 ]; then
     echo -e "${BLUE}=== Updating Main Module Direct Dependencies ===${NC}"
-    
+
     # Get list of outdated direct dependencies and update them specifically
     outdated_deps=$(go list -u -m -f '{{if not .Indirect}}{{if .Update}}{{.Path}}@{{.Update.Version}}{{end}}{{end}}' all)
     if [ -n "$outdated_deps" ]; then
@@ -84,11 +84,11 @@ fi
 
 echo
 
-# Update tools module - only direct dependencies  
+# Update tools module - only direct dependencies
 if [ "$tools_outdated" -gt 0 ]; then
     echo -e "${BLUE}=== Updating Tools Module Direct Dependencies ===${NC}"
     cd tools
-    
+
     # Get list of outdated direct dependencies and update them specifically
     outdated_deps=$(go list -u -m -f '{{if not .Indirect}}{{if .Update}}{{.Path}}@{{.Update.Version}}{{end}}{{end}}' all)
     if [ -n "$outdated_deps" ]; then
@@ -136,4 +136,4 @@ echo "   - Transitive dependencies updated automatically"
 
 echo
 echo -e "${CYAN}💡 Note: Only direct dependencies were updated.${NC}"
-echo -e "${CYAN}   Go modules automatically manages transitive dependencies.${NC}" 
+echo -e "${CYAN}   Go modules automatically manages transitive dependencies.${NC}"

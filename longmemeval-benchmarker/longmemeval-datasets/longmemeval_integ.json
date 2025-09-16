@@ -1,0 +1,156 @@
+[
+  {
+    "question_id": "integ_001",
+    "question_type": "single-session-user",
+    "question": "What is my favorite programming language?",
+    "answer": "Python",
+    "question_date": "2024-01-03",
+    "haystack_session_ids": ["session_001"],
+    "haystack_dates": ["2024-01-01"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I'm working on a new project and I really love Python for its simplicity."
+        },
+        {
+          "role": "assistant",
+          "content": "Python is indeed a great choice for many projects due to its clean syntax and extensive libraries. What kind of project are you working on?",
+          "has_answer": true
+        },
+        {
+          "role": "user",
+          "content": "It's a data analysis tool. Python is definitely my favorite programming language because of libraries like pandas and numpy."
+        },
+        {
+          "role": "assistant",
+          "content": "That's perfect! Python's data science ecosystem is one of its strongest features. Pandas and NumPy are excellent foundations for data analysis projects."
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_001"]
+  },
+  {
+    "question_id": "integ_002",
+    "question_type": "multi-session",
+    "question": "What are the names of my two cats?",
+    "answer": "Luna and Milo",
+    "question_date": "2024-01-05",
+    "haystack_session_ids": ["session_002", "session_003"],
+    "haystack_dates": ["2024-01-02", "2024-01-04"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "My cat Luna kept me up all night with her meowing."
+        },
+        {
+          "role": "assistant",
+          "content": "That can be frustrating! Luna might be trying to communicate something. Is she normally this vocal at night?",
+          "has_answer": true
+        },
+        {
+          "role": "user",
+          "content": "No, she's usually quiet. I think she misses playing with her brother."
+        },
+        {
+          "role": "assistant",
+          "content": "Cats can definitely miss their companions. Maybe some extra playtime before bed would help Luna settle down better at night."
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Good news! I figured out why Luna was upset. Milo was accidentally locked in the garage!"
+        },
+        {
+          "role": "assistant",
+          "content": "Oh my goodness! Poor Milo must have been scared being locked in the garage. I'm glad you found him. Luna was probably trying to alert you that her brother was missing!",
+          "has_answer": true
+        },
+        {
+          "role": "user",
+          "content": "Exactly! Now both cats are happily napping together."
+        },
+        {
+          "role": "assistant",
+          "content": "That's wonderful! Cats have such strong bonds with their siblings. Luna was being a good sister looking out for Milo."
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_002", "session_003"]
+  },
+  {
+    "question_id": "integ_003",
+    "question_type": "single-session-assistant",
+    "question": "What book did you recommend for learning web development?",
+    "answer": "Eloquent JavaScript",
+    "question_date": "2024-01-06",
+    "haystack_session_ids": ["session_004", "session_005", "session_006"],
+    "haystack_dates": ["2024-01-03", "2024-01-04", "2024-01-05"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I want to start learning web development. Where should I begin?"
+        },
+        {
+          "role": "assistant",
+          "content": "Great decision! For web development, I'd recommend starting with HTML and CSS basics, then moving to JavaScript. For JavaScript specifically, 'Eloquent JavaScript' by Marijn Haverbeke is an excellent free resource that's perfect for beginners.",
+          "has_answer": true
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "What about learning React?"
+        },
+        {
+          "role": "assistant",
+          "content": "React is a great next step after you're comfortable with JavaScript fundamentals. The official React documentation has an excellent tutorial to get you started."
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Should I learn TypeScript too?"
+        },
+        {
+          "role": "assistant",
+          "content": "TypeScript is valuable, especially for larger projects. However, I'd suggest getting comfortable with JavaScript first before adding TypeScript to your learning path."
+        }
+      ]
+    ],
+    "answer_session_ids": ["session_004"]
+  },
+  {
+    "question_id": "integ_004_abs",
+    "question_type": "single-session-preference",
+    "question": "Do I prefer tea or coffee in the morning?",
+    "answer": "I don't have information about your morning beverage preference",
+    "question_date": "2024-01-07",
+    "haystack_session_ids": ["session_007"],
+    "haystack_dates": ["2024-01-06"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I'm trying to cut down on caffeine intake."
+        },
+        {
+          "role": "assistant",
+          "content": "That's a healthy choice! Reducing caffeine can improve sleep quality and reduce anxiety. Are you planning to cut down gradually or stop completely?"
+        },
+        {
+          "role": "user",
+          "content": "Just reducing it gradually. Maybe switching some of my drinks to decaf versions."
+        },
+        {
+          "role": "assistant",
+          "content": "That's a sensible approach. Gradual reduction helps avoid withdrawal symptoms like headaches. You might also consider herbal teas as alternatives."
+        }
+      ]
+    ],
+    "answer_session_ids": []
+  }
+]

@@ -1,6 +1,6 @@
 # ADR-012: API Key-Based Authorization
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-08-11
 
 ## Context
@@ -40,7 +40,7 @@ sequenceDiagram
     participant API Handler
     participant Authorizer
     participant Database
-    
+
     Client->>API Handler: POST /api/memories<br/>Authorization: Bearer mk_proj_...
     API Handler->>Authorizer: authorize(apiKey, "memory.create", resource)
     Authorizer->>Database: lookup API key metadata
@@ -186,15 +186,15 @@ func (h *MemoryHandler) CreateMemory(w http.ResponseWriter, r *http.Request) {
 ## Alternatives Considered
 
 ### Alternative 1: JWT-Based Tokens
-**Description**: Use signed JWT tokens containing actor/permission claims  
+**Description**: Use signed JWT tokens containing actor/permission claims
 **Why rejected**: Stateless tokens harder to revoke; key rotation complexity
 
 ### Alternative 2: OAuth 2.0 / OpenID Connect
-**Description**: Full OAuth flow with external identity provider  
+**Description**: Full OAuth flow with external identity provider
 **Why rejected**: Over-engineering for API-to-API authentication; adds latency
 
 ### Alternative 3: Mutual TLS (mTLS)
-**Description**: Certificate-based authentication  
+**Description**: Certificate-based authentication
 **Why rejected**: Complex certificate management; doesn't solve authorization
 
 ## Migration Plan

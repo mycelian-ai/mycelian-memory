@@ -1,6 +1,6 @@
 # ADR-011: Memory Scoping and Isolation
 
-**Status**: Accepted  
+**Status**: Accepted
 **Date**: 2025-08-10
 
 ## Context
@@ -20,7 +20,7 @@ Current limitations:
 
 Implement three-tier organizational hierarchy:
 - **Organization** (`org_id`): Top-level tenant boundary
-- **Project** (`project_id`): Collaborative workspace within organization  
+- **Project** (`project_id`): Collaborative workspace within organization
 - **Vault** (`vault_id`): Memory container within project
 
 ### 2. Actor-Based Identity Model
@@ -87,7 +87,7 @@ contexts: (org_id, project_id, vault_id, memory_id, context_id)
 {
   "actor_id": "agent-summarizer-v2",
   "org_id": "mycelian-corp",
-  "project_id": "customer-support-kb", 
+  "project_id": "customer-support-kb",
   "permissions": ["memory:read", "memory:write", "entry:create"],
   "api_key": "mk_proj_abc123..."
 }
@@ -101,21 +101,21 @@ contexts: (org_id, project_id, vault_id, memory_id, context_id)
 ## Alternatives Considered
 
 ### Alternative 1: Flat Multi-Tenancy
-**Description**: Single org_id field without project hierarchy  
+**Description**: Single org_id field without project hierarchy
 **Why rejected**: Insufficient granularity for project-based collaboration within organizations
 
 ### Alternative 2: Role-Based Access Control (RBAC)
-**Description**: Complex role hierarchy instead of simple read/write permissions  
+**Description**: Complex role hierarchy instead of simple read/write permissions
 **Why rejected**: Over-engineering for current requirements; can be added later
 
 ### Alternative 3: External Authorization Service
-**Description**: Delegate all access control to external service  
+**Description**: Delegate all access control to external service
 **Why rejected**: Adds complexity and latency; prefer built-in project scoping
 
 ## Migration Plan
 
 1. **Schema Update**: Add new columns with default values
-2. **Data Migration**: Populate org/project IDs for existing records  
+2. **Data Migration**: Populate org/project IDs for existing records
 3. **API Versioning**: Deploy v2 endpoints with new scoping
 4. **Client Updates**: Migrate SDKs and tools to new API structure
 5. **Legacy Cleanup**: Remove old endpoints after transition period

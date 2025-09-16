@@ -1,0 +1,112 @@
+# Project Context: Mycelian Memory
+
+This document provides a high-level overview of the main components of the Mycelian Memory project, their responsibilities, and how they interact. This is intended to help Copilot and developers quickly build context about the codebase.
+
+---
+
+## 1. Overview
+Mycelian Memory is an open-source framework for providing long-term, high-fidelity memory and context to AI agents. It uses a log-structured, append-only architecture inspired by distributed systems, with a focus on reliability, precision, and user control.
+
+---
+
+## 2. Main Components
+
+### 2.1. Memory Service (`server/memoryservice`)
+- **Purpose:** The core HTTP API server for memory operations.
+- **Entrypoint:** `cmd/memory-service/main.go` calls `memoryservice.Run()`.
+- **Responsibilities:**
+  - Loads configuration and initializes dependencies (store, search index, embedding provider).
+  - Exposes REST endpoints for vaults, memories, entries, and context management.
+  - Handles health checks and graceful shutdown.
+- **Key Files:**
+  - `run.go`: Service startup, dependency wiring, HTTP server logic.
+  - `internal/api/`: HTTP handlers for vaults, memories, health, and search.
+  - `internal/services/`: Business logic for vaults and memories.
+  - `internal/store/`: Persistence abstraction (see below).
+
+### 2.2. Persistence Layer (`server/internal/store`)
+- **Purpose:** Abstracts database operations for users, vaults, memories, entries, and contexts.
+- **Responsibilities:**
+  - Provides interfaces for CRUD operations, hiding SQL/driver specifics.
+  - Enables easy mocking for tests and business logic decoupling.
+- **Key Files:**
+  - `store.go`: Main interfaces for Store, Users, Vaults, Memories, Entries, Contexts.
+  - Driver implementations live under `internal/store/<driver>/` (e.g., Postgres).
+
+### 2.3. Client SDK (`client/`)
+- **Purpose:** Go client for interacting with the Memory Service API.
+- **Responsibilities:**
+  - Provides programmatic access to memory/vault operations.
+  - Includes tests and integration helpers.
+- **Key Files:**
+  - `client.go`: Main client logic.
+  - `auth_test.go`, `await_test.go`, etc.: Tests and usage examples.
+
+### 2.4. MCP Server (`cmd/mycelian-mcp-server/`)
+- **Purpose:** Orchestrates agent-to-memory communication (see docs for details).
+- **Entrypoint:** `main.go` in this directory.
+
+### 2.5. Outbox Worker (`cmd/outbox-worker/`)
+- **Purpose:** Handles async processing, e.g., propagating memory changes to vector DBs.
+- **Entrypoint:** `main.go` in this directory.
+
+### 2.6. Tools (`tools/`)
+- **Purpose:** Utility scripts for development, benchmarking, and maintenance.
+- **Examples:**
+  - `delete_vault_memories.py`: Data cleanup.
+  - `longmemeval-benchmarker/`: Memory recall benchmarking.
+
+---
+
+## 3. Data Model
+- **Vaults:** Top-level containers for organizing memories.
+- **Memories:** Log-structured, append-only records within vaults.
+- **Entries:** Individual memory events or data points.
+- **Contexts:** Snapshots of memory state for efficient recall.
+
+---
+
+## 4. Configuration & Deployment
+- **Configuration:**
+  - Environment variables prefixed with `MEMORY_SERVER_` (see `server/internal/config`).
+- **Deployment:**
+  - Docker Compose files in `deployments/docker/` for local and production setups.
+  - Postgres is the default database (port 5432).
+
+---
+
+## 5. Documentation
+- **High-level architecture:** `docs/designs/001_mycelian_memory_architecture.md`
+- **API reference:** `docs/api-reference.md`
+- **Development standards:** `docs/coding-stds/`
+
+---
+
+## 6. Quickstart
+- See `README.md` for setup and usage instructions.
+
+---
+
+## 7. LongMemEval Benchmarker
+
+The LongMemEval benchmarker (in `longmemeval-benchmarker/`) is used to evaluate Mycelian Memory's performance and scalability for long-term memory tasks. It runs the LongMemEval benchmark, which simulates large-scale, multi-session conversational memory workloads.
+
+**Key features:**
+- Uses a task queue orchestrator for robust, resumable, and parallelized benchmarking.
+- Supports multiple LLM providers (OpenAI, Vertex AI, OpenRouter) via config.
+- Handles large datasets (hundreds of questions, thousands of sessions) with sharding and progress tracking.
+- Stores all agent memories in Mycelian, then evaluates recall and QA performance.
+- Provides real-time monitoring and crash recovery.
+
+**Quickstart:**
+1. Start Mycelian backend and MCP server (`make start-dev-mycelian-server` and `make start-mcp-streamable-server`).
+2. Set up Python venv and install requirements in `longmemeval-benchmarker/`.
+3. Configure model provider credentials and dataset path in TOML config.
+4. Run the orchestrator: `python -m src.orchestrator run.toml --auto --workers 3`
+5. Monitor progress and evaluate results as described in the benchmarker's README.
+
+See `longmemeval-benchmarker/README.md` for full details, troubleshooting, and advanced usage.
+
+---
+
+*Generated by GitHub Copilot on 2025-09-08 for rapid onboarding and context building.*

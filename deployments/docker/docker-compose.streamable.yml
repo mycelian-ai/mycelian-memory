@@ -27,4 +27,4 @@ services:
 
 networks:
   default:
-    driver: bridge 
+    driver: bridge

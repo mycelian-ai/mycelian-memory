@@ -34,8 +34,8 @@ func NewWeaviateNativeIndex(baseURL string) (Index, error) {
 	return &weavNative{client: cl, baseURL: baseURL}, nil
 }
 
-func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error) {
-	log.Info().Str("memoryId", memoryID).Str("query", query).Str("actorID", actorID).Int("topK", topK).Float32("alpha", alpha).Int("vectorLength", len(vec)).Msg("weaviate search starting")
+func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query string, vec []float32, topKE int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error) {
+	log.Info().Str("memoryId", memoryID).Str("query", query).Str("actorID", actorID).Int("topKE", topKE).Float32("alpha", alpha).Int("vectorLength", len(vec)).Msg("weaviate search starting")
 
 	// helper to safely extract strings
 	safeString := func(v interface{}) string {
@@ -55,13 +55,14 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 		WithClassName("MemoryEntry").
 		WithWhere(where).
 		WithHybrid(hy).
-		WithLimit(topK).
+		WithLimit(topKE).
 		WithFields(
 			gql.Field{Name: "entryId"},
 			gql.Field{Name: "actorId"},
 			gql.Field{Name: "memoryId"},
 			gql.Field{Name: "summary"},
 			gql.Field{Name: "rawEntry"},
+			gql.Field{Name: "creationTime"},
 			gql.Field{Name: "_additional", Fields: []gql.Field{{Name: "score"}}},
 		)
 
@@ -108,13 +109,26 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 				}
 			}
 		}
+		// Parse creation time
+		var creationTime time.Time
+		if ctStr := safeString(m["creationTime"]); ctStr != "" {
+			creationTime, _ = time.Parse(time.RFC3339, ctStr)
+		}
+
+		rawEntry := safeString(m["rawEntry"])
+		// Clear raw entry if not requested to save tokens
+		if !includeRawEntries {
+			rawEntry = ""
+		}
+
 		hit := model.SearchHit{
-			EntryID:  safeString(m["entryId"]),
-			ActorID:  safeString(m["actorId"]),
-			MemoryID: safeString(m["memoryId"]),
-			Summary:  safeString(m["summary"]),
-			RawEntry: safeString(m["rawEntry"]),
-			Score:    score,
+			EntryID:      safeString(m["entryId"]),
+			ActorID:      safeString(m["actorId"]),
+			MemoryID:     safeString(m["memoryId"]),
+			Summary:      safeString(m["summary"]),
+			RawEntry:     rawEntry,
+			Score:        score,
+			CreationTime: creationTime,
 		}
 		log.Debug().Str("entryId", hit.EntryID).Str("summary", hit.Summary).Float64("score", score).Msg("search hit")
 		out = append(out, hit)
@@ -168,7 +182,8 @@ func (w *weavNative) LatestContext(ctx context.Context, actorID string, memoryID
 	return ctxStr, ts, nil
 }
 
-func (w *weavNative) BestContext(ctx context.Context, actorID string, memoryID, query string, vec []float32, alpha float32) (string, time.Time, float64, error) {
+// SearchContexts returns top-K matching context shards for a query.
+func (w *weavNative) SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topKC int, alpha float32) ([]model.ContextHit, error) {
 	hy := (&gql.HybridArgumentBuilder{}).
 		WithQuery(query).
 		WithVector(vec).
@@ -180,7 +195,7 @@ func (w *weavNative) BestContext(ctx context.Context, actorID string, memoryID, 
 		WithClassName("MemoryContext").
 		WithWhere(where).
 		WithHybrid(hy).
-		WithLimit(1).
+		WithLimit(topKC).
 		WithFields(
 			gql.Field{Name: "context"},
 			gql.Field{Name: "creationTime"},
@@ -188,38 +203,42 @@ func (w *weavNative) BestContext(ctx context.Context, actorID string, memoryID, 
 		)
 	resp, err := req.Do(ctx)
 	if err != nil {
-		return "", time.Time{}, 0, err
+		return nil, err
 	}
 	if len(resp.Errors) > 0 {
-		return "", time.Time{}, 0, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
+		return nil, fmt.Errorf("weaviate graphql: %s", formatGraphQLErrors(resp.Errors))
 	}
 	getData, ok := resp.Data["Get"].(map[string]interface{})
 	if !ok {
-		return "", time.Time{}, 0, nil
+		return nil, nil
 	}
 	val := getData["MemoryContext"]
 	if val == nil {
-		return "", time.Time{}, 0, nil
+		return []model.ContextHit{}, nil
 	}
 	arr, ok := val.([]interface{})
-	if !ok || len(arr) == 0 {
-		return "", time.Time{}, 0, nil
+	if !ok {
+		return nil, nil
 	}
-	item := arr[0].(map[string]interface{})
-	ctxText, _ := item["context"].(string)
-	tsStr, _ := item["creationTime"].(string)
-	ts, _ := time.Parse(time.RFC3339, tsStr)
-	var score float64
-	if add, ok := item["_additional"].(map[string]interface{}); ok {
-		switch v := add["score"].(type) {
-		case float64:
-			score = v
-		case string:
-			f, _ := strconv.ParseFloat(v, 64)
-			score = f
+	out := make([]model.ContextHit, 0, len(arr))
+	for _, it := range arr {
+		m := it.(map[string]interface{})
+		ctxText, _ := m["context"].(string)
+		tsStr, _ := m["creationTime"].(string)
+		ts, _ := time.Parse(time.RFC3339, tsStr)
+		var score float64
+		if add, ok := m["_additional"].(map[string]interface{}); ok {
+			switch v := add["score"].(type) {
+			case float64:
+				score = v
+			case string:
+				f, _ := strconv.ParseFloat(v, 64)
+				score = f
+			}
 		}
+		out = append(out, model.ContextHit{Context: ctxText, Timestamp: ts, Score: score})
 	}
-	return ctxText, ts, score, nil
+	return out, nil
 }
 
 func (w *weavNative) DeleteEntry(ctx context.Context, actorID string, entryID string) error {

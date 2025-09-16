@@ -1,7 +1,7 @@
 # Data Model
 
-**Type**: System Documentation  
-**Status**: Active  
+**Type**: System Documentation
+**Status**: Active
 
 ## Overview
 
@@ -23,7 +23,7 @@ The system is built on the principle that **agents choose** which memories to cr
 ## Core Entities
 
 ### User
-**Purpose**: Current top-level isolation boundary (Organization level pending implementation)  
+**Purpose**: Current top-level isolation boundary (Organization level pending implementation)
 **Scope**: All data is isolated by user - no cross-user access
 
 - **ID**: Unique user identifier
@@ -33,7 +33,7 @@ The system is built on the principle that **agents choose** which memories to cr
 - **Timestamps**: Creation and update tracking
 
 ### Vault
-**Purpose**: Organizational container for related memories  
+**Purpose**: Organizational container for related memories
 **Scope**: User-owned containers that group memories by purpose, project, or domain
 
 - **VaultID**: Unique identifier within user scope
@@ -48,7 +48,7 @@ The system is built on the principle that **agents choose** which memories to cr
 - "Customer Interactions" vault with conversation memories
 
 ### Memory
-**Purpose**: Collection of related entries representing a coherent stream of events  
+**Purpose**: Collection of related entries representing a coherent stream of events
 **Scope**: Specific memory within a vault, typed for agent behavior
 
 - **MemoryID**: Unique identifier
@@ -63,7 +63,7 @@ The system is built on the principle that **agents choose** which memories to cr
 - **Future types**: Will determine how agents interact with the memory
 
 ### Entry
-**Purpose**: Individual events, facts, observations, or decisions  
+**Purpose**: Individual events, facts, observations, or decisions
 **Scope**: Atomic unit of information within a memory
 
 - **EntryID**: Unique identifier
@@ -82,7 +82,7 @@ The system is built on the principle that **agents choose** which memories to cr
 - Agent recorded: "User prefers morning meetings for better focus"
 
 ### Context (Conceptual)
-**Purpose**: Evolving memory state that grows and gets sharded over time  
+**Purpose**: Evolving memory state that grows and gets sharded over time
 **Scope**: Associated with each memory, enables efficient context retrieval
 
 - **Sharded storage**: Large contexts split for efficient access
@@ -101,7 +101,7 @@ erDiagram
         string description
         timestamp createdAt
     }
-    
+
     User ||--o{ Vault : owns
     User {
         string userID PK
@@ -112,7 +112,7 @@ erDiagram
         timestamp createdAt
         timestamp updatedAt
     }
-    
+
     Vault ||--o{ Memory : contains
     Vault {
         string vaultID PK
@@ -121,7 +121,7 @@ erDiagram
         string description
         timestamp creationTime
     }
-    
+
     Memory ||--o{ Entry : collects
     Memory ||--|| Context : maintains
     Memory {
@@ -134,7 +134,7 @@ erDiagram
         timestamp createdAt
         timestamp updatedAt
     }
-    
+
     Entry {
         string entryID PK
         string memoryID FK
@@ -146,7 +146,7 @@ erDiagram
         json tags
         timestamp expirationTime
     }
-    
+
     Context {
         string memoryID FK
         json contextData
@@ -215,15 +215,15 @@ erDiagram
 ### Query Isolation
 ```sql
 -- All queries include user isolation
-SELECT * FROM entries 
+SELECT * FROM entries
 WHERE userID = ? AND vaultID = ? AND memoryID = ?
 
 -- Cross-vault search within user scope
-SELECT * FROM entries 
+SELECT * FROM entries
 WHERE userID = ? AND rawEntry LIKE ?
 
 -- Vault-level memory listing
-SELECT * FROM memories 
+SELECT * FROM memories
 WHERE userID = ? AND vaultID = ?
 ```
 

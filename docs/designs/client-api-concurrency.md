@@ -1,8 +1,8 @@
 # Client API Concurrency Design
 
-**Status**: Implemented  
-**Author**: Development Team  
-**Type**: Technical Implementation Document  
+**Status**: Implemented
+**Author**: Development Team
+**Type**: Technical Implementation Document
 
 ## Objective
 
@@ -23,7 +23,7 @@ Memory-focused applications require predictable operation ordering to maintain c
 
 ### Functional Requirements
 - [x] **Per-memory write ordering**: All write operations for a single memory execute in FIFO order
-- [x] **Cross-memory parallelism**: Different memories can have concurrent operations  
+- [x] **Cross-memory parallelism**: Different memories can have concurrent operations
 - [x] **Explicit consistency control**: Developers can wait for operation completion when needed
 
 ### Non-Functional Requirements
@@ -48,7 +48,7 @@ The client API divides all operations into three distinct execution classes:
 - **Rationale**: Provides immediate acknowledgment while preserving ordering
 - **Trade-offs**: Callers must handle eventual consistency explicitly
 
-**Decision 2: Reads are direct and unordered**  
+**Decision 2: Reads are direct and unordered**
 - **Rationale**: Maximum performance for read-heavy workloads
 - **Trade-offs**: May see stale data until `AwaitConsistency()` called
 
@@ -68,14 +68,14 @@ flowchart TD
         SQ --> Ack[EnqueueAck Response]
         Ack --> Client1
     end
-    
+
     subgraph "Direct Operations (Read)"
         Client2[Client] --> HTTP2[HTTP/REST]
         HTTP2 --> Backend2[Backend]
         Backend2 --> Response[Response]
         Response --> Client2
     end
-    
+
     subgraph "Admin Operations (Direct)"
         Client3[Client] --> HTTP3[HTTP/REST]
         HTTP3 --> Backend3[Backend]
@@ -112,12 +112,12 @@ func (c *Client) AddEntry(ctx context.Context, userID, vaultID, memID string, re
         // HTTP POST implementation
         return makeHTTPRequest(jobCtx, req)
     })
-    
+
     // Submit to shard queue for ordering
     if err := c.exec.Submit(ctx, memID, job); err != nil {
         return nil, err
     }
-    
+
     // Return immediately with enqueue acknowledgment
     return &EnqueueAck{MemoryID: memID, Status: "enqueued"}, nil
 }
@@ -130,7 +130,7 @@ shard := fnv32a(memoryID) % cfg.Shards  // Default: 4 shards
 
 **Operations**:
 - `AddEntry(memoryID, entry)` → `*EnqueueAck`
-- `PutContext(memoryID, context)` → `*EnqueueAck`  
+- `PutContext(memoryID, context)` → `*EnqueueAck`
 - `AwaitConsistency(memoryID)` → blocks until queue empty
 
 ### Direct Operations Implementation
@@ -140,7 +140,7 @@ shard := fnv32a(memoryID) % cfg.Shards  // Default: 4 shards
 ```go
 func (c *Client) GetEntry(ctx context.Context, userID, vaultID, memID, entryID string) (*Entry, error) {
     // Direct HTTP request
-    url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries/%s", 
+    url := fmt.Sprintf("%s/v0/users/%s/vaults/%s/memories/%s/entries/%s",
                        c.baseURL, userID, vaultID, memID, entryID)
     resp, err := c.http.Get(url)
     // Handle response...
@@ -189,7 +189,7 @@ func (c *Client) AwaitConsistency(ctx context.Context, memoryID string) error {
         return nil
     })
     c.exec.Submit(ctx, memoryID, job)
-    
+
     select {
     case <-done:
         return nil
@@ -261,7 +261,7 @@ case err != nil:
 
 **Prometheus Metrics**:
 - `mycelian_shardqueue_submissions_total{shard}` - Jobs enqueued
-- `mycelian_shardqueue_queue_full_total{shard}` - Back-pressure events  
+- `mycelian_shardqueue_queue_full_total{shard}` - Back-pressure events
 - `mycelian_shardqueue_run_duration_seconds{shard}` - Execution latency
 - `mycelian_shardqueue_queue_depth{shard}` - Current queue size
 
@@ -274,7 +274,7 @@ case err != nil:
 
 ### Latency Profile
 - **Enqueue latency**: Sub-millisecond (channel send)
-- **HTTP round-trip**: Network dependent  
+- **HTTP round-trip**: Network dependent
 - **Queue full timeout**: 100ms (configurable)
 
 ### Throughput Capacity
@@ -290,7 +290,7 @@ case err != nil:
 
 ### Unit Testing
 - Mock executor interface for API layer testing
-- Isolated shardqueue behavior testing  
+- Isolated shardqueue behavior testing
 - Error condition coverage (timeouts, cancellation)
 
 ### Integration Testing
@@ -319,30 +319,30 @@ Environment variable `MYCELIAN_FORCE_SYNC=true` disables async execution for deb
 ## Alternatives Considered
 
 ### Alternative 1: All Operations Synchronous
-**Pros**: Simpler mental model, immediate error feedback  
-**Cons**: Poor offline experience, head-of-line blocking, no ordering guarantees  
+**Pros**: Simpler mental model, immediate error feedback
+**Cons**: Poor offline experience, head-of-line blocking, no ordering guarantees
 **Why rejected**: Doesn't solve core ordering problem, hurts offline UX
 
-### Alternative 2: Global Operation Queue  
-**Pros**: Simpler implementation, total ordering  
-**Cons**: No parallelism, single point of contention, poor scalability  
+### Alternative 2: Global Operation Queue
+**Pros**: Simpler implementation, total ordering
+**Cons**: No parallelism, single point of contention, poor scalability
 **Why rejected**: Eliminates beneficial parallelism across memories
 
 ### Alternative 3: Client-Side SQLite Queue
-**Pros**: Survives process restart, queryable state  
-**Cons**: Complex dependency, disk I/O overhead, concurrency complexity  
+**Pros**: Survives process restart, queryable state
+**Cons**: Complex dependency, disk I/O overhead, concurrency complexity
 **Why rejected**: Over-engineered for current requirements, deferred to future
 
 ## Future Considerations
 
 **Planned Extensions**:
-- Persistent queue backends for process restart survival  
+- Persistent queue backends for process restart survival
 - Batch operation APIs for high-throughput scenarios
 - Cross-memory transaction support
 - Priority queuing within shards
 
 **Technical Debt**:
-- Evaluate queue size auto-tuning based on load patterns  
+- Evaluate queue size auto-tuning based on load patterns
 - Add circuit breaker for backend fault tolerance
 - Consider abstracting HTTP client for future transport flexibility
 
@@ -354,7 +354,7 @@ Environment variable `MYCELIAN_FORCE_SYNC=true` disables async execution for deb
 ## References
 
 - ShardQueue Implementation Specification (`docs/specs/shardqueue.md`)
-- Client concurrency model ADR (`docs-archive/client/adr/0020-client-concurrency-model.md`)  
+- Client concurrency model ADR (`docs-archive/client/adr/0020-client-concurrency-model.md`)
 - Context management ADR (`docs-archive/client/adr/0026-context-processing-update.md`)
 - Delete operation ordering ADR (`docs-archive/client/adr/0009-delete-queue-integration.md`)
 

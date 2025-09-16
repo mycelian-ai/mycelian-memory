@@ -10,6 +10,19 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        exclude: |
+          (?x)^(
+            .*\.lock$|
+            .*\.log$|
+            .*test.*|
+            .*\.example$|
+            .*\.env$
+          )$
+
   - repo: local
     hooks:
       - id: check-forbidden-files

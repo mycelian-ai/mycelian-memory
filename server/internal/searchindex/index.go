@@ -14,9 +14,12 @@ type Embeddings interface {
 
 // Index provides vector search and index maintenance.
 type Index interface {
-	Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topK int, alpha float32) ([]model.SearchHit, error)
+	Search(ctx context.Context, actorID, memoryID, query string, vec []float32, topKE int, alpha float32, includeRawEntries bool) ([]model.SearchHit, error)
 	LatestContext(ctx context.Context, actorID, memoryID string) (text string, ts time.Time, err error)
-	BestContext(ctx context.Context, actorID, memoryID, query string, vec []float32, alpha float32) (best string, ts time.Time, score float64, err error)
+
+	// SearchContexts returns top-K matching context shards for a query.
+	// Implementations should use the same hybrid scoring as entries search.
+	SearchContexts(ctx context.Context, actorID, memoryID, query string, vec []float32, topKC int, alpha float32) ([]model.ContextHit, error)
 
 	// Upserts (best-effort; implementations may ignore or approximate)
 	UpsertEntry(ctx context.Context, entryID string, vec []float32, payload map[string]interface{}) error

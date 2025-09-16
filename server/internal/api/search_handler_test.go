@@ -26,20 +26,24 @@ type mockSearch struct {
 	empty bool
 }
 
-func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, k int, a float32) ([]model.SearchHit, error) {
+func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32, kE int, a float32, includeRawEntries bool) ([]model.SearchHit, error) {
 	m.calls++
 	if m.empty {
 		return []model.SearchHit{}, nil
 	}
-	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9}}, nil
+	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9, CreationTime: time.Now()}}, nil
 }
 
 func (m *mockSearch) LatestContext(ctx context.Context, uid, mid string) (string, time.Time, error) {
 	return "ctx", time.Now(), nil
 }
 
-func (m *mockSearch) BestContext(ctx context.Context, uid, mid, q string, v []float32, a float32) (string, time.Time, float64, error) {
-	return "bestctx", time.Now(), 0.9, nil
+func (m *mockSearch) SearchContexts(ctx context.Context, uid, mid, q string, v []float32, kC int, a float32) ([]model.ContextHit, error) {
+	out := make([]model.ContextHit, 0, kC)
+	for i := 0; i < kC; i++ {
+		out = append(out, model.ContextHit{Context: "ctx", Timestamp: time.Now(), Score: 0.8})
+	}
+	return out, nil
 }
 
 // new interface methods (no-ops for tests)
@@ -75,7 +79,7 @@ func TestHandleSearch_EmbedsOnce(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hello","topK":3}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hello","top_ke":2,"top_kc":1}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
@@ -101,7 +105,7 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi"}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","top_ke":5,"top_kc":2}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()
@@ -114,7 +118,6 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 		Entries       []model.SearchHit `json:"entries"`
 		Count         int               `json:"count"`
 		LatestContext string            `json:"latestContext"`
-		BestContext   string            `json:"bestContext"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -122,8 +125,39 @@ func TestHandleSearch_ResponseMapping(t *testing.T) {
 	if resp.Count != 1 || len(resp.Entries) != 1 || resp.Entries[0].EntryID != "e1" {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
-	if resp.LatestContext == "" || resp.BestContext == "" {
-		t.Fatalf("expected context fields")
+	if resp.LatestContext == "" {
+		t.Fatalf("expected latestContext to be present")
+	}
+}
+
+func TestHandleSearch_ContextsArray_KCLimit(t *testing.T) {
+	emb := &mockEmbedder{}
+	srch := &mockSearch{}
+	auth := &mockAuthorizer{}
+	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
+
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","top_ke":5,"top_kc":1}`)
+	req := httptest.NewRequest("POST", "/v0/search", body)
+	req.Header.Set("Authorization", "Bearer test-api-key")
+	w := httptest.NewRecorder()
+	h.HandleSearch(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200")
+	}
+	var resp struct {
+		Contexts               []map[string]any `json:"contexts"`
+		LatestContext          string           `json:"latestContext"`
+		LatestContextTimestamp string           `json:"latestContextTimestamp"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Contexts) == 0 || len(resp.Contexts) > 1 {
+		t.Fatalf("expected contexts length 1, got %d", len(resp.Contexts))
+	}
+	if resp.LatestContext == "" {
+		t.Fatalf("expected latestContext to be present")
 	}
 }
 
@@ -133,7 +167,7 @@ func TestHandleSearch_NoResults(t *testing.T) {
 	auth := &mockAuthorizer{}
 	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
 
-	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi"}`)
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"hi","top_ke":5,"top_kc":2}`)
 	req := httptest.NewRequest("POST", "/v0/search", body)
 	req.Header.Set("Authorization", "Bearer test-api-key")
 	w := httptest.NewRecorder()

@@ -169,6 +169,11 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 	switch j.op {
 	case OpUpsertEntry:
 		text := preferredText(j.payload, "summary", "rawEntry")
+		// Skip embedding/upsert when there is no usable text
+		if strings.TrimSpace(text) == "" {
+			w.log.Warn().Str("entryId", j.aggregateID).Msg("empty entry text; skipping indexing and marking done")
+			return nil
+		}
 		w.log.Debug().Str("text", text).Str("entryId", j.aggregateID).Msg("upserting entry")
 		vec, err := w.embed(text, ctx)
 		if err != nil {
@@ -179,6 +184,10 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 		normalizeEntryTags(j.payload)
 		err = w.index.UpsertEntry(ctx, j.aggregateID, vec, j.payload)
 		if err != nil {
+			if isAlreadyExists(err) {
+				w.log.Info().Str("entryId", j.aggregateID).Msg("entry already in index; marking done")
+				return nil
+			}
 			w.log.Error().Err(err).Str("entryId", j.aggregateID).Msg("upsert entry failed")
 			return err
 		}
@@ -188,11 +197,23 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 		return w.index.DeleteEntry(ctx, stringField(j.payload, "actorId"), j.aggregateID)
 	case OpUpsertContext:
 		text := stringField(j.payload, "context")
+		// Skip embedding/upsert when there is no usable text
+		if strings.TrimSpace(text) == "" {
+			w.log.Warn().Str("contextId", j.aggregateID).Msg("empty context text; skipping indexing and marking done")
+			return nil
+		}
 		vec, err := w.embed(text, ctx)
 		if err != nil {
 			return err
 		}
-		return w.index.UpsertContext(ctx, j.aggregateID, vec, j.payload)
+		if err := w.index.UpsertContext(ctx, j.aggregateID, vec, j.payload); err != nil {
+			if isAlreadyExists(err) {
+				w.log.Info().Str("contextId", j.aggregateID).Msg("context already in index; marking done")
+				return nil
+			}
+			return err
+		}
+		return nil
 	case OpDeleteContext:
 		return w.index.DeleteContext(ctx, stringField(j.payload, "actorId"), j.aggregateID)
 	default:
@@ -270,4 +291,15 @@ func normalizeEntryTags(m map[string]interface{}) {
 		}
 		m["tags"] = keys
 	}
+}
+
+// isAlreadyExists returns true when the vector index reports that the
+// object ID already exists. We use a substring match to avoid coupling
+// to a specific client error type.
+func isAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "already exists") || strings.Contains(msg, "status code: 422")
 }
