@@ -153,9 +153,11 @@ longmemeval-benchmarker/logs/
 longmemeval-benchmarker/logs/*/
 longmemeval-benchmarker/*.log
 
-# Large dataset files (keep only small test datasets in git)
-longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
-longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
+# Large dataset files - ignore entire local datasets directory
+longmemeval-benchmarker/longmemeval-local-datasets/
+
+# Local config files for stress testing
+longmemeval-benchmarker/config-local/
 
 # Root level files that should be ignored
 huey_orchestrator.log
@@ -164,9 +166,8 @@ memory-bank/
 .cursor/
 .cursorignore
 
-# Ignore large dataset files
-longmemeval-benchmarker/longmemeval-datasets/longmemeval_m.json
-longmemeval-benchmarker/longmemeval-datasets/longmemeval_s.json
+# Note: longmemeval-datasets/ contains small files for git commits
+# Large files are in longmemeval-local-datasets/ (ignored above)
 
 # Ignore log files
 *.log
