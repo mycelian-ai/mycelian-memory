@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.orchestrator.progress_tracker import ProgressTracker
 from src.single_question_runner import SingleQuestionRunner
-from src.benchmarker import parse_config
+from src.config_parser import parse_config
 from src.memory_manager import MemoryManager
 from src.mycelian_memory_agent import create_mcp_client
 
@@ -54,7 +54,6 @@ def _log_startup_config():
 
 
 _SRC_DIR = Path(__file__).parent.parent / "src"
-_BENCH_SCRIPT = _SRC_DIR / "benchmarker.py"
 
 
 def _atomic_write_json(target: Path, payload: Dict) -> None:
