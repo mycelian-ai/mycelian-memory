@@ -7,7 +7,7 @@ YOU MUST remain unbiased in your feedback.
 **Mycelian Memory** is an open-source memory framework providing long-term memory and context to AI agents through a log-structured architecture. Licensed under Apache v2.
 
 **GitHub**: https://github.com/mycelian-ai/mycelian-memory
-**Status**: Early-stage, active development (~5 weeks as of 08/24/2024)
+**Status**: Early-stage, active development
 **Author**: @sam33rch (built using AI development tools: Cursor, Claude Code, Kiro)
 
 ## Communication Preferences
@@ -52,20 +52,24 @@ AI Agent <-> MCP Server <-> Memory Service <-> Postgres + Vector DB
 - `/tools/mycelianCli` - CLI for testing/debugging
 - `/tools/mycelian-service-tools` - Service management tools
 - `/tools/invariants-checker` - Data consistency checker
+- `/tools/dep-update` - Dependency update utilities
 - `/pkg/devauth` - Development authentication
 
 ### Other Components
-- `/tools/benchmarker` - Python-based performance testing
+- `/longmemeval-benchmarker` - LangGraph-based LongMemEval benchmark implementation
+- `/tools/longmemeval-benchmarker` - Legacy Python benchmarker (deprecated)
 - `/deployments/docker` - Docker compose configurations
 - `/docs` - Architecture, ADRs, API documentation
+- `/data` - Test data and datasets
 
 ## Development Setup
 
 ### Prerequisites
-- Go 1.24.6+
+- Go 1.23+
 - Docker Desktop
 - Ollama (with nomic-embed-text model)
 - Make, jq
+- Python 3.11+ (for benchmarker)
 
 ### Quick Start
 ```bash
