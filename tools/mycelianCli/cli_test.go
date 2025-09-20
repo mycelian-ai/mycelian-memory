@@ -73,10 +73,16 @@ func TestCLI_CreateVaultMemoryEntry_ListEntries(t *testing.T) {
 		t.Fatalf("create-memory cmd failed: %v", err)
 	}
 
-	// create-entry
+	// create-entry without conversation_time
 	root.SetArgs([]string{"create-entry", "--service-url", srv.URL, "--vault-id", "vault-999", "--memory-id", "mem-456", "--raw-entry", "hello", "--summary", "hello summary"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("create-entry cmd failed: %v", err)
+	}
+
+	// create-entry with conversation_time
+	root.SetArgs([]string{"create-entry", "--service-url", srv.URL, "--vault-id", "vault-999", "--memory-id", "mem-456", "--raw-entry", "past meeting", "--summary", "meeting notes", "--conversation-time", "2025-01-15T14:30:00Z"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("create-entry with conversation_time cmd failed: %v", err)
 	}
 
 	// list-entries
@@ -96,5 +102,25 @@ func TestCLI_CreateVaultMemoryEntry_ListEntries(t *testing.T) {
 	rootTop.SetArgs([]string{"list-entries", "--service-url", srv.URL, "--vault-id", "vault-999", "--memory-id", "mem-456", "--limit", "1"})
 	if err := rootTop.Execute(); err != nil {
 		t.Fatalf("list-entries cmd failed: %v", err)
+	}
+}
+
+func TestCreateEntryWithInvalidConversationTime(t *testing.T) {
+	// Test that invalid conversation_time format returns an error
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This handler shouldn't be reached for invalid timestamp
+		t.Fatal("HTTP handler should not be called for invalid conversation_time")
+	}))
+	defer srv.Close()
+
+	root := NewRootCmd()
+	// Try with invalid timestamp format
+	root.SetArgs([]string{"create-entry", "--service-url", srv.URL, "--vault-id", "vault-999", "--memory-id", "mem-456", "--raw-entry", "test", "--summary", "test", "--conversation-time", "invalid-date"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for invalid conversation_time format, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid conversation-time format") {
+		t.Fatalf("expected error message about invalid format, got: %v", err)
 	}
 }
