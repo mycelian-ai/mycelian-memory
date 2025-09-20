@@ -220,11 +220,12 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 	}
 
 	var in struct {
-		RawEntry       string                 `json:"rawEntry"`
-		Summary        *string                `json:"summary,omitempty"`
-		Metadata       map[string]interface{} `json:"metadata,omitempty"`
-		Tags           map[string]interface{} `json:"tags,omitempty"`
-		ExpirationTime *time.Time             `json:"expirationTime,omitempty"`
+		RawEntry         string                 `json:"rawEntry"`
+		Summary          *string                `json:"summary,omitempty"`
+		ConversationTime *time.Time             `json:"conversationTime,omitempty"`
+		Metadata         map[string]interface{} `json:"metadata,omitempty"`
+		Tags             map[string]interface{} `json:"tags,omitempty"`
+		ExpirationTime   *time.Time             `json:"expirationTime,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		respond.WriteBadRequest(w, "Invalid JSON")
@@ -233,6 +234,10 @@ func (h *MemoryHandler) CreateMemoryEntry(w http.ResponseWriter, r *http.Request
 	e := &model.MemoryEntry{
 		ActorID: actorInfo.ActorID, VaultID: vaultID, MemoryID: memoryID,
 		RawEntry: in.RawEntry, Summary: in.Summary, Metadata: in.Metadata, Tags: in.Tags, ExpirationTime: in.ExpirationTime,
+	}
+	// Set ConversationTime if provided
+	if in.ConversationTime != nil {
+		e.ConversationTime = *in.ConversationTime
 	}
 	out, err := h.svc.CreateEntry(r.Context(), e)
 	if err != nil {

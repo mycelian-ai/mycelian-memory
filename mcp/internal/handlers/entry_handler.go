@@ -34,6 +34,7 @@ func (eh *EntryHandler) RegisterTools(s *server.MCPServer) error {
 		mcp.WithString("memory_id", mcp.Required(), mcp.Description("The UUID of the memory")),
 		mcp.WithString("raw_entry", mcp.Required(), mcp.Description("Raw entry text")),
 		mcp.WithString("summary", mcp.Required(), mcp.Description("Short summary of entry")),
+		mcp.WithString("conversation_time", mcp.Description("Optional ISO-8601 timestamp of when the conversation occurred (e.g., 2023-01-08T12:49:00Z)")),
 		mcp.WithObject("tags", mcp.Description("Optional JSON object of tags")),
 	)
 	s.AddTool(addEntry, eh.handleAddEntry)
@@ -66,6 +67,15 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 	memoryID, _ := req.RequireString("memory_id")
 	rawEntry, _ := req.RequireString("raw_entry")
 	summary, _ := req.RequireString("summary")
+
+	// Parse conversation_time if provided
+	var conversationTime *time.Time
+	if ct, ok := req.GetArguments()["conversation_time"].(string); ok && ct != "" {
+		if parsed, err := time.Parse(time.RFC3339, ct); err == nil {
+			conversationTime = &parsed
+		}
+	}
+
 	var tags map[string]string
 	if t, ok := req.GetArguments()["tags"]; ok {
 		_ = mapstructureDecode(t, &tags)
@@ -85,9 +95,10 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
 	// beyond the tool call completion.
 	jobCtx := context.Background()
 	ack, err := eh.client.AddEntry(jobCtx, vaultID, memoryID, clientpkg.AddEntryRequest{
-		RawEntry: rawEntry,
-		Summary:  summary,
-		Tags:     tags,
+		RawEntry:         rawEntry,
+		Summary:          summary,
+		ConversationTime: conversationTime,
+		Tags:             tags,
 	})
 	elapsed := time.Since(start)
 	log.Debug().Err(err).Interface("ack", ack).Dur("elapsed", elapsed).Msg("AddEntry completed")
