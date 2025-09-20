@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
 	"github.com/mycelian/mycelian-memory/server/internal/model"
@@ -52,6 +54,10 @@ func (s *MemoryService) DeleteContext(ctx context.Context, userID, vaultID, memo
 }
 
 func (s *MemoryService) CreateEntry(ctx context.Context, e *model.MemoryEntry) (*model.MemoryEntry, error) {
+	// Validate conversation_time is not in the future
+	if !e.ConversationTime.IsZero() && e.ConversationTime.After(time.Now().Add(time.Minute)) {
+		return nil, fmt.Errorf("conversation_time cannot be in the future")
+	}
 	// For now, delegate to store; indexing is handled out of band for create.
 	return s.store.Entries().Create(ctx, e)
 }
