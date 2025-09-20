@@ -456,25 +456,34 @@ func (e *entries) Create(ctx context.Context, me *model.MemoryEntry) (*model.Mem
 
 	entryID := uuid.New().String()
 	var created time.Time
+	var conversation time.Time
 	metaJSON, _ := json.Marshal(me.Metadata)
 	tagsJSON, _ := json.Marshal(me.Tags)
+
+	// Use provided ConversationTime or default to current time
+	var convTime *time.Time
+	if !me.ConversationTime.IsZero() {
+		convTime = &me.ConversationTime
+	}
+
 	row := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_entries (actor_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        RETURNING creation_time
-    `, me.ActorID, me.VaultID, me.MemoryID, me.RawEntry, me.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
-	if err := row.Scan(&created); err != nil {
+        INSERT INTO memory_entries (actor_id, vault_id, memory_id, conversation_time, raw_entry, summary, metadata, tags, entry_id)
+        VALUES ($1,$2,$3,COALESCE($4, CURRENT_TIMESTAMP),$5,$6,$7,$8,$9)
+        RETURNING creation_time, conversation_time
+    `, me.ActorID, me.VaultID, me.MemoryID, convTime, me.RawEntry, me.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
+	if err := row.Scan(&created, &conversation); err != nil {
 		return nil, err
 	}
 
 	payload := map[string]interface{}{
-		"actorId":      me.ActorID,
-		"memoryId":     me.MemoryID,
-		"entryId":      entryID,
-		"rawEntry":     me.RawEntry,
-		"summary":      me.Summary,
-		"tags":         me.Tags,
-		"creationTime": created,
+		"actorId":          me.ActorID,
+		"memoryId":         me.MemoryID,
+		"entryId":          entryID,
+		"rawEntry":         me.RawEntry,
+		"summary":          me.Summary,
+		"tags":             me.Tags,
+		"creationTime":     created,
+		"conversationTime": conversation,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_entry", entryID, payload); err != nil {
 		return nil, err
@@ -485,11 +494,12 @@ func (e *entries) Create(ctx context.Context, me *model.MemoryEntry) (*model.Mem
 	out := *me
 	out.EntryID = entryID
 	out.CreationTime = created
+	out.ConversationTime = conversation
 	return &out, nil
 }
 
 func (e *entries) List(ctx context.Context, req model.ListEntriesRequest) ([]*model.MemoryEntry, error) {
-	query := `SELECT actor_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
+	query := `SELECT actor_id, vault_id, memory_id, creation_time, conversation_time, entry_id, raw_entry, summary, metadata, tags,
                       correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                       correction_reason, last_update_time
                FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`
@@ -517,7 +527,7 @@ func (e *entries) List(ctx context.Context, req model.ListEntriesRequest) ([]*mo
 		var meta, tags sql.NullString
 		var corrTime, corrEntryTime, lastUpd sql.NullTime
 		var corrMemID sql.NullString
-		if err := rows.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
+		if err := rows.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.ConversationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
 			&corrTime, &corrMemID, &corrEntryTime, &corrMemID, &lastUpd); err != nil {
 			return nil, err
 		}
@@ -538,12 +548,12 @@ func (e *entries) GetByID(ctx context.Context, userID, vaultID, memoryID, entryI
 	var corrTime, corrEntryTime, lastUpd sql.NullTime
 	var corrMemID sql.NullString
 	row := e.db.QueryRowContext(ctx, `
-        SELECT actor_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
+        SELECT actor_id, vault_id, memory_id, creation_time, conversation_time, entry_id, raw_entry, summary, metadata, tags,
                correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                correction_reason, last_update_time
         FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND entry_id=$4
     `, userID, vaultID, memoryID, entryID)
-	if err := row.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
+	if err := row.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.ConversationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
 		&corrTime, &corrMemID, &corrEntryTime, &corrMemID, &lastUpd); err != nil {
 		return nil, err
 	}

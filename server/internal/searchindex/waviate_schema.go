@@ -32,6 +32,7 @@ func BootstrapWeaviate(ctx context.Context, baseURL string) error {
 			{Name: "summary", DataType: []string{"text"}},
 			{Name: "tags", DataType: []string{"text[]"}},
 			{Name: "creationTime", DataType: []string{"date"}},
+			{Name: "conversationTime", DataType: []string{"date"}},
 		},
 	}
 

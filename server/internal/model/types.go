@@ -34,16 +34,17 @@ type Memory struct {
 
 // MemoryEntry is an immutable record of content with optional summary and metadata.
 type MemoryEntry struct {
-	EntryID        string                 `json:"entryId"`
-	ActorID        string                 `json:"actorId"`
-	VaultID        string                 `json:"vaultId"`
-	MemoryID       string                 `json:"memoryId"`
-	RawEntry       string                 `json:"rawEntry"`
-	Summary        *string                `json:"summary,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
-	Tags           map[string]interface{} `json:"tags,omitempty"`
-	CreationTime   time.Time              `json:"creationTime"`
-	ExpirationTime *time.Time             `json:"expirationTime,omitempty"`
+	EntryID          string                 `json:"entryId"`
+	ActorID          string                 `json:"actorId"`
+	VaultID          string                 `json:"vaultId"`
+	MemoryID         string                 `json:"memoryId"`
+	RawEntry         string                 `json:"rawEntry"`
+	Summary          *string                `json:"summary,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+	Tags             map[string]interface{} `json:"tags,omitempty"`
+	CreationTime     time.Time              `json:"creationTime"`
+	ConversationTime time.Time              `json:"conversationTime"`
+	ExpirationTime   *time.Time             `json:"expirationTime,omitempty"`
 }
 
 // MemoryContext stores the latest context snapshot for a memory.
