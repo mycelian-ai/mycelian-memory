@@ -158,7 +158,7 @@ func newCreateMemoryCmd() *cobra.Command {
 }
 
 func newCreateEntryCmd() *cobra.Command {
-	var vaultID, memoryID, rawEntry, summary string
+	var vaultID, memoryID, rawEntry, summary, conversationTime string
 
 	cmd := &cobra.Command{
 		Use:   "create-entry",
@@ -166,11 +166,22 @@ func newCreateEntryCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Client-side validation removed; rely on server-side validation
 
+			// Parse conversation time if provided
+			var convTime *time.Time
+			if conversationTime != "" {
+				parsed, err := time.Parse(time.RFC3339, conversationTime)
+				if err != nil {
+					return fmt.Errorf("invalid conversation-time format (use RFC3339): %w", err)
+				}
+				convTime = &parsed
+			}
+
 			log.Debug().
 				Str("vault_id", vaultID).
 				Str("memory_id", memoryID).
 				Int("raw_entry_len", len(rawEntry)).
 				Str("summary", summary).
+				Str("conversation_time", conversationTime).
 				Str("service_url", serviceURL).
 				Msg("creating entry")
 
@@ -184,8 +195,9 @@ func newCreateEntryCmd() *cobra.Command {
 
 			start := time.Now()
 			ack, err := c.AddEntry(ctx, vaultID, memoryID, client.AddEntryRequest{
-				RawEntry: rawEntry,
-				Summary:  summary,
+				RawEntry:         rawEntry,
+				Summary:          summary,
+				ConversationTime: convTime,
 			})
 			elapsed := time.Since(start)
 
@@ -217,6 +229,7 @@ func newCreateEntryCmd() *cobra.Command {
 	cmd.Flags().StringVar(&memoryID, "memory-id", "", "Memory ID (required)")
 	cmd.Flags().StringVar(&rawEntry, "raw-entry", "", "Raw entry text (required)")
 	cmd.Flags().StringVar(&summary, "summary", "", "Summary (required)")
+	cmd.Flags().StringVar(&conversationTime, "conversation-time", "", "Conversation timestamp in RFC3339 format (optional, e.g., 2023-01-08T12:49:00Z)")
 
 	_ = cmd.MarkFlagRequired("vault-id")
 	_ = cmd.MarkFlagRequired("memory-id")
