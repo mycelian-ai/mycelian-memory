@@ -377,25 +377,27 @@ func (s *PostgresStorage) CreateMemoryEntry(ctx context.Context, req storage.Cre
 
 	entryID := uuid.New().String()
 	var creation time.Time
+	var conversation time.Time
 	metaJSON, _ := json.Marshal(req.Metadata)
 	tagsJSON, _ := json.Marshal(req.Tags)
 	row := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_entries (actor_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        RETURNING creation_time
-    `, req.ActorID, req.VaultID.String(), req.MemoryID, req.RawEntry, req.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
-	if err := row.Scan(&creation); err != nil {
+        INSERT INTO memory_entries (actor_id, vault_id, memory_id, conversation_time, raw_entry, summary, metadata, tags, entry_id)
+        VALUES ($1,$2,$3,COALESCE($4, CURRENT_TIMESTAMP),$5,$6,$7,$8,$9)
+        RETURNING creation_time, conversation_time
+    `, req.ActorID, req.VaultID.String(), req.MemoryID, req.ConversationTime, req.RawEntry, req.Summary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), entryID)
+	if err := row.Scan(&creation, &conversation); err != nil {
 		return nil, err
 	}
 
 	payload := map[string]interface{}{
-		"actorId":      req.ActorID,
-		"memoryId":     req.MemoryID,
-		"entryId":      entryID,
-		"rawEntry":     req.RawEntry,
-		"summary":      req.Summary,
-		"tags":         req.Tags,
-		"creationTime": creation,
+		"actorId":          req.ActorID,
+		"memoryId":         req.MemoryID,
+		"entryId":          entryID,
+		"rawEntry":         req.RawEntry,
+		"summary":          req.Summary,
+		"tags":             req.Tags,
+		"creationTime":     creation,
+		"conversationTime": conversation,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_entry", entryID, payload); err != nil {
 		return nil, err
@@ -405,15 +407,16 @@ func (s *PostgresStorage) CreateMemoryEntry(ctx context.Context, req storage.Cre
 		return nil, err
 	}
 	return &storage.MemoryEntry{
-		ActorID:      req.ActorID,
-		VaultID:      req.VaultID,
-		MemoryID:     req.MemoryID,
-		CreationTime: creation,
-		EntryID:      entryID,
-		RawEntry:     req.RawEntry,
-		Summary:      req.Summary,
-		Metadata:     req.Metadata,
-		Tags:         req.Tags,
+		ActorID:          req.ActorID,
+		VaultID:          req.VaultID,
+		MemoryID:         req.MemoryID,
+		CreationTime:     creation,
+		ConversationTime: conversation,
+		EntryID:          entryID,
+		RawEntry:         req.RawEntry,
+		Summary:          req.Summary,
+		Metadata:         req.Metadata,
+		Tags:             req.Tags,
 	}, nil
 }
 
@@ -427,12 +430,12 @@ func (s *PostgresStorage) GetMemoryEntry(ctx context.Context, actorID string, va
 	var corrTime, corrEntryTime, lastUpd sql.NullTime
 	var corrMemID, corrReason sql.NullString
 	row := s.db.QueryRowContext(ctx, `
-        SELECT entry_id, raw_entry, summary, metadata, tags,
+        SELECT entry_id, conversation_time, raw_entry, summary, metadata, tags,
                correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                correction_reason, last_update_time
         FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND creation_time=$4
     `, actorID, vaultID.String(), memoryID, creationTime)
-	if err := row.Scan(&e.EntryID, &e.RawEntry, &e.Summary, &meta, &tags,
+	if err := row.Scan(&e.EntryID, &e.ConversationTime, &e.RawEntry, &e.Summary, &meta, &tags,
 		&corrTime, &corrMemID, &corrEntryTime, &corrReason, &lastUpd); err != nil {
 		return nil, err
 	}
@@ -472,12 +475,12 @@ func (s *PostgresStorage) GetMemoryEntryByID(ctx context.Context, actorID string
 	var corrTime, corrEntryTime, lastUpd sql.NullTime
 	var corrMemID, corrReason sql.NullString
 	row := s.db.QueryRowContext(ctx, `
-        SELECT actor_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
+        SELECT actor_id, vault_id, memory_id, creation_time, conversation_time, entry_id, raw_entry, summary, metadata, tags,
                correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                correction_reason, last_update_time
         FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND entry_id=$4
     `, actorID, vaultID.String(), memoryID, entryID)
-	if err := row.Scan(&e.ActorID, &vid, &e.MemoryID, &e.CreationTime, &e.EntryID, &e.RawEntry, &e.Summary, &meta, &tags,
+	if err := row.Scan(&e.ActorID, &vid, &e.MemoryID, &e.CreationTime, &e.ConversationTime, &e.EntryID, &e.RawEntry, &e.Summary, &meta, &tags,
 		&corrTime, &corrMemID, &corrEntryTime, &corrReason, &lastUpd); err != nil {
 		return nil, err
 	}
@@ -514,7 +517,7 @@ func (s *PostgresStorage) GetMemoryEntryByID(ctx context.Context, actorID string
 }
 
 func (s *PostgresStorage) ListMemoryEntries(ctx context.Context, req storage.ListMemoryEntriesRequest) ([]*storage.MemoryEntry, error) {
-	query := `SELECT actor_id, vault_id, memory_id, creation_time, entry_id, raw_entry, summary, metadata, tags,
+	query := `SELECT actor_id, vault_id, memory_id, creation_time, conversation_time, entry_id, raw_entry, summary, metadata, tags,
                      correction_time, corrected_entry_memory_id, corrected_entry_creation_time,
                      correction_reason, last_update_time
               FROM memory_entries WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3`
@@ -544,7 +547,7 @@ func (s *PostgresStorage) ListMemoryEntries(ctx context.Context, req storage.Lis
 		var meta, tags sql.NullString
 		var corrTime, corrEntryTime, lastUpd sql.NullTime
 		var corrMemID, corrReason sql.NullString
-		if err := rows.Scan(&e.ActorID, &vid, &e.MemoryID, &e.CreationTime, &e.EntryID, &e.RawEntry, &e.Summary, &meta, &tags,
+		if err := rows.Scan(&e.ActorID, &vid, &e.MemoryID, &e.CreationTime, &e.ConversationTime, &e.EntryID, &e.RawEntry, &e.Summary, &meta, &tags,
 			&corrTime, &corrMemID, &corrEntryTime, &corrReason, &lastUpd); err != nil {
 			return nil, err
 		}
@@ -606,15 +609,25 @@ func (s *PostgresStorage) CorrectMemoryEntry(ctx context.Context, req storage.Co
 		return nil, fmt.Errorf("IMMUTABILITY_VIOLATION: entry was already corrected at %v", *existingCorrection)
 	}
 
-	// Insert correction entry
+	// Get original entry's conversation_time
+	var origConversationTime time.Time
+	if err := tx.QueryRowContext(ctx, `
+        SELECT conversation_time FROM memory_entries
+        WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3 AND creation_time=$4
+    `, req.ActorID, req.VaultID.String(), req.MemoryID, req.OriginalCreationTime).Scan(&origConversationTime); err != nil {
+		return nil, fmt.Errorf("failed to get original conversation_time: %w", err)
+	}
+
+	// Insert correction entry with same conversation_time as original
 	var created time.Time
+	var conversation time.Time
 	metaJSON, _ := json.Marshal(req.Metadata)
 	tagsJSON, _ := json.Marshal(req.Tags)
 	if err := tx.QueryRowContext(ctx, `
-        INSERT INTO memory_entries (actor_id, vault_id, memory_id, raw_entry, summary, metadata, tags, entry_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        RETURNING creation_time
-    `, req.ActorID, req.VaultID.String(), req.MemoryID, req.CorrectedContent, req.CorrectedSummary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), req.CorrectedEntryID).Scan(&created); err != nil {
+        INSERT INTO memory_entries (actor_id, vault_id, memory_id, conversation_time, raw_entry, summary, metadata, tags, entry_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        RETURNING creation_time, conversation_time
+    `, req.ActorID, req.VaultID.String(), req.MemoryID, origConversationTime, req.CorrectedContent, req.CorrectedSummary, nullIfEmpty(metaJSON), nullIfEmpty(tagsJSON), req.CorrectedEntryID).Scan(&created, &conversation); err != nil {
 		return nil, fmt.Errorf("failed to insert correction entry: %w", err)
 	}
 
@@ -632,13 +645,14 @@ func (s *PostgresStorage) CorrectMemoryEntry(ctx context.Context, req storage.Co
 
 	// Outbox for correction entry upsert
 	payload := map[string]interface{}{
-		"actorId":      req.ActorID,
-		"memoryId":     req.MemoryID,
-		"entryId":      req.CorrectedEntryID,
-		"rawEntry":     req.CorrectedContent,
-		"summary":      req.CorrectedSummary,
-		"tags":         req.Tags,
-		"creationTime": created,
+		"actorId":          req.ActorID,
+		"memoryId":         req.MemoryID,
+		"entryId":          req.CorrectedEntryID,
+		"rawEntry":         req.CorrectedContent,
+		"summary":          req.CorrectedSummary,
+		"tags":             req.Tags,
+		"creationTime":     created,
+		"conversationTime": conversation,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_entry", req.CorrectedEntryID, payload); err != nil {
 		return nil, err
@@ -649,14 +663,16 @@ func (s *PostgresStorage) CorrectMemoryEntry(ctx context.Context, req storage.Co
 	}
 
 	return &storage.MemoryEntry{
-		ActorID:      req.ActorID,
-		MemoryID:     req.MemoryID,
-		CreationTime: created,
-		EntryID:      req.CorrectedEntryID,
-		RawEntry:     req.CorrectedContent,
-		Summary:      req.CorrectedSummary,
-		Metadata:     req.Metadata,
-		Tags:         req.Tags,
+		ActorID:          req.ActorID,
+		VaultID:          req.VaultID,
+		MemoryID:         req.MemoryID,
+		CreationTime:     created,
+		ConversationTime: conversation,
+		EntryID:          req.CorrectedEntryID,
+		RawEntry:         req.CorrectedContent,
+		Summary:          req.CorrectedSummary,
+		Metadata:         req.Metadata,
+		Tags:             req.Tags,
 	}, nil
 }
 

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS memory_entries (
   vault_id       TEXT NOT NULL,
   memory_id      TEXT NOT NULL,
   creation_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  conversation_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   entry_id       TEXT NOT NULL,
   raw_entry      TEXT NOT NULL,
   summary        TEXT,
@@ -45,6 +46,8 @@ CREATE TABLE IF NOT EXISTS memory_entries (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS memory_entries_entry_id_uq ON memory_entries(entry_id);
 CREATE INDEX IF NOT EXISTS memory_entries_recent_idx ON memory_entries(actor_id, vault_id, memory_id, creation_time DESC);
+CREATE INDEX IF NOT EXISTS memory_entries_conversation_time_idx ON memory_entries(memory_id, conversation_time DESC);
+CREATE INDEX IF NOT EXISTS memory_entries_temporal_range_idx ON memory_entries(vault_id, memory_id, conversation_time DESC);
 
 -- MemoryContexts
 CREATE TABLE IF NOT EXISTS memory_contexts (

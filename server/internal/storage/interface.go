@@ -26,6 +26,7 @@ type MemoryEntry struct {
 	VaultID                    uuid.UUID              `json:"vaultId"`
 	MemoryID                   string                 `json:"memoryId"`
 	CreationTime               time.Time              `json:"creationTime"`
+	ConversationTime           time.Time              `json:"conversationTime"`
 	EntryID                    string                 `json:"entryId"`
 	RawEntry                   string                 `json:"rawEntry"`
 	Summary                    *string                `json:"summary,omitempty"`
@@ -64,14 +65,15 @@ type CreateMemoryRequest struct {
 
 // CreateMemoryEntryRequest represents the request to create a new memory entry
 type CreateMemoryEntryRequest struct {
-	VaultID        uuid.UUID              `json:"vaultId"`
-	ActorID        string                 `json:"actorId"`
-	MemoryID       string                 `json:"memoryId"`
-	RawEntry       string                 `json:"rawEntry"`
-	Summary        *string                `json:"summary,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
-	Tags           map[string]interface{} `json:"tags,omitempty"`
-	ExpirationTime *time.Time             `json:"expirationTime,omitempty"`
+	VaultID          uuid.UUID              `json:"vaultId"`
+	ActorID          string                 `json:"actorId"`
+	MemoryID         string                 `json:"memoryId"`
+	RawEntry         string                 `json:"rawEntry"`
+	Summary          *string                `json:"summary,omitempty"`
+	ConversationTime *time.Time             `json:"conversationTime,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+	Tags             map[string]interface{} `json:"tags,omitempty"`
+	ExpirationTime   *time.Time             `json:"expirationTime,omitempty"`
 }
 
 // ListMemoryEntriesRequest represents the request to list memory entries
