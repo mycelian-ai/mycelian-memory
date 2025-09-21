@@ -54,13 +54,15 @@ class MycelianAgentInvoker:
         )
         return result
 
-    def process_conversation_message(self, role: str, content: str, thread_id: str) -> None:
+    def process_conversation_message(self, role: str, content: str, thread_id: str,
+                                     conversation_time: Optional[str] = None) -> None:
         """Process a conversation message, handling flush automatically.
 
         Args:
             role: The role of the message (user, assistant, etc.)
             content: The content of the message
             thread_id: Unique identifier for this conversation thread
+            conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
         """
         self.msg_count += 1
 
@@ -75,13 +77,15 @@ class MycelianAgentInvoker:
                 "msg_count": self.msg_count,
                 "control": ControlState.PROCESS_MESSAGE.value,
                 "role": role,
-                "content_preview": content[:200] if content else None
+                "content_preview": content[:200] if content else None,
+                "conversation_time": conversation_time
             }))
 
         result = self.agent.invoke(
             control=ControlState.PROCESS_MESSAGE,
             thread_id=thread_id,
-            to_process=message
+            to_process=message,
+            conversation_time=conversation_time
         )
 
         # Then flush if needed (every 6 messages)

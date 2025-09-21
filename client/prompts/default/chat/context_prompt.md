@@ -16,6 +16,7 @@ Context is organized in sections. Add additional section IF AND ONLY IF they cov
 `# Timeline` - Events in chronological order. Use minimum granularity needed:
   YYYY-MM-DD for single daily events, add HH:MM for multiple same-day events,
   add :SS for rapid sequences. Goal: clear sequence without excess precision.
+  When Conversation Timestamp is provided, use that timestamp for Timeline entries.
 
 ## Core Rules
 
@@ -44,9 +45,15 @@ Extract information that could answer "who, what, when, where, why, how" questio
 - Include events with dates in Timeline, derive current state for Facts:
   * Events go in Timeline with dates
   * Current state derived from events goes in Facts
-  * Implicit "today" should use current date
+  * Implicit "today" should use Conversation Timestamp when provided, otherwise current date
 - Omit dates for atemporal attributes (has MBA, has 2 siblings) but include date for temporal facts (e.g., 'got MBA on 2019-05-15')
 - Timeline section tracks when topics were discussed and when you learned things
+
+#### Timeline Construction with Conversation Timestamp
+When Conversation Timestamp is provided:
+- Use the Conversation Timestamp as the date for Timeline entries
+- This represents when the user-assistant conversation took place
+- Format according to the granularity rules above (YYYY-MM-DD, add HH:MM if needed)
 
 #### Factual extraction rules
 

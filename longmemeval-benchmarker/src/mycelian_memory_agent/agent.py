@@ -53,6 +53,7 @@ class AgentState(TypedDict):
     tool_history: Sequence[Union[AIMessage, ToolMessage]]  # Tool flow for current invocation (not checkpointed)
     control: ControlState  # Control state driving execution
     messages: Sequence[BaseMessage]  # Tool I/O buffer for ToolNode (per-invocation only, no accumulation)
+    conversation_time: Optional[str]  # ISO-8601 timestamp of when the conversation occurred
 
 
 class MycelianMemoryAgent:
@@ -229,6 +230,7 @@ class MycelianMemoryAgent:
         conversation_history = state.get("conversation_history", [])
         to_process = state.get("to_process", [])
         messages = state.get("messages", [])
+        conversation_time = state.get("conversation_time")
 
         # Copy any new ToolMessages from messages to tool_history
         # ToolNode adds results to messages, we need them in tool_history for tracking
@@ -426,7 +428,7 @@ class MycelianMemoryAgent:
 
                 prompt = build_add_entry_prompt(
                     conversation_history, to_process[0], self.prompts,
-                    self.vault_id, self.memory_id
+                    self.vault_id, self.memory_id, conversation_time
                 )
                 llm_messages = [
                     {"role": "system", "content": prompt},
@@ -725,7 +727,8 @@ class MycelianMemoryAgent:
                 }))
 
     def invoke(self, control: ControlState, thread_id: str,
-               to_process: Optional[ChatMessage] = None) -> Any:
+               to_process: Optional[ChatMessage] = None,
+               conversation_time: Optional[str] = None) -> Any:
         """Execute based on control state.
 
         Uses checkpointer for state persistence across invocations.
@@ -735,6 +738,7 @@ class MycelianMemoryAgent:
             control: The control state determining which operation to perform
             thread_id: Unique identifier for this conversation thread
             to_process: Optional message to process (for PROCESS_MESSAGE operations)
+            conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
 
         Returns:
             The result of the graph execution
@@ -756,7 +760,8 @@ class MycelianMemoryAgent:
             "control": control,
             "to_process": [to_process] if to_process else [],
             "tool_history": [],  # Starts fresh each invocation
-            "messages": []  # For ToolNode compatibility
+            "messages": [],  # For ToolNode compatibility
+            "conversation_time": conversation_time  # Pass timestamp through state
         }
 
         # If processing a message, also add it to conversation_history
@@ -800,7 +805,8 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
                           to_process: ChatMessage,
                           prompts: Dict[str, str],
                           vault_id: str,
-                          memory_id: str) -> str:
+                          memory_id: str,
+                          conversation_time: Optional[str] = None) -> str:
     """Build prompt for add_entry tool call.
 
     Args:
@@ -809,6 +815,7 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
         prompts: Dictionary containing MCP prompt templates
         vault_id: The vault ID to use
         memory_id: The memory ID to use
+        conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
 
     Returns:
         Formatted prompt for LLM to generate add_entry tool call
@@ -847,6 +854,7 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
 Current Operation: PROCESS_MESSAGE
 Vault ID: {vault_id}
 Memory ID: {memory_id}
+{f'Conversation Timestamp: {conversation_time}' if conversation_time else ''}
 
 Previous conversation context (including retrieved context from previous sessions):
 {context}

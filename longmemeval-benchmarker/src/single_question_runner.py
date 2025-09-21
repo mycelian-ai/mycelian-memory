@@ -416,8 +416,10 @@ class SingleQuestionRunner:
                 # Process all sessions
                 for s_idx, s in enumerate(q.get("sessions", []), start=1):
                     thread_id = f"{memory_id}:s{s_idx}"
-                    runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s",
-                                  qid, s_idx, memory_id, thread_id)
+                    # Extract conversation_time for this session if available
+                    conversation_time = s.get("conversation_time") if isinstance(s, dict) else None
+                    runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s conversation_time=%s",
+                                  qid, s_idx, memory_id, thread_id, conversation_time)
 
                     # Start session (retrieves context and recent entries)
                     invoker.start_session(thread_id)
@@ -437,7 +439,8 @@ class SingleQuestionRunner:
                                 invoker.process_conversation_message(
                                     role=role,
                                     content=content,
-                                    thread_id=thread_id
+                                    thread_id=thread_id,
+                                    conversation_time=conversation_time
                                 )
                                 messages_processed += 1
                                 # Periodically persist message-level progress (every 10 messages)
