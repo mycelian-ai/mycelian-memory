@@ -14,11 +14,11 @@ qa = "openrouter:openai/gpt-4o-mini"
 
 # Search configuration
 [search]
-use_two_pass = false  # Single pass for smoke test
+use_two_pass = true  # Single pass for smoke test
 
 # Agent configuration
 [agent]
-context_only = false  # IMPORTANT: Use entries mode to store conversation_time
+context_only = true  # IMPORTANT: Use entries mode to store conversation_time
 
 # Mycelian API configuration
 [mycelian]
