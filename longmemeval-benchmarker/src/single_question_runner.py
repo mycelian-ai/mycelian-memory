@@ -222,7 +222,7 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
         logger = logging.getLogger("lme.runner")
 
     # First pass: Search with original question
-    logger.info("TWO_PASS_SEARCH pass=1 query='%s'", question[:100])
+    logger.info("TWO_PASS_SEARCH pass=1 query='%s' top_ke=10 top_kc=3", question)
 
     # Use higher limits for first pass to get broader results
     first_results = memory_manager.search_memories(
@@ -240,14 +240,19 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
     logger.info("TWO_PASS_SEARCH pass=1 found entries=%d contexts=%d",
                 len(entries or []), len(contexts or []))
 
-    # Log context shards from first pass
-    for i, ctx_shard in enumerate(contexts[:3], 1):
+    # Log complete raw response
+    import json
+    logger.info("TWO_PASS_SEARCH pass=1 raw_response='%s'",
+                json.dumps(first_results, indent=2))
+
+    # Log ALL context shards from first pass - FULL CONTENT
+    for i, ctx_shard in enumerate(contexts, 1):
         if isinstance(ctx_shard, dict):
             ctx_text = ctx_shard.get("context", "")
             ctx_score = ctx_shard.get("score", 0)
-            preview = ctx_text[:300] if ctx_text else "(empty)"
-            logger.info("TWO_PASS_SEARCH pass=1 context_shard=%d score=%.3f preview='%s...'",
-                       i, ctx_score, preview)
+            ctx_timestamp = ctx_shard.get("timestamp", "")
+            logger.info("TWO_PASS_SEARCH pass=1 shard=%d score=%.3f timestamp=%s full_context='%s'",
+                       i, ctx_score, ctx_timestamp, ctx_text)
 
     # Build summary of what we found for analysis
     summaries_text = "\n".join([
@@ -275,7 +280,7 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
     analysis = llm.invoke(analysis_prompt)
     analysis_text = (getattr(analysis, "content", str(analysis)) or "").strip()
 
-    logger.info("TWO_PASS_SEARCH analysis='%s'", analysis_text[:200])
+    logger.info("TWO_PASS_SEARCH analysis='%s'", analysis_text)
 
     # Check if second pass is needed
     if not analysis_text.startswith("REFINE:"):
@@ -289,7 +294,7 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
         return first_results
 
     # Second pass with refined query
-    logger.info("TWO_PASS_SEARCH pass=2 refined_query='%s'", refined_query[:100])
+    logger.info("TWO_PASS_SEARCH pass=2 refined_query='%s' top_ke=5 top_kc=2", refined_query)
 
     second_results = memory_manager.search_memories(
         memory_id,
@@ -334,14 +339,22 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
     logger.info("TWO_PASS_SEARCH merged entries=%d contexts=%d",
                 len(merged["entries"]), len(merged["contexts"]))
 
-    # Log final merged context shards
-    for i, ctx_shard in enumerate(merged["contexts"][:3], 1):
+    # Log complete second pass response
+    logger.info("TWO_PASS_SEARCH pass=2 raw_response='%s'",
+                json.dumps(second_results, indent=2))
+
+    # Log ALL final merged context shards - FULL CONTENT
+    for i, ctx_shard in enumerate(merged["contexts"], 1):
         if isinstance(ctx_shard, dict):
             ctx_text = ctx_shard.get("context", "")
             ctx_score = ctx_shard.get("score", 0)
-            preview = ctx_text[:300] if ctx_text else "(empty)"
-            logger.info("TWO_PASS_SEARCH merged context_shard=%d score=%.3f preview='%s...'",
-                       i, ctx_score, preview)
+            ctx_timestamp = ctx_shard.get("timestamp", "")
+            logger.info("TWO_PASS_SEARCH merged shard=%d score=%.3f timestamp=%s full_context='%s'",
+                       i, ctx_score, ctx_timestamp, ctx_text)
+
+    # Log complete merged results
+    logger.info("TWO_PASS_SEARCH merged full_result='%s'",
+                json.dumps(merged, indent=2))
 
     return merged
 
@@ -665,10 +678,14 @@ class SingleQuestionRunner:
                 )
             else:
                 runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=single query='%s' top_ke=%d top_kc=%d",
-                              qid, memory_id, query_text[:100], 5, 3)
+                              qid, memory_id, query_text, 5, 3)  # Log full query
                 sr = memory_manager.search_memories(
                     memory_id, query=query_text, top_ke=5, top_kc=3
                 )
+                # Log complete single mode response
+                import json
+                runner_log.info("SEARCH_MEMORIES single mode full_response='%s'",
+                              json.dumps(sr, indent=2))
 
             # Log search results
             entries_count = len((sr.get("entries") or []) if isinstance(sr, dict) else [])
@@ -677,33 +694,41 @@ class SingleQuestionRunner:
             runner_log.info("SEARCH_RESULT qid=%s entries=%d has_latest=%s contexts=%d",
                           qid, entries_count, has_latest, contexts_count)
 
-            # Log detailed context shards for debugging
+            # Log ALL context shards with FULL CONTENT
             if isinstance(sr, dict):
                 contexts = sr.get("contexts") or []
-                for i, ctx_shard in enumerate(contexts[:5], 1):  # Log up to 5 shards
+                for i, ctx_shard in enumerate(contexts, 1):  # Log ALL shards
                     if isinstance(ctx_shard, dict):
                         ctx_text = ctx_shard.get("context", "")
                         ctx_score = ctx_shard.get("score", 0)
                         ctx_timestamp = ctx_shard.get("timestamp", "")
-                        preview = ctx_text[:200] if ctx_text else "(empty)"
-                        runner_log.info("CONTEXT_SHARD qid=%s shard=%d score=%.3f timestamp=%s preview='%s...'",
-                                      qid, i, ctx_score, ctx_timestamp, preview)
+                        runner_log.info("CONTEXT_SHARD qid=%s shard=%d score=%.3f timestamp=%s full_context='%s'",
+                                      qid, i, ctx_score, ctx_timestamp, ctx_text)
 
-                # Log entry summaries for debugging
+                # Log ALL entries with FULL CONTENT
                 entries = sr.get("entries") or []
-                for i, entry in enumerate(entries[:5], 1):  # Log up to 5 entries
+                for i, entry in enumerate(entries, 1):  # Log ALL entries
                     if isinstance(entry, dict):
-                        summary = entry.get("summary", "")
-                        entry_id = entry.get("entryId", "")
-                        score = entry.get("score", 0)
-                        runner_log.info("ENTRY qid=%s entry=%d id=%s score=%.3f summary='%s'",
-                                      qid, i, entry_id[:8] if entry_id else "N/A", score, summary[:100] if summary else "(empty)")
+                        # Log complete entry as JSON
+                        import json
+                        runner_log.info("ENTRY qid=%s entry=%d full_entry='%s'",
+                                      qid, i, json.dumps(entry, indent=2))
 
-            # Build context and log it
+            # Build context and log it - FULL CONTENT
             ctx = _build_qa_context(sr)
-            ctx_preview = ctx[:500] if ctx else "(empty)"
-            runner_log.info("QA_CONTEXT qid=%s context_len=%d preview='%s'",
-                          qid, len(ctx) if ctx else 0, ctx_preview)
+            runner_log.info("QA_CONTEXT qid=%s context_len=%d full_context='%s'",
+                          qid, len(ctx) if ctx else 0, ctx)
+
+            # Also log context by sections for easier analysis
+            sections = ["# Description", "# Facts", "# Preferences", "# Decisions",
+                       "# Recommendations", "# Topics", "# Entities", "# Notes", "# Timeline"]
+            for section in sections:
+                if section in ctx:
+                    start = ctx.index(section)
+                    end = ctx.find("\n#", start + 1)
+                    section_content = ctx[start:end] if end > 0 else ctx[start:]
+                    runner_log.info("QA_CONTEXT_SECTION qid=%s section='%s' content='%s'",
+                                  qid, section, section_content)
 
             # Run QA and log
             runner_log.info("QA_INVOKE qid=%s model=%s", qid, self.cfg.models.qa)
