@@ -279,11 +279,9 @@ def generate_run_id() -> str:
               help='Run only QA phase for an existing run (requires --run-id). Always re-runs QA for questions with completed ingestion.')
 @click.option('--debug', is_flag=True,
               help='Enable DEBUG level logging for troubleshooting')
-@click.option('--recreate-tasks', is_flag=True,
-              help='Recreate tasks from a previous run (requires --run-id)')
 def main(config_path: str, num_questions: Optional[int],
          resume: bool, run_id: Optional[str], workers: int, resume_mode: str, monitor: bool, auto: bool, clear_state: bool,
-         stop: bool, force: bool, qa_only: bool, debug: bool, recreate_tasks: bool):
+         stop: bool, force: bool, qa_only: bool, debug: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
 
@@ -334,89 +332,6 @@ def main(config_path: str, num_questions: Optional[int],
 
     # Initialize progress tracker
     tracker = ProgressTracker()
-
-    # Handle recreate-tasks mode
-    if recreate_tasks:
-        if not run_id:
-            click.echo("Error: --run-id required for --recreate-tasks")
-            return 1
-
-        # Get all questions from the run
-        questions = tracker.get_all_questions(run_id)
-        if not questions:
-            click.echo(f"No questions found for run {run_id}")
-            return 1
-
-        click.echo(f"Found {len(questions)} questions in run {run_id}")
-
-        # Get run config to recreate tasks with same config
-        run_cfg = tracker.get_run_config(run_id) or {}
-        config_path = run_cfg.get('config_path')
-        if not config_path:
-            click.echo(f"Error: No config path found for run {run_id}")
-            return 1
-
-        from src.orchestrator import tasks as _tasks
-
-        # Recreate tasks based on their status
-        ingestion_tasks = []
-        qa_tasks = []
-
-        for row in questions:
-            qid = row.get('question_id')
-            ingestion_status = row.get('ingestion_status', 'pending')
-            qa_status = row.get('qa_status', 'pending')
-
-            if ingestion_status in ['pending', 'failed']:
-                ingestion_tasks.append(qid)
-            elif ingestion_status == 'completed' and qa_status in ['pending', 'failed']:
-                qa_tasks.append(qid)
-
-        click.echo(f"\nTasks to recreate:")
-        click.echo(f"  - {len(ingestion_tasks)} ingestion tasks: {', '.join(ingestion_tasks[:3])}{'...' if len(ingestion_tasks) > 3 else ''}")
-        click.echo(f"  - {len(qa_tasks)} QA tasks: {', '.join(qa_tasks[:3])}{'...' if len(qa_tasks) > 3 else ''}")
-
-        if not click.confirm("\nProceed with recreating these tasks?"):
-            return 0
-
-        queue_name = f"huey-{run_id}"
-        os.environ['HUEY_QUEUE_NAME'] = queue_name
-
-        # Enqueue ingestion tasks
-        for qid in ingestion_tasks:
-            details = tracker.get_question_details(run_id, qid) or {}
-            question_data = tracker.get_question_json(run_id, qid) or {'question_id': qid}
-            _tasks.process_question(
-                run_id=run_id,
-                question_data=question_data,
-                vault_id=details.get('vault_id', ''),
-                memory_id=details.get('memory_id', ''),
-                config_path=config_path
-            )
-
-        # Enqueue QA tasks
-        for qid in qa_tasks:
-            _tasks.run_qa(run_id, qid)
-
-        total_tasks = len(ingestion_tasks) + len(qa_tasks)
-        click.echo(f"\n{total_tasks} tasks recreated successfully")
-
-        if auto:
-            click.echo("\nAuto mode: starting worker and monitoring")
-            worker_proc = _start_worker_subprocess(workers, queue_name)
-            atexit.register(lambda: _stop_worker_subprocess(worker_proc))
-
-            try:
-                monitor_progress(tracker, run_id)
-            except KeyboardInterrupt:
-                click.echo("\nStopping worker...")
-            finally:
-                _stop_worker_subprocess(worker_proc)
-        else:
-            click.echo(f"\nStart worker to process tasks:")
-            click.echo(f"  HUEY_QUEUE_NAME={queue_name} python -m src.orchestrator.worker --workers {workers}")
-
-        return 0
 
     # Handle QA-only mode
     if qa_only:

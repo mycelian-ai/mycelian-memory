@@ -542,18 +542,3 @@ class ProgressTracker:
                 (run_id,)
             )
             conn.commit()
-
-    def get_all_questions(self, run_id: str) -> List[Dict]:
-        """Get all questions for a run with their current status."""
-        with self._get_connection() as conn:
-            result = conn.execute(
-                """
-                SELECT question_id, vault_id, memory_id, ingestion_status, qa_status
-                FROM question_progress
-                WHERE run_id = ?
-                ORDER BY question_id
-                """,
-                (run_id,)
-            )
-            rows = result.fetchall()
-            return [dict(zip(['question_id', 'vault_id', 'memory_id', 'ingestion_status', 'qa_status'], row)) for row in rows]
