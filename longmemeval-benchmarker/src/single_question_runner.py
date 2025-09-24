@@ -240,6 +240,15 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
     logger.info("TWO_PASS_SEARCH pass=1 found entries=%d contexts=%d",
                 len(entries or []), len(contexts or []))
 
+    # Log context shards from first pass
+    for i, ctx_shard in enumerate(contexts[:3], 1):
+        if isinstance(ctx_shard, dict):
+            ctx_text = ctx_shard.get("context", "")
+            ctx_score = ctx_shard.get("score", 0)
+            preview = ctx_text[:300] if ctx_text else "(empty)"
+            logger.info("TWO_PASS_SEARCH pass=1 context_shard=%d score=%.3f preview='%s...'",
+                       i, ctx_score, preview)
+
     # Build summary of what we found for analysis
     summaries_text = "\n".join([
         f"- {e.get('summary', '')}"
@@ -324,6 +333,15 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
 
     logger.info("TWO_PASS_SEARCH merged entries=%d contexts=%d",
                 len(merged["entries"]), len(merged["contexts"]))
+
+    # Log final merged context shards
+    for i, ctx_shard in enumerate(merged["contexts"][:3], 1):
+        if isinstance(ctx_shard, dict):
+            ctx_text = ctx_shard.get("context", "")
+            ctx_score = ctx_shard.get("score", 0)
+            preview = ctx_text[:300] if ctx_text else "(empty)"
+            logger.info("TWO_PASS_SEARCH merged context_shard=%d score=%.3f preview='%s...'",
+                       i, ctx_score, preview)
 
     return merged
 
@@ -658,6 +676,28 @@ class SingleQuestionRunner:
             contexts_count = len((sr.get("contexts") or []) if isinstance(sr, dict) else [])
             runner_log.info("SEARCH_RESULT qid=%s entries=%d has_latest=%s contexts=%d",
                           qid, entries_count, has_latest, contexts_count)
+
+            # Log detailed context shards for debugging
+            if isinstance(sr, dict):
+                contexts = sr.get("contexts") or []
+                for i, ctx_shard in enumerate(contexts[:5], 1):  # Log up to 5 shards
+                    if isinstance(ctx_shard, dict):
+                        ctx_text = ctx_shard.get("context", "")
+                        ctx_score = ctx_shard.get("score", 0)
+                        ctx_timestamp = ctx_shard.get("timestamp", "")
+                        preview = ctx_text[:200] if ctx_text else "(empty)"
+                        runner_log.info("CONTEXT_SHARD qid=%s shard=%d score=%.3f timestamp=%s preview='%s...'",
+                                      qid, i, ctx_score, ctx_timestamp, preview)
+
+                # Log entry summaries for debugging
+                entries = sr.get("entries") or []
+                for i, entry in enumerate(entries[:5], 1):  # Log up to 5 entries
+                    if isinstance(entry, dict):
+                        summary = entry.get("summary", "")
+                        entry_id = entry.get("entryId", "")
+                        score = entry.get("score", 0)
+                        runner_log.info("ENTRY qid=%s entry=%d id=%s score=%.3f summary='%s'",
+                                      qid, i, entry_id[:8] if entry_id else "N/A", score, summary[:100] if summary else "(empty)")
 
             # Build context and log it
             ctx = _build_qa_context(sr)
