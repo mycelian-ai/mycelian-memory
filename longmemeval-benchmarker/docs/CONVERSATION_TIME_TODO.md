@@ -1,6 +1,6 @@
 # Conversation Time Implementation - TODO Tracker
 
-## ✅ Completed Tasks (12/21 - 57%)
+## ✅ Completed Tasks (17/21 - 81%)
 
 ### Infrastructure Layer
 - [x] Create storage layer tests for conversation_time
@@ -18,15 +18,17 @@
 - [x] Update prompt files for conversation_time handling
 - [x] Test end-to-end with temporal questions (smoke test)
 
-## 📋 Pending Tasks (9/21 - 43%)
+### Search API Implementation
+- [x] Update SearchHit model with ConversationTime field
+- [x] Update search implementation to retrieve conversationTime from index
+- [x] Check if outbox worker needs updates for conversation_time (no changes needed)
+- [x] Add unit tests for SearchHit model with ConversationTime
+- [x] Add search tests for conversation_time in results
+
+## 📋 Pending Tasks (4/21 - 19%)
 
 ### Search & Compliance (Priority 1)
-- [ ] Update SearchHit model with ConversationTime field
-- [ ] Update search implementation to handle conversationTime parameter
-- [ ] Add unit tests for SearchHit model with ConversationTime
 - [ ] Add search tests for conversation_time filtering
-- [ ] Add search tests for conversation_time in results
-- [ ] Check if outbox worker needs updates for conversation_time
 - [ ] Update store layer compliance tests for search with conversation_time
 - [ ] Add integration tests for search API with conversation_time
 - [ ] Test search API with temporal queries from LongMemEval
@@ -39,7 +41,8 @@
 - ✅ API validation implemented (rejects future dates)
 - ✅ LongMemEval integration complete: dataset timestamps parsed and used
 - ✅ Context Timeline now uses conversation_time from dataset
-- ⏳ Search API integration pending
+- ✅ Search API updated: SearchHit includes ConversationTime field
+- ⏳ Search filtering and integration tests pending
 
 ### Key Accomplishments
 - Successfully parse and normalize haystack_dates to ISO-8601
@@ -84,10 +87,12 @@
    - Prompts updated for temporal reasoning
    - Tested with smoke dataset
 
-4. **Phase 4: Search Integration** ⏳ IN PROGRESS
-   - Update search models and API
-   - Add comprehensive test coverage
-   - Enable temporal search queries
+4. **Phase 4: Search Integration** ⏳ IN PROGRESS (75% complete)
+   - ✅ Updated SearchHit model with ConversationTime
+   - ✅ Search implementation retrieves conversationTime
+   - ✅ Basic unit tests added
+   - ⏳ Search filtering by conversation_time pending
+   - ⏳ Integration tests pending
 
 ### Relevant Files
 - `/server/internal/storage/postgres/schema.sql` - Database schema with conversation_time
@@ -100,6 +105,7 @@
 All changes are on branch: `conversation-time`
 
 Recent commits:
+- `79ab751` - feat: add ConversationTime field to SearchHit model and search results
 - `22afb95` - fix: ensure conversation_time flows through entire session lifecycle
 - `d911cbb` - feat: implement conversation_time support in LongMemEval benchmarker
 - `3be0023` - docs: add persistent TODO tracker for conversation_time implementation
