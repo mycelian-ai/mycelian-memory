@@ -25,7 +25,8 @@ DEFAULT_AGENT_LOGGER = "lme.agent"
 # Define allowed tools for each control state and last tool combination
 ALLOWED_TOOLS = {
     ControlState.START_SESSION: {
-        None: ["get_context"],              # No tool executed yet -> get_context
+        None: ["await_consistency"],        # No tool executed yet -> await_consistency
+        "await_consistency": ["get_context"], # After await_consistency -> get_context
         "get_context": ["list_entries"],    # After get_context -> list_entries
         "list_entries": []                  # After list_entries -> done
     },
