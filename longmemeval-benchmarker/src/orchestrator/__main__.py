@@ -366,6 +366,23 @@ def main(config_path: str, num_questions: Optional[int],
         click.echo(f"Found {len(questions)} questions to run QA for")
         click.echo(f"QA results will be saved to: logs/{qa_run_id}/")
 
+        # Clear any existing pending tasks in the queue to avoid conflicts
+        import sqlite3
+        queue_name = f"huey-{run_id}"
+        db_path = 'data/orchestrator.db'
+        try:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            # Clear existing tasks for this queue
+            cur.execute("DELETE FROM task WHERE queue = ?", (queue_name,))
+            deleted_count = cur.rowcount
+            conn.commit()
+            conn.close()
+            if deleted_count > 0:
+                click.echo(f"Cleared {deleted_count} pending tasks from queue")
+        except Exception as e:
+            click.echo(f"Warning: Could not clear pending tasks: {e}")
+
         # Reset QA status to pending so monitor tracks progress
         tracker.reset_qa_status_for_run(run_id)
         click.echo("Reset QA status to pending for re-run")
