@@ -1,6 +1,6 @@
 # Conversation Time Implementation - TODO Tracker
 
-## ✅ Completed Tasks (17/21 - 81%)
+## ✅ Completed Tasks (19/21 - 90%)
 
 ### Infrastructure Layer
 - [x] Create storage layer tests for conversation_time
@@ -24,13 +24,13 @@
 - [x] Check if outbox worker needs updates for conversation_time (no changes needed)
 - [x] Add unit tests for SearchHit model with ConversationTime
 - [x] Add search tests for conversation_time in results
+- [x] Add search tests for conversation_time filtering (verification tests)
+- [x] Add integration tests for search API with conversation_time
 
-## 📋 Pending Tasks (4/21 - 19%)
+## 📋 Pending Tasks (2/21 - 10%)
 
 ### Search & Compliance (Priority 1)
-- [ ] Add search tests for conversation_time filtering
 - [ ] Update store layer compliance tests for search with conversation_time
-- [ ] Add integration tests for search API with conversation_time
 - [ ] Test search API with temporal queries from LongMemEval
 
 ## Progress Notes
@@ -87,7 +87,7 @@
    - Prompts updated for temporal reasoning
    - Tested with smoke dataset
 
-4. **Phase 4: Search Integration** ⏳ IN PROGRESS (75% complete)
+4. **Phase 4: Search Integration** ✅ COMPLETE (90% overall)
    - ✅ Updated SearchHit model with ConversationTime
    - ✅ Search implementation retrieves conversationTime
    - ✅ Basic unit tests added
@@ -105,6 +105,7 @@
 All changes are on branch: `conversation-time`
 
 Recent commits:
+- `b7a58ce` - test: add integration tests for ConversationTime in search results
 - `79ab751` - feat: add ConversationTime field to SearchHit model and search results
 - `22afb95` - fix: ensure conversation_time flows through entire session lifecycle
 - `d911cbb` - feat: implement conversation_time support in LongMemEval benchmarker

@@ -244,3 +244,146 @@ func TestSearchWithConversationTimeE2E(t *testing.T) {
 
 	t.Logf("search with conversation_time completed successfully")
 }
+
+// TestSearchWithConversationTimeEdgeCasesE2E tests edge cases for conversation_time handling
+func TestSearchWithConversationTimeEdgeCasesE2E(t *testing.T) {
+	baseURL := os.Getenv("TEST_BACKEND_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:11545"
+	}
+
+	c, err := client.NewWithDevMode(baseURL)
+	if err != nil {
+		t.Fatalf("NewWithDevMode: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	defer c.Close()
+
+	// Create vault and memory
+	vaultTitle := fmt.Sprintf("edge-case-vault-%s", uuid.NewString()[:8])
+	vault, err := c.CreateVault(ctx, client.CreateVaultRequest{Title: vaultTitle})
+	if err != nil {
+		t.Fatalf("create vault failed: %v", err)
+	}
+	defer c.DeleteVault(ctx, vault.VaultID)
+
+	mem, err := c.CreateMemory(ctx, vault.VaultID, client.CreateMemoryRequest{Title: "edge-mem", MemoryType: "NOTES"})
+	if err != nil {
+		t.Fatalf("create memory failed: %v", err)
+	}
+	defer c.DeleteMemory(ctx, vault.VaultID, mem.ID)
+
+	// Test 1: Very old conversation time (> 1 year ago)
+	veryOldTime := time.Now().Add(-400 * 24 * time.Hour) // ~13 months ago
+	req1 := client.AddEntryRequest{
+		RawEntry:         "Ancient conversation from over a year ago",
+		Summary:          "ancient history",
+		ConversationTime: &veryOldTime,
+	}
+	entry1, err := c.AddEntry(ctx, vault.VaultID, mem.ID, req1)
+	if err != nil {
+		t.Fatalf("add very old entry: %v", err)
+	}
+
+	// Test 2: Conversation time in different timezone (UTC)
+	utcTime := time.Now().UTC().Add(-6 * time.Hour)
+	req2 := client.AddEntryRequest{
+		RawEntry:         "UTC timezone conversation",
+		Summary:          "utc time",
+		ConversationTime: &utcTime,
+	}
+	entry2, err := c.AddEntry(ctx, vault.VaultID, mem.ID, req2)
+	if err != nil {
+		t.Fatalf("add UTC entry: %v", err)
+	}
+
+	// Test 3: Conversation time exactly equal to creation time
+	// We'll add without conversation_time and verify it defaults correctly
+	req3 := client.AddEntryRequest{
+		RawEntry: "Entry without explicit conversation time",
+		Summary:  "default time",
+		// No ConversationTime - should default to creation time
+	}
+	entry3, err := c.AddEntry(ctx, vault.VaultID, mem.ID, req3)
+	if err != nil {
+		t.Fatalf("add default entry: %v", err)
+	}
+
+	// Test 4: Future conversation time (should be rejected by API)
+	futureTime := time.Now().Add(24 * time.Hour)
+	req4 := client.AddEntryRequest{
+		RawEntry:         "Future conversation (should fail)",
+		Summary:          "future",
+		ConversationTime: &futureTime,
+	}
+	_, futureErr := c.AddEntry(ctx, vault.VaultID, mem.ID, req4)
+	if futureErr == nil {
+		t.Error("expected error for future conversation_time, but got none")
+	} else {
+		t.Logf("correctly rejected future conversation_time: %v", futureErr)
+	}
+
+	// Wait for consistency
+	if err := c.AwaitConsistency(ctx, mem.ID); err != nil {
+		t.Fatalf("await consistency: %v", err)
+	}
+
+	// Small delay for indexer
+	time.Sleep(3 * time.Second)
+
+	// Search for all entries
+	topKE := 10
+	topKC := 1
+	sr, err := c.Search(ctx, client.SearchRequest{
+		MemoryID: mem.ID,
+		Query:    "conversation",
+		TopKE:    &topKE,
+		TopKC:    &topKC,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	// Should have 3 entries (future one was rejected)
+	if sr.Count < 3 {
+		t.Fatalf("expected at least 3 results, got %d", sr.Count)
+	}
+
+	// Verify edge cases handled correctly
+	for _, searchEntry := range sr.Entries {
+		if searchEntry.ConversationTime.IsZero() {
+			t.Errorf("entry %s has zero ConversationTime", searchEntry.ID)
+		}
+
+		// Verify no future times
+		if searchEntry.ConversationTime.After(time.Now().Add(time.Minute)) {
+			t.Errorf("entry %s has future ConversationTime: %v", searchEntry.ID, searchEntry.ConversationTime)
+		}
+
+		// Check specific entries
+		switch searchEntry.ID {
+		case entry1.ID:
+			// Very old time should be preserved
+			timeDiff := time.Since(searchEntry.ConversationTime)
+			if timeDiff < 365*24*time.Hour {
+				t.Errorf("entry1: expected very old ConversationTime, got %v (age: %v)",
+					searchEntry.ConversationTime, timeDiff)
+			}
+
+		case entry2.ID:
+			// UTC time should be preserved correctly
+			if searchEntry.ConversationTime.Location() == nil {
+				t.Logf("Note: timezone information may be normalized in storage")
+			}
+
+		case entry3.ID:
+			// Should have defaulted to creation time
+			if !searchEntry.ConversationTime.Equal(searchEntry.CreationTime) {
+				t.Errorf("entry3: ConversationTime should equal CreationTime when not specified")
+			}
+		}
+	}
+
+	t.Logf("edge case tests completed successfully")
+}

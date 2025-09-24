@@ -224,3 +224,85 @@ func TestHandleSearch_ConversationTimeInResults(t *testing.T) {
 		t.Fatalf("expected ConversationTime to be different from CreationTime")
 	}
 }
+
+func TestHandleSearch_MultipleEntriesWithVariedConversationTimes(t *testing.T) {
+	emb := &mockEmbedder{}
+	// Create mock that returns multiple entries with different conversation times
+	srch := &mockSearchMultiple{}
+	auth := &mockAuthorizer{}
+	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
+
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"test","top_ke":5,"top_kc":1}`)
+	req := httptest.NewRequest("POST", "/v0/search", body)
+	req.Header.Set("Authorization", "Bearer test-api-key")
+	w := httptest.NewRecorder()
+	h.HandleSearch(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Entries []model.SearchHit `json:"entries"`
+		Count   int               `json:"count"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.Count != 3 {
+		t.Fatalf("expected 3 entries, got %d", resp.Count)
+	}
+
+	// Verify each entry has unique ConversationTime
+	seenTimes := make(map[time.Time]bool)
+	for i, entry := range resp.Entries {
+		if entry.ConversationTime.IsZero() {
+			t.Errorf("entry %d has zero ConversationTime", i)
+		}
+
+		// Check for duplicates
+		if seenTimes[entry.ConversationTime] {
+			t.Errorf("duplicate ConversationTime found: %v", entry.ConversationTime)
+		}
+		seenTimes[entry.ConversationTime] = true
+
+		// Verify ConversationTime is not in the future
+		if entry.ConversationTime.After(time.Now().Add(time.Minute)) {
+			t.Errorf("entry %d has future ConversationTime: %v", i, entry.ConversationTime)
+		}
+	}
+}
+
+// mockSearchMultiple returns multiple entries with varied conversation times
+type mockSearchMultiple struct{}
+
+func (m *mockSearchMultiple) Search(ctx context.Context, uid, mid, q string, v []float32, kE int, a float32, includeRawEntries bool) ([]model.SearchHit, error) {
+	now := time.Now()
+	return []model.SearchHit{
+		{EntryID: "e1", Summary: "old entry", Score: 0.9, CreationTime: now.Add(-48*time.Hour), ConversationTime: now.Add(-72*time.Hour)},
+		{EntryID: "e2", Summary: "recent entry", Score: 0.8, CreationTime: now.Add(-2*time.Hour), ConversationTime: now.Add(-3*time.Hour)},
+		{EntryID: "e3", Summary: "current entry", Score: 0.7, CreationTime: now, ConversationTime: now},
+	}, nil
+}
+
+func (m *mockSearchMultiple) LatestContext(ctx context.Context, uid, mid string) (string, time.Time, error) {
+	return "ctx", time.Now(), nil
+}
+
+func (m *mockSearchMultiple) SearchContexts(ctx context.Context, uid, mid, q string, v []float32, kC int, a float32) ([]model.ContextHit, error) {
+	return []model.ContextHit{{Context: "ctx", Timestamp: time.Now(), Score: 0.8}}, nil
+}
+
+func (m *mockSearchMultiple) UpsertEntry(ctx context.Context, entryID string, vec []float32, payload map[string]interface{}) error {
+	return nil
+}
+
+func (m *mockSearchMultiple) UpsertContext(ctx context.Context, ctxID string, vec []float32, payload map[string]interface{}) error {
+	return nil
+}
+
+func (m *mockSearchMultiple) DeleteEntry(ctx context.Context, userID, entryID string) error   { return nil }
+func (m *mockSearchMultiple) DeleteContext(ctx context.Context, userID, contextID string) error { return nil }
+func (m *mockSearchMultiple) DeleteMemory(ctx context.Context, userID, memoryID string) error  { return nil }
+func (m *mockSearchMultiple) DeleteVault(ctx context.Context, userID, vaultID string) error    { return nil }
