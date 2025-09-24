@@ -23,7 +23,7 @@ import tomllib  # Python 3.11+
 from src.orchestrator.progress_tracker import ProgressTracker
 from src.paths import resolve_under_root
 
-# Configure logging
+# Configure logging (will be updated by main if --debug is set)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -277,14 +277,21 @@ def generate_run_id() -> str:
               help='When used with --stop: do not prompt. With --resume: force retry all failed questions.')
 @click.option('--qa-only', is_flag=True,
               help='Run only QA phase for an existing run (requires --run-id). Always re-runs QA for questions with completed ingestion.')
+@click.option('--debug', is_flag=True,
+              help='Enable DEBUG level logging for troubleshooting')
 def main(config_path: str, num_questions: Optional[int],
          resume: bool, run_id: Optional[str], workers: int, resume_mode: str, monitor: bool, auto: bool, clear_state: bool,
-         stop: bool, force: bool, qa_only: bool):
+         stop: bool, force: bool, qa_only: bool, debug: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
 
     CONFIG_PATH: Path to configuration TOML file
     """
+
+    # Set debug logging if requested
+    if debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.info("Debug logging enabled")
 
     # Stop processes early if requested
     if stop:

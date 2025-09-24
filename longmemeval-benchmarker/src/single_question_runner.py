@@ -1,16 +1,120 @@
 """SingleQuestionRunner using the clean agent implementation."""
 
-from typing import Any, Dict, TextIO, Optional
+from typing import Any, Dict, TextIO, Optional, List
 import logging
 import json
 import os
 import time
+from datetime import datetime
 
 from src.mycelian_memory_agent.build import build_agent_with_invoker
 from src.mycelian_memory_agent.mcp_utils import create_mcp_client
 from src.memory_manager import MemoryManager
 from pathlib import Path
 import sqlite3
+
+
+def _parse_haystack_date(date_str: str) -> Optional[str]:
+    """Parse haystack date format to ISO-8601.
+
+    Input formats:
+    - "2023/05/20 (Sat) 02:21" (full format with time)
+    - "2024-01-10" (simple date format)
+    Output format: "2023-05-20T02:21:00Z"
+    """
+    if not date_str:
+        return None
+
+    try:
+        # Try full format first (with day of week and time)
+        dt = datetime.strptime(date_str, "%Y/%m/%d (%a) %H:%M")
+        return dt.isoformat() + "Z"
+    except (ValueError, TypeError):
+        try:
+            # Try simple YYYY-MM-DD format
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            return dt.isoformat() + "Z"
+        except (ValueError, TypeError):
+            return None
+
+
+def _normalize_question(rec: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a question from raw dataset format to expected format.
+
+    Converts haystack_sessions (list of lists) to sessions (list of dicts)
+    and adds conversation_time from haystack_dates.
+    """
+    # Copy the original record
+    normalized = dict(rec)
+
+    # Extract haystack_dates if present
+    haystack_dates = rec.get("haystack_dates", [])
+    if not isinstance(haystack_dates, list):
+        haystack_dates = []
+
+    # Get sessions - prefer normalized format, fall back to haystack format
+    sessions_raw = rec.get("sessions")
+    if not sessions_raw:
+        sessions_raw = rec.get("haystack_sessions", [])
+
+    if not isinstance(sessions_raw, list):
+        sessions_raw = []
+
+    # Normalize sessions
+    norm_sessions: List[Dict[str, Any]] = []
+    for idx, s in enumerate(sessions_raw):
+        # Support either dict sessions with messages, or list-of-message sessions (haystack)
+        sid = None
+        msgs: List[Dict[str, Any]] = []
+
+        if isinstance(s, dict):
+            # Already normalized format
+            sid = s.get("session_id")
+            msgs = s.get("messages", [])
+            # Check if conversation_time already exists
+            if "conversation_time" in s:
+                norm_sessions.append(s)
+                continue
+        elif isinstance(s, list):
+            # Raw haystack format - list of messages
+            msgs = s
+
+        # Generate session ID if not present
+        sid = sid or f"S{idx+1}"
+
+        # Validate and copy messages
+        if not isinstance(msgs, list):
+            msgs = []
+
+        norm_msgs: List[Dict[str, Any]] = []
+        for m in msgs:
+            if isinstance(m, dict):
+                role = m.get("role")
+                content = m.get("content")
+                if isinstance(role, str) and isinstance(content, str):
+                    norm_msgs.append({"role": role, "content": content})
+
+        # Extract and parse timestamp for this session
+        conversation_time = None
+        if idx < len(haystack_dates):
+            raw_date = haystack_dates[idx]
+            conversation_time = _parse_haystack_date(raw_date)
+            if conversation_time:
+                logging.getLogger("dataset_normalization").debug(
+                    f"Session {sid}: parsed date '{raw_date}' -> '{conversation_time}'"
+                )
+
+        # Build normalized session
+        session_dict = {"session_id": sid, "messages": norm_msgs}
+        if conversation_time:
+            session_dict["conversation_time"] = conversation_time
+
+        norm_sessions.append(session_dict)
+
+    # Update the normalized record with sessions
+    normalized["sessions"] = norm_sessions
+
+    return normalized
 
 
 def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
@@ -240,6 +344,9 @@ class SingleQuestionRunner:
 
     def run_question(self, q: Dict[str, Any], vault_id: str, run_id: str, log: TextIO,
                     memory_id: Optional[str] = None, qa_log_path: Optional[str] = None) -> Dict[str, Any]:
+        # Normalize the question data to ensure sessions have conversation_time
+        q = _normalize_question(q)
+
         qid = q.get("question_id", "unknown")
         mem_title = (self.cfg.memory_title_template or "{question_id}__{run_id}").format(
             question_id=qid, run_id=run_id
@@ -287,7 +394,11 @@ class SingleQuestionRunner:
             # Attach handler only to per-question runner logger
             lg = logging.getLogger(f"lme.runner.{qid}")
             logger_snapshots.append((lg, list(lg.handlers), lg.propagate, lg.level))
-            lg.setLevel(logging.INFO)
+            # Use DEBUG level if root logger is at DEBUG, otherwise INFO
+            if logging.getLogger().level <= logging.DEBUG:
+                lg.setLevel(logging.DEBUG)
+            else:
+                lg.setLevel(logging.INFO)
             lg.addHandler(qhandler)
             lg.propagate = False
             # Defer agent logger handler until memory_id is known
@@ -367,7 +478,11 @@ class SingleQuestionRunner:
                 qhandler_agent.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
                 agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
                 logger_snapshots.append((agent_logger, list(agent_logger.handlers), agent_logger.propagate, agent_logger.level))
-                agent_logger.setLevel(logging.INFO)
+                # Use DEBUG level if root logger is at DEBUG, otherwise INFO
+                if logging.getLogger().level <= logging.DEBUG:
+                    agent_logger.setLevel(logging.DEBUG)
+                else:
+                    agent_logger.setLevel(logging.INFO)
                 agent_logger.addHandler(qhandler_agent)
                 agent_logger.propagate = False
             except Exception:
@@ -397,7 +512,11 @@ class SingleQuestionRunner:
                 qhandler_agent.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
                 agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
                 logger_snapshots.append((agent_logger, list(agent_logger.handlers), agent_logger.propagate, agent_logger.level))
-                agent_logger.setLevel(logging.INFO)
+                # Use DEBUG level if root logger is at DEBUG, otherwise INFO
+                if logging.getLogger().level <= logging.DEBUG:
+                    agent_logger.setLevel(logging.DEBUG)
+                else:
+                    agent_logger.setLevel(logging.INFO)
                 agent_logger.addHandler(qhandler_agent)
                 agent_logger.propagate = False
             except Exception:
@@ -413,8 +532,17 @@ class SingleQuestionRunner:
         try:
             # Skip ingestion for QA-only mode
             if self.mode != "qa":
+                # Debug: Log what we received from dataset
+                sessions = q.get("sessions", [])
+                runner_log.debug("SESSIONS_DEBUG qid=%s sessions_count=%d", qid, len(sessions))
+                for idx, s in enumerate(sessions):
+                    runner_log.debug("SESSION_DEBUG qid=%s idx=%d type=%s has_conversation_time=%s value=%s",
+                                   qid, idx, type(s).__name__,
+                                   "conversation_time" in s if isinstance(s, dict) else False,
+                                   s.get("conversation_time") if isinstance(s, dict) else None)
+
                 # Process all sessions
-                for s_idx, s in enumerate(q.get("sessions", []), start=1):
+                for s_idx, s in enumerate(sessions, start=1):
                     thread_id = f"{memory_id}:s{s_idx}"
                     # Extract conversation_time for this session if available
                     conversation_time = s.get("conversation_time") if isinstance(s, dict) else None
@@ -422,7 +550,7 @@ class SingleQuestionRunner:
                                   qid, s_idx, memory_id, thread_id, conversation_time)
 
                     # Start session (retrieves context and recent entries)
-                    invoker.start_session(thread_id)
+                    invoker.start_session(thread_id, conversation_time)
 
                     try:
                         # Process all messages in the session
@@ -449,7 +577,7 @@ class SingleQuestionRunner:
                         # Always attempt to end the session and advance counters,
                         # even if message processing raised.
                         try:
-                            invoker.end_session(thread_id)
+                            invoker.end_session(thread_id, conversation_time)
                         except Exception:
                             # Best-effort: continue to mark progress so orchestrator can resume safely
                             pass

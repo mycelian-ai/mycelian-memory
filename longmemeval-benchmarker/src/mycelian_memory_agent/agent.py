@@ -238,6 +238,17 @@ class MycelianMemoryAgent:
             if isinstance(msg, ToolMessage) and msg not in tool_history:
                 tool_history.append(msg)
 
+        # Debug log for conversation_time
+        self.logger.debug(json.dumps({
+            "event": "observe_conversation_time_debug",
+            "timestamp": datetime.utcnow().isoformat(),
+            "control": control.value if control else None,
+            "conversation_time": conversation_time,
+            "conversation_time_type": type(conversation_time).__name__,
+            "conversation_time_is_none": conversation_time is None,
+            "state_keys": list(state.keys())
+        }))
+
         self.logger.info(json.dumps({
                 "event": "observe_start",
                 "timestamp": datetime.utcnow().isoformat(),
@@ -526,7 +537,8 @@ class MycelianMemoryAgent:
 
                 prompt = build_put_context_prompt(
                     conversation_history, self.prompts,
-                    self.vault_id, self.memory_id, self.logger
+                    self.vault_id, self.memory_id, self.logger,
+                    conversation_time
                 )
                 llm_messages = [
                     {"role": "system", "content": prompt},
@@ -613,7 +625,8 @@ class MycelianMemoryAgent:
 
                 prompt = build_put_context_prompt(
                     conversation_history, self.prompts,
-                    self.vault_id, self.memory_id, self.logger
+                    self.vault_id, self.memory_id, self.logger,
+                    conversation_time
                 )
                 llm_messages = [
                     {"role": "system", "content": prompt},
@@ -743,6 +756,17 @@ class MycelianMemoryAgent:
         Returns:
             The result of the graph execution
         """
+        # Debug log for conversation_time
+        self.logger.debug(json.dumps({
+            "event": "agent_conversation_time_debug",
+            "timestamp": datetime.utcnow().isoformat(),
+            "control": control.value,
+            "thread_id": thread_id,
+            "conversation_time": conversation_time,
+            "conversation_time_type": type(conversation_time).__name__,
+            "conversation_time_is_none": conversation_time is None
+        }))
+
         self.logger.info(json.dumps({
                 "event": "agent_invoke",
                 "timestamp": datetime.utcnow().isoformat(),
@@ -848,6 +872,11 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
     else:
         # Fallback to MCP prompt if enhanced version not found
         summary_prompt = prompts.get("summary_prompt", "")
+
+    # Debug log for conversation_time
+    import logging
+    logger = logging.getLogger(f"lme.agent.{memory_id}")
+    logger.debug(f"build_add_entry_prompt: conversation_time={conversation_time}, type={type(conversation_time).__name__}")
 
     prompt = f"""{AGENT_PREFIX}
 
@@ -968,12 +997,17 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
                             prompts: Dict[str, str],
                             vault_id: str,
                             memory_id: str,
-                            logger: Optional[logging.Logger] = None) -> str:
+                            logger: Optional[logging.Logger] = None,
+                            conversation_time: Optional[str] = None) -> str:
     """Build prompt for put_context tool call.
 
     Args:
         conversation_history: Full conversation to synthesize
         prompts: Dictionary containing MCP prompt templates
+        vault_id: The vault ID to use
+        memory_id: The memory ID to use
+        logger: Optional logger instance
+        conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
 
     Returns:
         Formatted prompt for LLM to generate put_context tool call
@@ -1005,6 +1039,7 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
 Current Operation: CONTEXT_SYNTHESIS
 Vault ID: {vault_id}
 Memory ID: {memory_id}
+{f'Conversation Timestamp: {conversation_time}' if conversation_time else ''}
 
 === CRITICAL INSTRUCTIONS ===
 You MUST call ONLY the put_context tool - no other tools.

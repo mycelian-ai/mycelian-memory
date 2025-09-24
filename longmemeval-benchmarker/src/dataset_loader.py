@@ -10,21 +10,29 @@ DatasetQuestion = Dict[str, Any]
 def _parse_haystack_date(date_str: str) -> Optional[str]:
     """Parse haystack date format to ISO-8601.
 
-    Input format: "2023/05/20 (Sat) 02:21"
+    Input formats:
+    - "2023/05/20 (Sat) 02:21" (full format with time)
+    - "2024-01-10" (simple date format)
     Output format: "2023-05-20T02:21:00Z"
     """
     if not date_str:
         return None
 
     try:
-        # Direct parsing using standard strptime format
+        # Try full format first (with day of week and time)
         # %a matches abbreviated weekday name (Mon, Tue, etc.)
         dt = datetime.strptime(date_str, "%Y/%m/%d (%a) %H:%M")
         # Return ISO-8601 format with Z suffix for UTC
         return dt.isoformat() + "Z"
     except (ValueError, TypeError):
-        # If parsing fails, return None
-        return None
+        try:
+            # Try simple YYYY-MM-DD format
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            # Add default time of 00:00:00 for date-only format
+            return dt.isoformat() + "Z"
+        except (ValueError, TypeError):
+            # If both formats fail, return None
+            return None
 
 
 def _read_jsonl(path: str) -> Iterator[Dict[str, Any]]:
@@ -100,11 +108,24 @@ def _normalize_record(rec: Dict[str, Any]) -> DatasetQuestion:
         # Extract and parse the timestamp for this session if available
         conversation_time = None
         if idx < len(haystack_dates):
-            conversation_time = _parse_haystack_date(haystack_dates[idx])
+            raw_date = haystack_dates[idx]
+            conversation_time = _parse_haystack_date(raw_date)
+            # Debug logging
+            import logging
+            logger = logging.getLogger("dataset_loader")
+            logger.debug(f"Session {idx}: raw_date='{raw_date}' -> parsed='{conversation_time}'")
 
         session_dict = {"session_id": sid, "messages": norm_msgs}
         if conversation_time:
             session_dict["conversation_time"] = conversation_time
+            # Debug logging
+            import logging
+            logger = logging.getLogger("dataset_loader")
+            logger.info(f"Session {sid}: Added conversation_time={conversation_time}")
+        else:
+            import logging
+            logger = logging.getLogger("dataset_loader")
+            logger.warning(f"Session {sid}: No conversation_time (idx={idx}, haystack_dates len={len(haystack_dates)})")
         norm_sessions.append(session_dict)
 
     return {
