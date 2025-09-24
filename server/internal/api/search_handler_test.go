@@ -31,7 +31,8 @@ func (m *mockSearch) Search(ctx context.Context, uid, mid, q string, v []float32
 	if m.empty {
 		return []model.SearchHit{}, nil
 	}
-	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9, CreationTime: time.Now()}}, nil
+	now := time.Now()
+	return []model.SearchHit{{EntryID: "e1", Summary: "s", Score: 0.9, CreationTime: now, ConversationTime: now.Add(-time.Hour)}}, nil
 }
 
 func (m *mockSearch) LatestContext(ctx context.Context, uid, mid string) (string, time.Time, error) {
@@ -182,5 +183,44 @@ func TestHandleSearch_NoResults(t *testing.T) {
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Count != 0 {
 		t.Fatalf("expected count 0, got %d", resp.Count)
+	}
+}
+
+func TestHandleSearch_ConversationTimeInResults(t *testing.T) {
+	emb := &mockEmbedder{}
+	srch := &mockSearch{}
+	auth := &mockAuthorizer{}
+	h, _ := NewSearchHandler(emb, srch, 0.6, auth)
+
+	body := bytes.NewBufferString(`{"memoryId":"m1","query":"test","top_ke":1,"top_kc":1}`)
+	req := httptest.NewRequest("POST", "/v0/search", body)
+	req.Header.Set("Authorization", "Bearer test-api-key")
+	w := httptest.NewRecorder()
+	h.HandleSearch(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Entries []model.SearchHit `json:"entries"`
+		Count   int               `json:"count"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.Count != 1 || len(resp.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", resp.Count)
+	}
+
+	entry := resp.Entries[0]
+	if entry.ConversationTime.IsZero() {
+		t.Fatalf("expected ConversationTime to be set in search result")
+	}
+
+	// Verify ConversationTime is different from CreationTime (as per mock)
+	if entry.ConversationTime.Equal(entry.CreationTime) {
+		t.Fatalf("expected ConversationTime to be different from CreationTime")
 	}
 }

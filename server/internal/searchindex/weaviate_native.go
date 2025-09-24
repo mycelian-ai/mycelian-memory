@@ -63,6 +63,7 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 			gql.Field{Name: "summary"},
 			gql.Field{Name: "rawEntry"},
 			gql.Field{Name: "creationTime"},
+			gql.Field{Name: "conversationTime"},
 			gql.Field{Name: "_additional", Fields: []gql.Field{{Name: "score"}}},
 		)
 
@@ -115,6 +116,12 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 			creationTime, _ = time.Parse(time.RFC3339, ctStr)
 		}
 
+		// Parse conversation time
+		var conversationTime time.Time
+		if convStr := safeString(m["conversationTime"]); convStr != "" {
+			conversationTime, _ = time.Parse(time.RFC3339, convStr)
+		}
+
 		rawEntry := safeString(m["rawEntry"])
 		// Clear raw entry if not requested to save tokens
 		if !includeRawEntries {
@@ -122,13 +129,14 @@ func (w *weavNative) Search(ctx context.Context, actorID string, memoryID, query
 		}
 
 		hit := model.SearchHit{
-			EntryID:      safeString(m["entryId"]),
-			ActorID:      safeString(m["actorId"]),
-			MemoryID:     safeString(m["memoryId"]),
-			Summary:      safeString(m["summary"]),
-			RawEntry:     rawEntry,
-			Score:        score,
-			CreationTime: creationTime,
+			EntryID:          safeString(m["entryId"]),
+			ActorID:          safeString(m["actorId"]),
+			MemoryID:         safeString(m["memoryId"]),
+			Summary:          safeString(m["summary"]),
+			RawEntry:         rawEntry,
+			Score:            score,
+			CreationTime:     creationTime,
+			ConversationTime: conversationTime,
 		}
 		log.Debug().Str("entryId", hit.EntryID).Str("summary", hit.Summary).Float64("score", score).Msg("search hit")
 		out = append(out, hit)
