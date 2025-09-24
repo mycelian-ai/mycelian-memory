@@ -195,6 +195,11 @@ def _run_qa(model_id: str, question_text: str, context: str) -> str:
 
     prompt = (
         "You are a helpful assistant. Answer the question using the provided memory context.\n"
+        "The context may contain information that has evolved over time. When interpreting:\n"
+        "- Pay attention to temporal indicators in the question (is/was, current/previous, first/last/best/worst)\n"
+        "- Notation like 'X → Y' indicates a value changed from X to Y\n"
+        "- Multiple mentions of the same type of information may represent its evolution\n"
+        "- Match your answer to what the question is specifically asking about\n\n"
         "Before answering, carefully consider what the question is asking for.\n"
         "Evaluate each piece of relevant information in the context to determine if it should be part of your answer.\n\n"
         + ("Context:\n" + context + "\n\n" if context else "")
