@@ -29,11 +29,12 @@ type CreateMemoryRequest struct {
 
 // AddEntryRequest holds parameters for new entry
 type AddEntryRequest struct {
-	RawEntry       string                 `json:"rawEntry"`
-	Summary        string                 `json:"summary,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
-	Tags           map[string]string      `json:"tags,omitempty"`
-	ExpirationTime *time.Time             `json:"expirationTime,omitempty"`
+	RawEntry         string                 `json:"rawEntry"`
+	Summary          string                 `json:"summary,omitempty"`
+	ConversationTime *time.Time             `json:"conversationTime,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+	Tags             map[string]string      `json:"tags,omitempty"`
+	ExpirationTime   *time.Time             `json:"expirationTime,omitempty"`
 }
 
 // SearchRequest holds search parameters

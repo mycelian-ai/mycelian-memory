@@ -25,7 +25,8 @@ DEFAULT_AGENT_LOGGER = "lme.agent"
 # Define allowed tools for each control state and last tool combination
 ALLOWED_TOOLS = {
     ControlState.START_SESSION: {
-        None: ["get_context"],              # No tool executed yet -> get_context
+        None: ["await_consistency"],        # No tool executed yet -> await_consistency
+        "await_consistency": ["get_context"], # After await_consistency -> get_context
         "get_context": ["list_entries"],    # After get_context -> list_entries
         "list_entries": []                  # After list_entries -> done
     },
@@ -53,6 +54,7 @@ class AgentState(TypedDict):
     tool_history: Sequence[Union[AIMessage, ToolMessage]]  # Tool flow for current invocation (not checkpointed)
     control: ControlState  # Control state driving execution
     messages: Sequence[BaseMessage]  # Tool I/O buffer for ToolNode (per-invocation only, no accumulation)
+    conversation_time: Optional[str]  # ISO-8601 timestamp of when the conversation occurred
 
 
 class MycelianMemoryAgent:
@@ -133,6 +135,104 @@ class MycelianMemoryAgent:
 
         # Compile with checkpointer
         return workflow.compile(checkpointer=self.checkpointer)
+
+    def _invoke_put_context_with_single_retry(self,
+                                              stage: str,
+                                              purpose: str,
+                                              conversation_history: Sequence[ChatMessage],
+                                              conversation_time: Optional[str]) -> AIMessage:
+        """Call LLM to produce a put_context tool call with single retry.
+
+        Args:
+            stage: "FLUSH" or "END_SESSION" for logging
+            purpose: "put_context" or "put_context_final" for logging
+            conversation_history: messages to synthesize
+            conversation_time: optional ISO-8601 timestamp
+
+        Returns:
+            The AIMessage response from LLM.
+
+        Raises:
+            RuntimeError: if LLM does not return a put_context tool call after retry.
+        """
+        def _call_llm_once(attempt: int) -> AIMessage:
+            self.logger.info(json.dumps({
+                "event": "llm_call",
+                "timestamp": datetime.utcnow().isoformat(),
+                "purpose": purpose,
+                "conversation_count": len(conversation_history),
+                "attempt": attempt
+            }))
+            prompt = build_put_context_prompt(
+                conversation_history, self.prompts,
+                self.vault_id, self.memory_id, self.logger,
+                conversation_time
+            )
+            llm_messages = [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": "Execute the required operation."}
+            ]
+            try:
+                self.logger.info(json.dumps({
+                    "event": "llm_input_messages_full",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "purpose": purpose,
+                    "memory_id": self.memory_id,
+                    "vault_id": self.vault_id,
+                    "messages_count": len(llm_messages),
+                    "messages": llm_messages,
+                    "attempt": attempt
+                }))
+            except (TypeError, ValueError):
+                self.logger.info(json.dumps({
+                    "event": "llm_input_messages_full",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "purpose": purpose,
+                    "memory_id": self.memory_id,
+                    "vault_id": self.vault_id,
+                    "messages_count": len(llm_messages),
+                    "attempt": attempt
+                }))
+            return self._invoke_llm_with_retry(llm_messages)
+
+        response = _call_llm_once(attempt=1)
+        names = [c.get("name") if isinstance(c, dict) else getattr(c, "name", None)
+                 for c in (getattr(response, "tool_calls", None) or [])]
+        if "put_context" not in names:
+            # Log returned content preview when missing tool call
+            try:
+                _raw = getattr(response, "content", "")
+                _content_str = _raw if isinstance(_raw, str) else (json.dumps(_raw) if _raw is not None else "")
+            except Exception:
+                _content_str = str(getattr(response, "content", "") or "")
+            self.logger.warning(json.dumps({
+                "event": "llm_no_put_context",
+                "timestamp": datetime.utcnow().isoformat(),
+                "control_stage": stage,
+                "action": "retry_once",
+                "content_length": len(_content_str),
+                "content_preview": _content_str[:500] if _content_str else "[empty]"
+            }))
+            response = _call_llm_once(attempt=2)
+            names = [c.get("name") if isinstance(c, dict) else getattr(c, "name", None)
+                     for c in (getattr(response, "tool_calls", None) or [])]
+            if "put_context" not in names:
+                # Log returned content preview when still missing
+                try:
+                    _raw2 = getattr(response, "content", "")
+                    _content_str2 = _raw2 if isinstance(_raw2, str) else (json.dumps(_raw2) if _raw2 is not None else "")
+                except Exception:
+                    _content_str2 = str(getattr(response, "content", "") or "")
+                self.logger.error(json.dumps({
+                    "event": "llm_no_put_context",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "control_stage": stage,
+                    "action": "fail",
+                    "content_length": len(_content_str2),
+                    "content_preview": _content_str2[:500] if _content_str2 else "[empty]"
+                }))
+                raise RuntimeError(f"Expected put_context tool call during {stage}, but none was returned after retry")
+        return response
 
     def _get_tool_by_name(self, name: str):
         """Get a tool by its name from the tools list."""
@@ -229,12 +329,24 @@ class MycelianMemoryAgent:
         conversation_history = state.get("conversation_history", [])
         to_process = state.get("to_process", [])
         messages = state.get("messages", [])
+        conversation_time = state.get("conversation_time")
 
         # Copy any new ToolMessages from messages to tool_history
         # ToolNode adds results to messages, we need them in tool_history for tracking
         for msg in messages:
             if isinstance(msg, ToolMessage) and msg not in tool_history:
                 tool_history.append(msg)
+
+        # Debug log for conversation_time
+        self.logger.debug(json.dumps({
+            "event": "observe_conversation_time_debug",
+            "timestamp": datetime.utcnow().isoformat(),
+            "control": control.value if control else None,
+            "conversation_time": conversation_time,
+            "conversation_time_type": type(conversation_time).__name__,
+            "conversation_time_is_none": conversation_time is None,
+            "state_keys": list(state.keys())
+        }))
 
         self.logger.info(json.dumps({
                 "event": "observe_start",
@@ -426,7 +538,7 @@ class MycelianMemoryAgent:
 
                 prompt = build_add_entry_prompt(
                     conversation_history, to_process[0], self.prompts,
-                    self.vault_id, self.memory_id
+                    self.vault_id, self.memory_id, conversation_time
                 )
                 llm_messages = [
                     {"role": "system", "content": prompt},
@@ -514,47 +626,14 @@ class MycelianMemoryAgent:
                 return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
 
             elif last_tool == "await_consistency":
-                # Second tool: put_context (needs LLM for synthesis)
-                self.logger.info(json.dumps({
-                        "event": "llm_call",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "put_context",
-                        "conversation_count": len(conversation_history)
-                    }))
-
-                prompt = build_put_context_prompt(
-                    conversation_history, self.prompts,
-                    self.vault_id, self.memory_id, self.logger
+                # Second tool: put_context (needs LLM for synthesis) via shared helper
+                response = self._invoke_put_context_with_single_retry(
+                    stage="FLUSH",
+                    purpose="put_context",
+                    conversation_history=conversation_history,
+                    conversation_time=conversation_time
                 )
-                llm_messages = [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": "Execute the required operation."}
-                ]
-                # Log the full message array being sent to the model (put_context during FLUSH)
-                try:
-                    self.logger.info(json.dumps({
-                        "event": "llm_input_messages_full",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "put_context",
-                        "memory_id": self.memory_id,
-                        "vault_id": self.vault_id,
-                        "messages_count": len(llm_messages),
-                        "messages": llm_messages
-                    }))
-                except (TypeError, ValueError):
-                    self.logger.info(json.dumps({
-                        "event": "llm_input_messages_full",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "put_context",
-                        "memory_id": self.memory_id,
-                        "vault_id": self.vault_id,
-                        "messages_count": len(llm_messages)
-                    }))
-                response = self._invoke_llm_with_retry(llm_messages)
-                # Filter tool calls to only allowed ones
                 response = self._filter_tool_calls(response, control, last_tool)
-                # Also add to messages for ToolNode
-                # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
                 return {"tool_history": current_history + [response], "messages": [response]}
 
@@ -601,47 +680,14 @@ class MycelianMemoryAgent:
                 return {"tool_history": tool_history + [ai_msg], "messages": [ai_msg]}
 
             elif last_tool == "await_consistency":
-                # Second tool: put_context (needs LLM for synthesis)
-                self.logger.info(json.dumps({
-                        "event": "llm_call",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "put_context_final",
-                        "conversation_count": len(conversation_history)
-                    }))
-
-                prompt = build_put_context_prompt(
-                    conversation_history, self.prompts,
-                    self.vault_id, self.memory_id, self.logger
+                # Second tool: put_context (needs LLM for synthesis) via shared helper
+                response = self._invoke_put_context_with_single_retry(
+                    stage="END_SESSION",
+                    purpose="put_context_final",
+                    conversation_history=conversation_history,
+                    conversation_time=conversation_time
                 )
-                llm_messages = [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": "Execute the required operation."}
-                ]
-                # Log the full message array being sent to the model (final put_context)
-                try:
-                    self.logger.info(json.dumps({
-                        "event": "llm_input_messages_full",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "put_context_final",
-                        "memory_id": self.memory_id,
-                        "vault_id": self.vault_id,
-                        "messages_count": len(llm_messages),
-                        "messages": llm_messages
-                    }))
-                except (TypeError, ValueError):
-                    self.logger.info(json.dumps({
-                        "event": "llm_input_messages_full",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "purpose": "put_context_final",
-                        "memory_id": self.memory_id,
-                        "vault_id": self.vault_id,
-                        "messages_count": len(llm_messages)
-                    }))
-                response = self._invoke_llm_with_retry(llm_messages)
-                # Filter tool calls to only allowed ones
                 response = self._filter_tool_calls(response, control, last_tool)
-                # Also add to messages for ToolNode
-                # Manually accumulate tool_history
                 current_history = list(state.get("tool_history", []))
                 return {"tool_history": current_history + [response], "messages": [response]}
 
@@ -698,6 +744,22 @@ class MycelianMemoryAgent:
             response: The LLM response with tool calls
             invocation_id: Unique ID for this LLM invocation
         """
+        # If there are no tool calls, log a content preview for debugging
+        if not (hasattr(response, 'tool_calls') and response.tool_calls):
+            try:
+                _raw = getattr(response, 'content', '')
+                _content_str = _raw if isinstance(_raw, str) else (json.dumps(_raw) if _raw is not None else '')
+            except Exception:
+                _content_str = str(getattr(response, 'content', '') or '')
+            self.logger.warning(json.dumps({
+                "event": "llm_response_no_tools",
+                "timestamp": datetime.utcnow().isoformat(),
+                "invocation_id": invocation_id,
+                "content_length": len(_content_str),
+                "content_preview": _content_str[:500] if _content_str else "[empty]"
+            }))
+            return
+
         if hasattr(response, 'tool_calls') and response.tool_calls:
             for idx, call in enumerate(response.tool_calls):
                 tool_name = call.get('name', 'unknown') if isinstance(call, dict) else getattr(call, 'name', 'unknown')
@@ -725,7 +787,8 @@ class MycelianMemoryAgent:
                 }))
 
     def invoke(self, control: ControlState, thread_id: str,
-               to_process: Optional[ChatMessage] = None) -> Any:
+               to_process: Optional[ChatMessage] = None,
+               conversation_time: Optional[str] = None) -> Any:
         """Execute based on control state.
 
         Uses checkpointer for state persistence across invocations.
@@ -735,10 +798,22 @@ class MycelianMemoryAgent:
             control: The control state determining which operation to perform
             thread_id: Unique identifier for this conversation thread
             to_process: Optional message to process (for PROCESS_MESSAGE operations)
+            conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
 
         Returns:
             The result of the graph execution
         """
+        # Debug log for conversation_time
+        self.logger.debug(json.dumps({
+            "event": "agent_conversation_time_debug",
+            "timestamp": datetime.utcnow().isoformat(),
+            "control": control.value,
+            "thread_id": thread_id,
+            "conversation_time": conversation_time,
+            "conversation_time_type": type(conversation_time).__name__,
+            "conversation_time_is_none": conversation_time is None
+        }))
+
         self.logger.info(json.dumps({
                 "event": "agent_invoke",
                 "timestamp": datetime.utcnow().isoformat(),
@@ -756,7 +831,8 @@ class MycelianMemoryAgent:
             "control": control,
             "to_process": [to_process] if to_process else [],
             "tool_history": [],  # Starts fresh each invocation
-            "messages": []  # For ToolNode compatibility
+            "messages": [],  # For ToolNode compatibility
+            "conversation_time": conversation_time  # Pass timestamp through state
         }
 
         # If processing a message, also add it to conversation_history
@@ -800,7 +876,8 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
                           to_process: ChatMessage,
                           prompts: Dict[str, str],
                           vault_id: str,
-                          memory_id: str) -> str:
+                          memory_id: str,
+                          conversation_time: Optional[str] = None) -> str:
     """Build prompt for add_entry tool call.
 
     Args:
@@ -809,6 +886,7 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
         prompts: Dictionary containing MCP prompt templates
         vault_id: The vault ID to use
         memory_id: The memory ID to use
+        conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
 
     Returns:
         Formatted prompt for LLM to generate add_entry tool call
@@ -842,11 +920,17 @@ def build_add_entry_prompt(conversation_history: Sequence[ChatMessage],
         # Fallback to MCP prompt if enhanced version not found
         summary_prompt = prompts.get("summary_prompt", "")
 
+    # Debug log for conversation_time
+    import logging
+    logger = logging.getLogger(f"lme.agent.{memory_id}")
+    logger.debug(f"build_add_entry_prompt: conversation_time={conversation_time}, type={type(conversation_time).__name__}")
+
     prompt = f"""{AGENT_PREFIX}
 
 Current Operation: PROCESS_MESSAGE
 Vault ID: {vault_id}
 Memory ID: {memory_id}
+{f'Conversation Timestamp: {conversation_time}' if conversation_time else ''}
 
 Previous conversation context (including retrieved context from previous sessions):
 {context}
@@ -960,12 +1044,17 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
                             prompts: Dict[str, str],
                             vault_id: str,
                             memory_id: str,
-                            logger: Optional[logging.Logger] = None) -> str:
+                            logger: Optional[logging.Logger] = None,
+                            conversation_time: Optional[str] = None) -> str:
     """Build prompt for put_context tool call.
 
     Args:
         conversation_history: Full conversation to synthesize
         prompts: Dictionary containing MCP prompt templates
+        vault_id: The vault ID to use
+        memory_id: The memory ID to use
+        logger: Optional logger instance
+        conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
 
     Returns:
         Formatted prompt for LLM to generate put_context tool call
@@ -997,6 +1086,7 @@ def build_put_context_prompt(conversation_history: Sequence[ChatMessage],
 Current Operation: CONTEXT_SYNTHESIS
 Vault ID: {vault_id}
 Memory ID: {memory_id}
+{f'Conversation Timestamp: {conversation_time}' if conversation_time else ''}
 
 === CRITICAL INSTRUCTIONS ===
 You MUST call ONLY the put_context tool - no other tools.

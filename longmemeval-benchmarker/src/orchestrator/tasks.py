@@ -222,7 +222,8 @@ def process_question(
 @huey.task(retries=2, retry_delay=30)
 def run_qa(
     run_id: str,
-    question_id: str
+    question_id: str,
+    qa_run_id: Optional[str] = None
 ) -> Dict:
     """
     Run QA phase for a completed question.
@@ -238,7 +239,7 @@ def run_qa(
         Dict with QA results
     """
     _log_startup_config()
-    logger.info(f"Running QA for question {question_id}")
+    logger.info(f"Running QA for question {question_id} (qa_run_id={qa_run_id})")
     tracker = ProgressTracker()
 
     try:
@@ -264,7 +265,8 @@ def run_qa(
             vault_id=vault_id,
             memory_id=memory_id,
             config_path=config_path,
-            run_id=run_id
+            run_id=run_id,
+            qa_run_id=qa_run_id
         )
 
         # Mark QA as complete
@@ -357,12 +359,17 @@ def _run_qa_inprocess(
     vault_id: str,
     memory_id: str,
     config_path: str,
-    run_id: str
+    run_id: str,
+    qa_run_id: Optional[str] = None
 ) -> Dict:
     """Run the QA phase in-process using SingleQuestionRunner."""
-    target_run = run_id or "default"
+    # Use QA-specific run ID if provided (for QA-only mode)
+    logger.info(f"_run_qa_inprocess: run_id={run_id}, qa_run_id={qa_run_id}")
+    effective_run_id = qa_run_id or run_id
+    target_run = effective_run_id or "default"
+
     out_dir = Path("out") / (target_run if target_run.startswith("run_") else f"run_{target_run}")
-    logs_dir = Path(LOGS_DIR) / (run_id or "default")
+    logs_dir = Path(LOGS_DIR) / effective_run_id
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / f"{question_data.get('question_id', 'unknown')}_qa.log"
 
@@ -399,15 +406,17 @@ def _run_qa_inprocess(
     result_path = logs_dir / f"{question_data.get('question_id','unknown')}.result.json"
     _merge_result_json(result_path, {
         'run_id': run_id,
+        'qa_run_id': qa_run_id,  # Track which QA run this is from
         **artifact,
         'vault_id': vault_id,
         'memory_id': memory_id,
         'hypothesis': hypothesis,
     })
-    # Append to out/run_<run_id>/hypotheses.jsonl
+    # Append to out/run_<effective_run_id>/hypotheses.jsonl
     jsonl_path = out_dir / 'hypotheses.jsonl'
     _append_jsonl_atomic(jsonl_path, {
         'run_id': run_id,
+        'qa_run_id': qa_run_id,
         'question_id': question_data.get('question_id'),
         'vault_id': vault_id,
         'memory_id': memory_id,

@@ -526,3 +526,19 @@ class ProgressTracker:
                     (run_id,),
                 )
             return [dict(row) for row in result.fetchall()]
+
+    def reset_qa_status_for_run(self, run_id: str) -> None:
+        """Reset all QA statuses to pending for re-run in QA-only mode.
+
+        This allows the monitor to properly track QA progress when re-running.
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE question_progress
+                SET qa_status = 'pending'
+                WHERE run_id = ? AND ingestion_status = 'completed'
+                """,
+                (run_id,)
+            )
+            conn.commit()

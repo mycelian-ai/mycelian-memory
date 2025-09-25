@@ -1,0 +1,66 @@
+[
+  {
+    "question_id": "temporal_smoke_001",
+    "question_type": "temporal-reasoning",
+    "question": "What new car did I buy and when did I buy it?",
+    "answer": "Tesla Model X on 2024-03-15",
+    "question_date": "2024-03-20",
+    "haystack_session_ids": [
+      "session_001",
+      "session_002",
+      "session_003"
+    ],
+    "haystack_dates": [
+      "2024-03-01",
+      "2024-03-15",
+      "2024-03-18"
+    ],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I've been thinking about buying a new car. My current one is getting old and I want something more environmentally friendly."
+        },
+        {
+          "role": "assistant",
+          "content": "That's exciting! Are you considering any specific types of vehicles? Electric vehicles have become quite popular for their environmental benefits."
+        },
+        {
+          "role": "user",
+          "content": "Yes, I'm definitely interested in electric vehicles. I've been researching Tesla and some other brands. The technology is impressive."
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Great news! I just bought a new Tesla Model X today! I'm so excited about this purchase."
+        },
+        {
+          "role": "assistant",
+          "content": "Congratulations on your new Tesla Model X! That's a fantastic choice. The Model X is known for its impressive features and performance. How are you feeling about your purchase?"
+        },
+        {
+          "role": "user",
+          "content": "I'm thrilled! The falcon wing doors are amazing, and I can't wait to try out the autopilot features. It's exactly what I was looking for."
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "I've been driving my new Tesla for a few days now and it's been an incredible experience. The acceleration is insane!"
+        },
+        {
+          "role": "assistant",
+          "content": "That's wonderful to hear! The Tesla Model X is known for its impressive acceleration. What features have you enjoyed the most so far?"
+        },
+        {
+          "role": "user",
+          "content": "Definitely the autopilot on the highway and the instant torque. Plus, the panoramic windshield gives such an amazing view. Best car purchase I've made!"
+        }
+      ]
+    ],
+    "answer_session_ids": [
+      "session_002"
+    ]
+  }
+]

@@ -1,9 +1,38 @@
-from typing import Iterable, List, Dict, Any, Iterator
+from typing import Iterable, List, Dict, Any, Iterator, Optional
 import os
+from datetime import datetime
 
 DatasetMessage = Dict[str, Any]
 DatasetSession = Dict[str, Any]
 DatasetQuestion = Dict[str, Any]
+
+
+def _parse_haystack_date(date_str: str) -> Optional[str]:
+    """Parse haystack date format to ISO-8601.
+
+    Input formats:
+    - "2023/05/20 (Sat) 02:21" (full format with time)
+    - "2024-01-10" (simple date format)
+    Output format: "2023-05-20T02:21:00Z"
+    """
+    if not date_str:
+        return None
+
+    try:
+        # Try full format first (with day of week and time)
+        # %a matches abbreviated weekday name (Mon, Tue, etc.)
+        dt = datetime.strptime(date_str, "%Y/%m/%d (%a) %H:%M")
+        # Return ISO-8601 format with Z suffix for UTC
+        return dt.isoformat() + "Z"
+    except (ValueError, TypeError):
+        try:
+            # Try simple YYYY-MM-DD format
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            # Add default time of 00:00:00 for date-only format
+            return dt.isoformat() + "Z"
+        except (ValueError, TypeError):
+            # If both formats fail, return None
+            return None
 
 
 def _read_jsonl(path: str) -> Iterator[Dict[str, Any]]:
@@ -35,12 +64,18 @@ def _normalize_record(rec: Dict[str, Any]) -> DatasetQuestion:
     #   "question_id": str,
     #   "expected": str,
     #   "sessions": [
-    #       {"session_id": str, "messages": [{"role": "user"|"assistant", "content": str}, ...]}
+    #       {"session_id": str, "messages": [{"role": "user"|"assistant", "content": str}, ...], "conversation_time": str}
     #   ]
     # }
     qid = rec.get("question_id") or rec.get("id") or rec.get("qid")
     expected = rec.get("expected") or rec.get("answer") or ""
     question_text = rec.get("question") or rec.get("query") or ""
+
+    # Extract haystack_dates if present
+    haystack_dates = rec.get("haystack_dates", [])
+    if not isinstance(haystack_dates, list):
+        haystack_dates = []
+
     # Prefer canonical sessions; otherwise derive from haystack_sessions
     sessions_raw = rec.get("sessions")
     if not sessions_raw:
@@ -69,7 +104,30 @@ def _normalize_record(rec: Dict[str, Any]) -> DatasetQuestion:
             if not isinstance(role, str) or not isinstance(content, str):
                 continue
             norm_msgs.append({"role": role, "content": content})
-        norm_sessions.append({"session_id": sid, "messages": norm_msgs})
+
+        # Extract and parse the timestamp for this session if available
+        conversation_time = None
+        if idx < len(haystack_dates):
+            raw_date = haystack_dates[idx]
+            conversation_time = _parse_haystack_date(raw_date)
+            # Debug logging
+            import logging
+            logger = logging.getLogger("dataset_loader")
+            logger.debug(f"Session {idx}: raw_date='{raw_date}' -> parsed='{conversation_time}'")
+
+        session_dict = {"session_id": sid, "messages": norm_msgs}
+        if conversation_time:
+            session_dict["conversation_time"] = conversation_time
+            # Debug logging
+            import logging
+            logger = logging.getLogger("dataset_loader")
+            logger.info(f"Session {sid}: Added conversation_time={conversation_time}")
+        else:
+            import logging
+            logger = logging.getLogger("dataset_loader")
+            logger.warning(f"Session {sid}: No conversation_time (idx={idx}, haystack_dates len={len(haystack_dates)})")
+        norm_sessions.append(session_dict)
+
     return {
         "question_id": str(qid) if qid is not None else "",
         "expected": expected,

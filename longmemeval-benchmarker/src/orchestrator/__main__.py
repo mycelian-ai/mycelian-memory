@@ -23,7 +23,7 @@ import tomllib  # Python 3.11+
 from src.orchestrator.progress_tracker import ProgressTracker
 from src.paths import resolve_under_root
 
-# Configure logging
+# Configure logging (will be updated by main if --debug is set)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -277,14 +277,21 @@ def generate_run_id() -> str:
               help='When used with --stop: do not prompt. With --resume: force retry all failed questions.')
 @click.option('--qa-only', is_flag=True,
               help='Run only QA phase for an existing run (requires --run-id). Always re-runs QA for questions with completed ingestion.')
+@click.option('--debug', is_flag=True,
+              help='Enable DEBUG level logging for troubleshooting')
 def main(config_path: str, num_questions: Optional[int],
          resume: bool, run_id: Optional[str], workers: int, resume_mode: str, monitor: bool, auto: bool, clear_state: bool,
-         stop: bool, force: bool, qa_only: bool):
+         stop: bool, force: bool, qa_only: bool, debug: bool):
     """
     Orchestrate LongMemEval benchmark execution using Huey.
 
     CONFIG_PATH: Path to configuration TOML file
     """
+
+    # Set debug logging if requested
+    if debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.info("Debug logging enabled")
 
     # Stop processes early if requested
     if stop:
@@ -334,10 +341,17 @@ def main(config_path: str, num_questions: Optional[int],
 
         logger.info(f"QA-only mode for run: {run_id}")
 
+        # Generate timestamp for this QA-only run
+        import time
+        qa_timestamp = int(time.time())
+        qa_run_id = f"{run_id}_qa_{qa_timestamp}"
+        logger.info(f"QA-only run ID: {qa_run_id}")
+
         # Bind per-run queue
         queue_name = f"huey-{run_id}"
         os.environ['HUEY_QUEUE_NAME'] = queue_name
         os.environ['HUEY_RUN_ID'] = run_id
+        os.environ['QA_RUN_ID'] = qa_run_id  # Pass QA run ID to tasks
 
         # Import tasks
         from src.orchestrator import tasks as _tasks
@@ -350,13 +364,35 @@ def main(config_path: str, num_questions: Optional[int],
             return 1
 
         click.echo(f"Found {len(questions)} questions to run QA for")
+        click.echo(f"QA results will be saved to: logs/{qa_run_id}/")
 
-        # Enqueue QA tasks
+        # Clear any existing pending tasks in the queue to avoid conflicts
+        import sqlite3
+        queue_name = f"huey-{run_id}"
+        db_path = 'data/orchestrator.db'
+        try:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            # Clear existing tasks for this queue
+            cur.execute("DELETE FROM task WHERE queue = ?", (queue_name,))
+            deleted_count = cur.rowcount
+            conn.commit()
+            conn.close()
+            if deleted_count > 0:
+                click.echo(f"Cleared {deleted_count} pending tasks from queue")
+        except Exception as e:
+            click.echo(f"Warning: Could not clear pending tasks: {e}")
+
+        # Reset QA status to pending so monitor tracks progress
+        tracker.reset_qa_status_for_run(run_id)
+        click.echo("Reset QA status to pending for re-run")
+
+        # Enqueue QA tasks with QA run ID
         for row in questions:
             qid = row.get('question_id') if isinstance(row, dict) else (row[0] if row else None)
             if not qid:
                 continue
-            _tasks.run_qa(run_id, qid)
+            _tasks.run_qa(run_id, qid, qa_run_id=qa_run_id)
 
         click.echo(f"{len(questions)} QA tasks enqueued")
 
@@ -366,7 +402,7 @@ def main(config_path: str, num_questions: Optional[int],
             atexit.register(lambda: _stop_worker_subprocess(worker_proc))
 
             try:
-                monitor_progress(tracker, run_id)
+                monitor_progress(tracker, run_id, qa_only_mode=True)
             except KeyboardInterrupt:
                 click.echo("\nStopping worker...")
             finally:
@@ -610,7 +646,7 @@ def enqueue_question(question_data: Dict, run_id: str, config_path: str,
     logger.debug(f"Enqueued question {question_id}")
 
 
-def monitor_progress(tracker: ProgressTracker, run_id: str):
+def monitor_progress(tracker: ProgressTracker, run_id: str, qa_only_mode: bool = False):
     """Monitor progress of a benchmark run."""
     def _bar(done: int, tot: int, width: int = 30) -> str:
         if tot and tot > 0:
@@ -698,9 +734,16 @@ def monitor_progress(tracker: ProgressTracker, run_id: str):
                     details = tracker.get_in_progress_details(run_id, limit=10)
                     live.update(_build_rich_view(stats, details))
                     total = stats.get('total_questions', 0) or 0
-                    completed = stats.get('completed', 0) or 0
-                    if total > 0 and completed == total:
-                        break
+                    if qa_only_mode:
+                        # In QA-only mode, check QA completion specifically
+                        qa_done = stats.get('qa_done', 0) or 0
+                        if total > 0 and qa_done == total:
+                            break
+                    else:
+                        # Normal mode: check overall completion
+                        completed = stats.get('completed', 0) or 0
+                        if total > 0 and completed == total:
+                            break
                     time.sleep(1)
             _console.print("\n✅ Benchmark complete!")
         except KeyboardInterrupt:
@@ -791,9 +834,15 @@ def monitor_progress(tracker: ProgressTracker, run_id: str):
             stuck = tracker.get_stuck_questions(run_id)
             if stuck:
                 click.echo(f"\n⚠️  {len(stuck)} task(s) possibly stuck (>30m): {', '.join(stuck[:5])}{'…' if len(stuck) > 5 else ''}")
-            if completed == total:
-                click.echo("\n✅ Benchmark complete!")
-                break
+            # Check completion based on mode
+            if qa_only_mode:
+                if qa_done == total:
+                    click.echo("\n✅ QA re-run complete!")
+                    break
+            else:
+                if completed == total:
+                    click.echo("\n✅ Benchmark complete!")
+                    break
             time.sleep(5)
     except KeyboardInterrupt:
         click.echo("\n\nMonitoring stopped.")

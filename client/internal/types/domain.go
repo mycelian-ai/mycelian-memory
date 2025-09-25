@@ -39,15 +39,16 @@ type Memory struct {
 
 // Entry represents an entry
 type Entry struct {
-	ID             string            `json:"entryId"`
-	UserID         string            `json:"actorId"`
-	MemoryID       string            `json:"memoryId"`
-	VaultID        string            `json:"vaultId"`
-	CreationTime   time.Time         `json:"creationTime"`
-	RawEntry       string            `json:"rawEntry"`
-	Summary        string            `json:"summary,omitempty"`
-	Tags           map[string]string `json:"tags,omitempty"`
-	ExpirationTime *time.Time        `json:"expirationTime,omitempty"`
+	ID               string            `json:"entryId"`
+	UserID           string            `json:"actorId"`
+	MemoryID         string            `json:"memoryId"`
+	VaultID          string            `json:"vaultId"`
+	CreationTime     time.Time         `json:"creationTime"`
+	ConversationTime time.Time         `json:"conversationTime"`
+	RawEntry         string            `json:"rawEntry"`
+	Summary          string            `json:"summary,omitempty"`
+	Tags             map[string]string `json:"tags,omitempty"`
+	ExpirationTime   *time.Time        `json:"expirationTime,omitempty"`
 }
 
 // Context represents a context snapshot

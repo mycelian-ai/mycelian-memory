@@ -12,7 +12,7 @@ API_HEALTH_URL := http://localhost:11545/v0/health
 # ------------------------------------------------------------------------------
 # Backend (server) convenience wrappers
 # ------------------------------------------------------------------------------
-.PHONY: start-dev-mycelian-server backend-down backend-status backend-logs backend-clean-postgres
+.PHONY: start-dev-mycelian-server backend-down backend-status backend-logs clean-local-postgres-data
 
 
 
@@ -21,9 +21,16 @@ start-dev-mycelian-server:
 
 backend-down:
 	docker compose -f $(BACKEND_COMPOSE_FILE) down
-# Data cleanup wrappers (explicit destructive actions)
-backend-clean-postgres:
-	$(MAKE) -C server clean-postgres-data
+
+# Data cleanup (explicit destructive action)
+.PHONY: clean-local-postgres-data
+clean-local-postgres-data:
+	@echo "WARNING: This will DELETE all local PostgreSQL data!"
+	@echo "Data directory: data/postgres"
+	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
+	@echo "Removing PostgreSQL data..."
+	@rm -rf data/postgres
+	@echo "PostgreSQL data removed. Run 'make start-dev-mycelian-server' to recreate."
 
 
 backend-status:
@@ -180,6 +187,7 @@ help:
 	@echo "  backend-down           Stop backend stack containers"
 	@echo "  backend-status         Show backend container status"
 	@echo "  backend-logs           Tail backend container logs"
+	@echo "  clean-local-postgres-data    Clean local PostgreSQL data (DESTRUCTIVE - requires confirmation)"
 	@echo ""
 	@echo "Test Commands:"
 	@echo "  client-coverage-check  Run client tests and assert >= 78% coverage"

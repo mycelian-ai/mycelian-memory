@@ -257,6 +257,29 @@ RETURNING creation_time, conversation_time
 
 Similar updates to struct and INSERT statement.
 
+#### Outbox Worker Integration
+
+**File: `server/internal/store/postgres/postgres.go`**
+
+Update entry creation to include conversation_time in outbox payload (around line 470):
+```go
+payload := map[string]interface{}{
+    "actorId":          me.ActorID,
+    "memoryId":         me.MemoryID,
+    "entryId":          entryID,
+    "rawEntry":         me.RawEntry,
+    "summary":          me.Summary,
+    "tags":             me.Tags,
+    "creationTime":     created,
+    "conversationTime": conversationTime,  // NEW: Add conversation_time to payload
+}
+if err := writeOutbox(ctx, tx, "upsert_entry", entryID, payload); err != nil {
+    return nil, err
+}
+```
+
+**Note**: The outbox worker (`server/internal/outbox/worker.go`) automatically passes the entire payload to Weaviate, so no changes needed there.
+
 #### Client Library
 
 **File: `client/client.go`**
@@ -305,6 +328,97 @@ func (eh *EntryHandler) handleAddEntry(ctx context.Context, req mcp.CallToolRequ
         Tags:             tags,
     })
     // ... rest of function
+}
+```
+
+#### Weaviate Schema Updates
+
+**File: `server/internal/searchindex/waviate_schema.go`**
+
+Add conversationTime property to MemoryEntry class (line 34):
+```go
+entry := &models.Class{
+    Class:      "MemoryEntry",
+    Vectorizer: "none",
+    Properties: []*models.Property{
+        {Name: "entryId", DataType: []string{"uuid"}},
+        {Name: "actorId", DataType: []string{"text"}},
+        {Name: "memoryId", DataType: []string{"uuid"}},
+        {Name: "vaultId", DataType: []string{"uuid"}},
+        {Name: "rawEntry", DataType: []string{"text"}},
+        {Name: "summary", DataType: []string{"text"}},
+        {Name: "tags", DataType: []string{"text[]"}},
+        {Name: "creationTime", DataType: []string{"date"}},
+        {Name: "conversationTime", DataType: []string{"date"}},  // NEW
+    },
+}
+```
+
+#### Search Implementation Updates
+
+**File: `server/internal/searchindex/weaviate_native.go`**
+
+1. Update GraphQL query to request conversationTime (line 59-66):
+```go
+req := w.client.GraphQL().Get().
+    WithClassName("MemoryEntry").
+    WithWhere(where).
+    WithHybrid(hy).
+    WithLimit(topKE).
+    WithFields(
+        gql.Field{Name: "entryId"},
+        gql.Field{Name: "actorId"},
+        gql.Field{Name: "memoryId"},
+        gql.Field{Name: "summary"},
+        gql.Field{Name: "rawEntry"},
+        gql.Field{Name: "creationTime"},
+        gql.Field{Name: "conversationTime"},  // NEW
+        gql.Field{Name: "_additional", Fields: []gql.Field{{Name: "score"}}},
+    )
+```
+
+2. Parse conversationTime from results (after line 116):
+```go
+// Parse creation time
+var creationTime time.Time
+if ctStr := safeString(m["creationTime"]); ctStr != "" {
+    creationTime, _ = time.Parse(time.RFC3339, ctStr)
+}
+
+// Parse conversation time (NEW)
+var conversationTime time.Time
+if ctStr := safeString(m["conversationTime"]); ctStr != "" {
+    conversationTime, _ = time.Parse(time.RFC3339, ctStr)
+}
+```
+
+3. Include in SearchHit (line 124):
+```go
+hit := model.SearchHit{
+    EntryID:          safeString(m["entryId"]),
+    ActorID:          safeString(m["actorId"]),
+    MemoryID:         safeString(m["memoryId"]),
+    Summary:          safeString(m["summary"]),
+    RawEntry:         rawEntry,
+    Score:            score,
+    CreationTime:     creationTime,
+    ConversationTime: conversationTime,  // NEW
+}
+```
+
+**File: `server/internal/model/types.go`**
+
+Add ConversationTime to SearchHit struct:
+```go
+type SearchHit struct {
+    EntryID          string    `json:"entryId"`
+    ActorID          string    `json:"actorId"`
+    MemoryID         string    `json:"memoryId"`
+    Summary          string    `json:"summary"`
+    RawEntry         string    `json:"rawEntry,omitempty"`
+    Score            float64   `json:"score"`
+    CreationTime     time.Time `json:"creationTime"`
+    ConversationTime time.Time `json:"conversationTime"`  // NEW
 }
 ```
 
@@ -412,12 +526,34 @@ def process_conversation_message(self, role: str, content: str,
     # ... rest of existing implementation
 ```
 
-### 5. Critical: Ensure conversation_time Flows Through Entire Pipeline
+### 5. Critical Data Flow for Conversation Time
 
-**IMPORTANT**: For the QA model to answer temporal questions correctly, conversation_time must flow through:
-1. **ADD** - Store conversation_time when adding entries
-2. **RETRIEVE** - Return conversation_time in list_entries and search results
-3. **CONTEXT** - Include dates in Timeline section for QA model
+**IMPORTANT**: For the QA model to answer temporal questions correctly, conversation_time must flow through the entire pipeline:
+
+#### Ingestion Path:
+1. Client sends conversation_time → API endpoint
+2. Stored in Postgres memory_entries.conversation_time
+3. Outbox record created with conversation_time in payload
+4. Outbox worker sends to Weaviate with conversation_time
+5. Weaviate indexes conversation_time as date field
+
+#### Retrieval Path:
+1. Search request → Weaviate query includes conversationTime field
+2. Weaviate returns entries with conversationTime
+3. SearchHit model includes ConversationTime
+4. API response includes conversationTime in search results
+5. Client/Agent builds Timeline from conversationTime
+
+#### List Entries Path:
+1. ListEntries query includes conversation_time from Postgres
+2. Entry response includes conversation_time
+3. MCP handler returns conversation_time to client
+
+#### Temporal Query Support:
+- Weaviate can filter by conversationTime ranges
+- Enables queries like "entries from last week"
+- Supports chronological sorting by conversation_time
+- Timeline in context uses conversation_time (not creation_time)
 
 #### Update Entry Response Structures
 
@@ -460,14 +596,6 @@ entry := map[string]interface{}{
     // ...
 }
 ```
-
-#### Update Search Integration
-
-**File: `server/internal/search/weaviate_client.go` (or equivalent)**
-
-Ensure search results include conversation_time so it's available for context building:
-- Include conversation_time in indexed data
-- Return conversation_time in search results
 
 #### Update Context Building
 

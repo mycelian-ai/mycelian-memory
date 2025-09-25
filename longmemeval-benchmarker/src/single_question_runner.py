@@ -1,16 +1,120 @@
 """SingleQuestionRunner using the clean agent implementation."""
 
-from typing import Any, Dict, TextIO, Optional
+from typing import Any, Dict, TextIO, Optional, List
 import logging
 import json
 import os
 import time
+from datetime import datetime
 
 from src.mycelian_memory_agent.build import build_agent_with_invoker
 from src.mycelian_memory_agent.mcp_utils import create_mcp_client
 from src.memory_manager import MemoryManager
 from pathlib import Path
 import sqlite3
+
+
+def _parse_haystack_date(date_str: str) -> Optional[str]:
+    """Parse haystack date format to ISO-8601.
+
+    Input formats:
+    - "2023/05/20 (Sat) 02:21" (full format with time)
+    - "2024-01-10" (simple date format)
+    Output format: "2023-05-20T02:21:00Z"
+    """
+    if not date_str:
+        return None
+
+    try:
+        # Try full format first (with day of week and time)
+        dt = datetime.strptime(date_str, "%Y/%m/%d (%a) %H:%M")
+        return dt.isoformat() + "Z"
+    except (ValueError, TypeError):
+        try:
+            # Try simple YYYY-MM-DD format
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            return dt.isoformat() + "Z"
+        except (ValueError, TypeError):
+            return None
+
+
+def _normalize_question(rec: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a question from raw dataset format to expected format.
+
+    Converts haystack_sessions (list of lists) to sessions (list of dicts)
+    and adds conversation_time from haystack_dates.
+    """
+    # Copy the original record
+    normalized = dict(rec)
+
+    # Extract haystack_dates if present
+    haystack_dates = rec.get("haystack_dates", [])
+    if not isinstance(haystack_dates, list):
+        haystack_dates = []
+
+    # Get sessions - prefer normalized format, fall back to haystack format
+    sessions_raw = rec.get("sessions")
+    if not sessions_raw:
+        sessions_raw = rec.get("haystack_sessions", [])
+
+    if not isinstance(sessions_raw, list):
+        sessions_raw = []
+
+    # Normalize sessions
+    norm_sessions: List[Dict[str, Any]] = []
+    for idx, s in enumerate(sessions_raw):
+        # Support either dict sessions with messages, or list-of-message sessions (haystack)
+        sid = None
+        msgs: List[Dict[str, Any]] = []
+
+        if isinstance(s, dict):
+            # Already normalized format
+            sid = s.get("session_id")
+            msgs = s.get("messages", [])
+            # Check if conversation_time already exists
+            if "conversation_time" in s:
+                norm_sessions.append(s)
+                continue
+        elif isinstance(s, list):
+            # Raw haystack format - list of messages
+            msgs = s
+
+        # Generate session ID if not present
+        sid = sid or f"S{idx+1}"
+
+        # Validate and copy messages
+        if not isinstance(msgs, list):
+            msgs = []
+
+        norm_msgs: List[Dict[str, Any]] = []
+        for m in msgs:
+            if isinstance(m, dict):
+                role = m.get("role")
+                content = m.get("content")
+                if isinstance(role, str) and isinstance(content, str):
+                    norm_msgs.append({"role": role, "content": content})
+
+        # Extract and parse timestamp for this session
+        conversation_time = None
+        if idx < len(haystack_dates):
+            raw_date = haystack_dates[idx]
+            conversation_time = _parse_haystack_date(raw_date)
+            if conversation_time:
+                logging.getLogger("dataset_normalization").debug(
+                    f"Session {sid}: parsed date '{raw_date}' -> '{conversation_time}'"
+                )
+
+        # Build normalized session
+        session_dict = {"session_id": sid, "messages": norm_msgs}
+        if conversation_time:
+            session_dict["conversation_time"] = conversation_time
+
+        norm_sessions.append(session_dict)
+
+    # Update the normalized record with sessions
+    normalized["sessions"] = norm_sessions
+
+    return normalized
 
 
 def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
@@ -31,6 +135,9 @@ def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
 
 def _build_qa_context(search_result: Dict[str, Any]) -> str:
     import json
+    import logging
+
+    logger = logging.getLogger("lme.qa_context")
 
     # Get latestContext - handle JSON-encoded strings
     latest_ctx_raw = search_result.get("latestContext") or ""
@@ -53,55 +160,103 @@ def _build_qa_context(search_result: Dict[str, Any]) -> str:
             latest_ctx = str(latest_ctx_raw)
     latest_ctx = latest_ctx.strip()
 
+    # Log latestContext details - FULL CONTENT
+    logger.info("QA_CONTEXT_BUILD latestContext_len=%d latestContext_full='%s'",
+                len(latest_ctx), latest_ctx)
+
     # Get context shards from contexts array (new API format)
     # Use all contexts returned by search (already limited by kc parameter)
     contexts = search_result.get("contexts") or []
     context_texts: list[str] = []
-    for ctx in contexts:  # Use all context shards returned
+    for i, ctx in enumerate(contexts):  # Use all context shards returned
         if isinstance(ctx, dict):
             ctx_text = ctx.get("context", "")
             if ctx_text:
                 context_texts.append(str(ctx_text))
+                # Log each context shard - FULL CONTENT
+                logger.info("QA_CONTEXT_BUILD context_shard=%d len=%d timestamp='%s' score=%f full_text='%s'",
+                           i, len(ctx_text), ctx.get("timestamp", ""), ctx.get("score", 0.0), ctx_text)
 
     # Get entry summaries
     # Use all entries returned by search (already limited by ke parameter)
     entries = search_result.get("entries") or []
     entries_text: list[str] = []
-    for e in entries:  # Use all entries returned
+    for i, e in enumerate(entries):  # Use all entries returned
         if isinstance(e, dict):
             txt = e.get("summary") or ""
             if txt:
                 entries_text.append(str(txt))
+                # Log each entry - FULL CONTENT
+                logger.info("QA_CONTEXT_BUILD entry=%d len=%d full_summary='%s'",
+                           i, len(txt), txt)
 
     # Build final context from all parts
     # Priority: latestContext, then context shards, then entry summaries
     parts = []
     if latest_ctx:
         parts.append(latest_ctx)
+        logger.info("QA_CONTEXT_BUILD added_latestContext=True")
     if context_texts:
         parts.append("\n\n".join(context_texts))
+        logger.info("QA_CONTEXT_BUILD added_context_shards=%d total_shard_chars=%d",
+                   len(context_texts), sum(len(t) for t in context_texts))
     if entries_text:
         parts.append("\n\n".join(entries_text))
+        logger.info("QA_CONTEXT_BUILD added_entries=%d total_entry_chars=%d",
+                   len(entries_text), sum(len(t) for t in entries_text))
 
-    return "\n\n".join(parts) if parts else ""
+    final_context = "\n\n".join(parts) if parts else ""
+
+    # Log the COMPLETE final context that will be sent to LLM
+    logger.info("QA_CONTEXT_BUILD final_context_len=%d final_context_full='%s'",
+                len(final_context), final_context)
+
+    return final_context
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:
     from src.model_providers import get_chat_model
+    import logging
+
+    logger = logging.getLogger("lme.qa_llm")
 
     prompt = (
         "You are a helpful assistant. Answer the question using the provided memory context.\n"
-        "Before answering, carefully consider what the question is asking for.\n"
-        "Evaluate each piece of relevant information in the context to determine if it should be part of your answer.\n\n"
+        "The context may contain information that has evolved over time. When interpreting:\n"
+        "- Pay attention to temporal indicators in the question (is/was, current/previous, first/last/best/worst)\n"
+        "- Notation like 'X → Y' indicates a value changed from X to Y\n"
+        "- Multiple mentions of the same type of information may represent its evolution\n"
+        "- Match your answer to what the question is specifically asking about\n\n"
+        "IMPORTANT: Before answering, think step-by-step:\n"
+        "1. What exactly is the question asking for?\n"
+        "2. What relevant information exists in the context?\n"
+        "3. If there are multiple pieces of related information, analyze each one carefully:\n"
+        "   - What does each piece of information represent?\n"
+        "   - When did each occur (check timestamps)?\n"
+        "   - How do they relate to each other?\n"
+        "   - Which one best answers the specific question being asked?\n"
+        "4. Consider the semantic meaning of terms like 'best', 'worst', 'first', 'last', 'current', etc.\n"
+        "5. Synthesize your analysis to provide the most accurate answer.\n\n"
+        "Think through your reasoning, then provide your answer.\n\n"
         + ("Context:\n" + context + "\n\n" if context else "")
         + "Question: "
         + (question_text or "")
     )
 
+    # Log the FULL prompt being sent to LLM
+    logger.info("QA_LLM_CALL model=%s prompt_len=%d full_prompt='%s'",
+                model_id, len(prompt), prompt)
+
     # Use provider-agnostic model with built-in retry
     llm = get_chat_model(model_id)  # max_retries=6 is default
     ans = llm.invoke(prompt)
-    return (getattr(ans, "content", str(ans)) or "").strip()
+    result = (getattr(ans, "content", str(ans)) or "").strip()
+
+    # Log the full response from LLM
+    logger.info("QA_LLM_RESPONSE model=%s response_len=%d full_response='%s'",
+                model_id, len(result), result)
+
+    return result
 
 
 def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: str,
@@ -118,7 +273,7 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
         logger = logging.getLogger("lme.runner")
 
     # First pass: Search with original question
-    logger.info("TWO_PASS_SEARCH pass=1 query='%s'", question[:100])
+    logger.info("TWO_PASS_SEARCH pass=1 query='%s' top_ke=10 top_kc=3", question)
 
     # Use higher limits for first pass to get broader results
     first_results = memory_manager.search_memories(
@@ -135,6 +290,20 @@ def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: 
     # Log what we found
     logger.info("TWO_PASS_SEARCH pass=1 found entries=%d contexts=%d",
                 len(entries or []), len(contexts or []))
+
+    # Log complete raw response
+    import json
+    logger.info("TWO_PASS_SEARCH pass=1 raw_response='%s'",
+                json.dumps(first_results, indent=2))
+
+    # Log ALL context shards from first pass - FULL CONTENT
+    for i, ctx_shard in enumerate(contexts, 1):
+        if isinstance(ctx_shard, dict):
+            ctx_text = ctx_shard.get("context", "")
+            ctx_score = ctx_shard.get("score", 0)
+            ctx_timestamp = ctx_shard.get("timestamp", "")
+            logger.info("TWO_PASS_SEARCH pass=1 shard=%d score=%.3f timestamp=%s full_context='%s'",
+                       i, ctx_score, ctx_timestamp, ctx_text)
 
     # Build summary of what we found for analysis
     summaries_text = "\n".join([
@@ -162,7 +331,7 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
     analysis = llm.invoke(analysis_prompt)
     analysis_text = (getattr(analysis, "content", str(analysis)) or "").strip()
 
-    logger.info("TWO_PASS_SEARCH analysis='%s'", analysis_text[:200])
+    logger.info("TWO_PASS_SEARCH analysis='%s'", analysis_text)
 
     # Check if second pass is needed
     if not analysis_text.startswith("REFINE:"):
@@ -176,7 +345,7 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
         return first_results
 
     # Second pass with refined query
-    logger.info("TWO_PASS_SEARCH pass=2 refined_query='%s'", refined_query[:100])
+    logger.info("TWO_PASS_SEARCH pass=2 refined_query='%s' top_ke=5 top_kc=2", refined_query)
 
     second_results = memory_manager.search_memories(
         memory_id,
@@ -221,6 +390,23 @@ If a refined search could help, respond with "REFINE: <refined query>"."""
     logger.info("TWO_PASS_SEARCH merged entries=%d contexts=%d",
                 len(merged["entries"]), len(merged["contexts"]))
 
+    # Log complete second pass response
+    logger.info("TWO_PASS_SEARCH pass=2 raw_response='%s'",
+                json.dumps(second_results, indent=2))
+
+    # Log ALL final merged context shards - FULL CONTENT
+    for i, ctx_shard in enumerate(merged["contexts"], 1):
+        if isinstance(ctx_shard, dict):
+            ctx_text = ctx_shard.get("context", "")
+            ctx_score = ctx_shard.get("score", 0)
+            ctx_timestamp = ctx_shard.get("timestamp", "")
+            logger.info("TWO_PASS_SEARCH merged shard=%d score=%.3f timestamp=%s full_context='%s'",
+                       i, ctx_score, ctx_timestamp, ctx_text)
+
+    # Log complete merged results
+    logger.info("TWO_PASS_SEARCH merged full_result='%s'",
+                json.dumps(merged, indent=2))
+
     return merged
 
 
@@ -240,6 +426,9 @@ class SingleQuestionRunner:
 
     def run_question(self, q: Dict[str, Any], vault_id: str, run_id: str, log: TextIO,
                     memory_id: Optional[str] = None, qa_log_path: Optional[str] = None) -> Dict[str, Any]:
+        # Normalize the question data to ensure sessions have conversation_time
+        q = _normalize_question(q)
+
         qid = q.get("question_id", "unknown")
         mem_title = (self.cfg.memory_title_template or "{question_id}__{run_id}").format(
             question_id=qid, run_id=run_id
@@ -287,9 +476,23 @@ class SingleQuestionRunner:
             # Attach handler only to per-question runner logger
             lg = logging.getLogger(f"lme.runner.{qid}")
             logger_snapshots.append((lg, list(lg.handlers), lg.propagate, lg.level))
-            lg.setLevel(logging.INFO)
+            # Use DEBUG level if root logger is at DEBUG, otherwise INFO
+            if logging.getLogger().level <= logging.DEBUG:
+                lg.setLevel(logging.DEBUG)
+            else:
+                lg.setLevel(logging.INFO)
             lg.addHandler(qhandler)
             lg.propagate = False
+            # Also attach handler to QA loggers so enhanced QA logs are captured
+            for name in ("lme.qa_context", "lme.qa_llm"):
+                ql = logging.getLogger(name)
+                logger_snapshots.append((ql, list(ql.handlers), ql.propagate, ql.level))
+                if logging.getLogger().level <= logging.DEBUG:
+                    ql.setLevel(logging.DEBUG)
+                else:
+                    ql.setLevel(logging.INFO)
+                ql.addHandler(qhandler)
+                ql.propagate = False
             # Defer agent logger handler until memory_id is known
             qhandler_agent = None
         except Exception:
@@ -367,7 +570,11 @@ class SingleQuestionRunner:
                 qhandler_agent.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
                 agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
                 logger_snapshots.append((agent_logger, list(agent_logger.handlers), agent_logger.propagate, agent_logger.level))
-                agent_logger.setLevel(logging.INFO)
+                # Use DEBUG level if root logger is at DEBUG, otherwise INFO
+                if logging.getLogger().level <= logging.DEBUG:
+                    agent_logger.setLevel(logging.DEBUG)
+                else:
+                    agent_logger.setLevel(logging.INFO)
                 agent_logger.addHandler(qhandler_agent)
                 agent_logger.propagate = False
             except Exception:
@@ -397,7 +604,11 @@ class SingleQuestionRunner:
                 qhandler_agent.setFormatter(logging.Formatter("%(asctime)s [%(filename)s:%(funcName)s] %(message)s"))
                 agent_logger = logging.getLogger(f"lme.agent.{memory_id}")
                 logger_snapshots.append((agent_logger, list(agent_logger.handlers), agent_logger.propagate, agent_logger.level))
-                agent_logger.setLevel(logging.INFO)
+                # Use DEBUG level if root logger is at DEBUG, otherwise INFO
+                if logging.getLogger().level <= logging.DEBUG:
+                    agent_logger.setLevel(logging.DEBUG)
+                else:
+                    agent_logger.setLevel(logging.INFO)
                 agent_logger.addHandler(qhandler_agent)
                 agent_logger.propagate = False
             except Exception:
@@ -413,14 +624,25 @@ class SingleQuestionRunner:
         try:
             # Skip ingestion for QA-only mode
             if self.mode != "qa":
+                # Debug: Log what we received from dataset
+                sessions = q.get("sessions", [])
+                runner_log.debug("SESSIONS_DEBUG qid=%s sessions_count=%d", qid, len(sessions))
+                for idx, s in enumerate(sessions):
+                    runner_log.debug("SESSION_DEBUG qid=%s idx=%d type=%s has_conversation_time=%s value=%s",
+                                   qid, idx, type(s).__name__,
+                                   "conversation_time" in s if isinstance(s, dict) else False,
+                                   s.get("conversation_time") if isinstance(s, dict) else None)
+
                 # Process all sessions
-                for s_idx, s in enumerate(q.get("sessions", []), start=1):
+                for s_idx, s in enumerate(sessions, start=1):
                     thread_id = f"{memory_id}:s{s_idx}"
-                    runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s",
-                                  qid, s_idx, memory_id, thread_id)
+                    # Extract conversation_time for this session if available
+                    conversation_time = s.get("conversation_time") if isinstance(s, dict) else None
+                    runner_log.info("SESSION_START qid=%s s=%d memory_id=%s thread_id=%s conversation_time=%s",
+                                  qid, s_idx, memory_id, thread_id, conversation_time)
 
                     # Start session (retrieves context and recent entries)
-                    invoker.start_session(thread_id)
+                    invoker.start_session(thread_id, conversation_time)
 
                     try:
                         # Process all messages in the session
@@ -437,7 +659,8 @@ class SingleQuestionRunner:
                                 invoker.process_conversation_message(
                                     role=role,
                                     content=content,
-                                    thread_id=thread_id
+                                    thread_id=thread_id,
+                                    conversation_time=conversation_time
                                 )
                                 messages_processed += 1
                                 # Periodically persist message-level progress (every 10 messages)
@@ -446,7 +669,7 @@ class SingleQuestionRunner:
                         # Always attempt to end the session and advance counters,
                         # even if message processing raised.
                         try:
-                            invoker.end_session(thread_id)
+                            invoker.end_session(thread_id, conversation_time)
                         except Exception:
                             # Best-effort: continue to mark progress so orchestrator can resume safely
                             pass
@@ -516,10 +739,14 @@ class SingleQuestionRunner:
                 )
             else:
                 runner_log.info("SEARCH_MEMORIES qid=%s memory_id=%s mode=single query='%s' top_ke=%d top_kc=%d",
-                              qid, memory_id, query_text[:100], 5, 3)
+                              qid, memory_id, query_text, 5, 3)  # Log full query
                 sr = memory_manager.search_memories(
                     memory_id, query=query_text, top_ke=5, top_kc=3
                 )
+                # Log complete single mode response
+                import json
+                runner_log.info("SEARCH_MEMORIES single mode full_response='%s'",
+                              json.dumps(sr, indent=2))
 
             # Log search results
             entries_count = len((sr.get("entries") or []) if isinstance(sr, dict) else [])
@@ -528,11 +755,41 @@ class SingleQuestionRunner:
             runner_log.info("SEARCH_RESULT qid=%s entries=%d has_latest=%s contexts=%d",
                           qid, entries_count, has_latest, contexts_count)
 
-            # Build context and log it
+            # Log ALL context shards with FULL CONTENT
+            if isinstance(sr, dict):
+                contexts = sr.get("contexts") or []
+                for i, ctx_shard in enumerate(contexts, 1):  # Log ALL shards
+                    if isinstance(ctx_shard, dict):
+                        ctx_text = ctx_shard.get("context", "")
+                        ctx_score = ctx_shard.get("score", 0)
+                        ctx_timestamp = ctx_shard.get("timestamp", "")
+                        runner_log.info("CONTEXT_SHARD qid=%s shard=%d score=%.3f timestamp=%s full_context='%s'",
+                                      qid, i, ctx_score, ctx_timestamp, ctx_text)
+
+                # Log ALL entries with FULL CONTENT
+                entries = sr.get("entries") or []
+                for i, entry in enumerate(entries, 1):  # Log ALL entries
+                    if isinstance(entry, dict):
+                        # Log complete entry as JSON
+                        import json
+                        runner_log.info("ENTRY qid=%s entry=%d full_entry='%s'",
+                                      qid, i, json.dumps(entry, indent=2))
+
+            # Build context and log it - FULL CONTENT
             ctx = _build_qa_context(sr)
-            ctx_preview = ctx[:500] if ctx else "(empty)"
-            runner_log.info("QA_CONTEXT qid=%s context_len=%d preview='%s'",
-                          qid, len(ctx) if ctx else 0, ctx_preview)
+            runner_log.info("QA_CONTEXT qid=%s context_len=%d full_context='%s'",
+                          qid, len(ctx) if ctx else 0, ctx)
+
+            # Also log context by sections for easier analysis
+            sections = ["# Description", "# Facts", "# Preferences", "# Decisions",
+                       "# Recommendations", "# Topics", "# Entities", "# Notes", "# Timeline"]
+            for section in sections:
+                if section in ctx:
+                    start = ctx.index(section)
+                    end = ctx.find("\n#", start + 1)
+                    section_content = ctx[start:end] if end > 0 else ctx[start:]
+                    runner_log.info("QA_CONTEXT_SECTION qid=%s section='%s' content='%s'",
+                                  qid, section, section_content)
 
             # Run QA and log
             runner_log.info("QA_INVOKE qid=%s model=%s", qid, self.cfg.models.qa)

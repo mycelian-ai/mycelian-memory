@@ -31,13 +31,14 @@ class MycelianAgentInvoker:
         self.agent = agent
         self.logger = logger or logging.getLogger(f"{DEFAULT_INVOKER_LOGGER}.{getattr(agent, 'memory_id', 'unknown')}")
         self.msg_count = 0
-    def start_session(self, thread_id: str) -> None:
+    def start_session(self, thread_id: str, conversation_time: Optional[str] = None) -> None:
         """Start a new session.
 
         This retrieves previous context and recent entries.
 
         Args:
             thread_id: Unique identifier for this conversation thread
+            conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
         """
         self.msg_count = 0
 
@@ -45,27 +46,41 @@ class MycelianAgentInvoker:
                 "event": "invoker_start_session",
                 "timestamp": datetime.utcnow().isoformat(),
                 "thread_id": thread_id,
-                "msg_count_reset": True
+                "msg_count_reset": True,
+                "conversation_time": conversation_time
             }))
 
         result = self.agent.invoke(
             control=ControlState.START_SESSION,
-            thread_id=thread_id
+            thread_id=thread_id,
+            conversation_time=conversation_time
         )
         return result
 
-    def process_conversation_message(self, role: str, content: str, thread_id: str) -> None:
+    def process_conversation_message(self, role: str, content: str, thread_id: str,
+                                     conversation_time: Optional[str] = None) -> None:
         """Process a conversation message, handling flush automatically.
 
         Args:
             role: The role of the message (user, assistant, etc.)
             content: The content of the message
             thread_id: Unique identifier for this conversation thread
+            conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
         """
         self.msg_count += 1
 
         # Build message internally
         message = ChatMessage(role=role, content=content)
+
+        # Debug log for conversation_time
+        self.logger.debug(json.dumps({
+            "event": "invoker_conversation_time_debug",
+            "timestamp": datetime.utcnow().isoformat(),
+            "thread_id": thread_id,
+            "conversation_time": conversation_time,
+            "conversation_time_type": type(conversation_time).__name__,
+            "conversation_time_is_none": conversation_time is None
+        }))
 
         # Always process the message first
         self.logger.info(json.dumps({
@@ -75,13 +90,15 @@ class MycelianAgentInvoker:
                 "msg_count": self.msg_count,
                 "control": ControlState.PROCESS_MESSAGE.value,
                 "role": role,
-                "content_preview": content[:200] if content else None
+                "content_preview": content[:200] if content else None,
+                "conversation_time": conversation_time
             }))
 
         result = self.agent.invoke(
             control=ControlState.PROCESS_MESSAGE,
             thread_id=thread_id,
-            to_process=message
+            to_process=message,
+            conversation_time=conversation_time
         )
 
         # Then flush if needed (every 6 messages)
@@ -100,23 +117,26 @@ class MycelianAgentInvoker:
 
         return result
 
-    def end_session(self, thread_id: str) -> None:
+    def end_session(self, thread_id: str, conversation_time: Optional[str] = None) -> None:
         """End the session.
 
         This ensures consistency and saves the final context.
 
         Args:
             thread_id: Unique identifier for this conversation thread
+            conversation_time: Optional ISO-8601 timestamp of when the conversation occurred
         """
         self.logger.info(json.dumps({
                 "event": "invoker_end_session",
                 "timestamp": datetime.utcnow().isoformat(),
                 "thread_id": thread_id,
-                "final_msg_count": self.msg_count
+                "final_msg_count": self.msg_count,
+                "conversation_time": conversation_time
             }))
 
         result = self.agent.invoke(
             control=ControlState.END_SESSION,
-            thread_id=thread_id
+            thread_id=thread_id,
+            conversation_time=conversation_time
         )
         return result

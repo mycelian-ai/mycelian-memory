@@ -49,7 +49,11 @@ When debug mode is enabled, the CLI will output structured JSON logs showing:
 
 #### Entry Operations
 ```bash
+# Create entry with current timestamp (default)
 mycelianCli --debug create-entry --vault-id vault-123 --memory-id mem-456 --raw-entry "test" --summary "test summary"
+
+# Create entry with specific conversation timestamp
+mycelianCli --debug create-entry --vault-id vault-123 --memory-id mem-456 --raw-entry "test" --summary "test summary" --conversation-time "2025-01-15T14:30:00Z"
 ```
 
 #### Context Operations
