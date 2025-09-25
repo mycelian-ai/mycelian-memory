@@ -49,6 +49,21 @@ Extract information that could answer "who, what, when, where, why, how" questio
 - Omit dates for atemporal attributes (has MBA, has 2 siblings) but include date for temporal facts (e.g., 'got MBA on 2019-05-15')
 - Timeline section tracks when topics were discussed and when you learned things
 
+#### Qualifier Preservation (CRITICAL)
+- Keep the scope words in the fact. Do not drop them.
+  - Examples: "charity 5K", "practice run", "official", "home/away", source or dataset names.
+- If the same metric appears in different scopes, keep one fact per scope. Do not overwrite.
+- When shortening, remove filler words — not the qualifier.
+- In Timeline, include the qualifier when it helps disambiguate.
+
+- Examples:
+  - Facts:
+    - `- User personal best 5K (overall): 25:50 [2023-05-30]`
+    - `- User personal best 5K (charity 5K): 27:12 [2023-05-23]`
+  - Timeline:
+    - `- 2023-05-23: Charity 5K - time 27:12`
+    - `- 2023-05-30: 5K (non-charity) - time 25:50`
+
 #### Timeline Construction with Conversation Timestamp
 When Conversation Timestamp is provided:
 - Use the Conversation Timestamp as the date for Timeline entries
@@ -70,6 +85,17 @@ For each fact:
 - Include temporal markers if relevant
 - Resolve all pronouns to specific entities
 - Separate facts from interpretations
+
+- When facts differ only because of qualifiers (scope), keep both with their qualifiers instead of applying a value update. Use the Fact Update format only when the scope is identical.
+  - Examples:
+    - Keep both (different scopes):
+      - `- User personal best 5K (overall): 25:50 [2023-05-30]`
+      - `- User personal best 5K (charity 5K): 27:12 [2023-05-23]`
+    - Do NOT do (wrong cross-scope update):
+      - `- User personal best 5K: 27:12 → 25:50 [2023-05-30]`
+    - Correct value update (scope identical):
+      - `- User personal best 5K (overall): 26:30 → 25:50 [2023-05-30]`
+      - `- User weight: 172 lb → 168 lb [2025-05-01]`
 
 Fact Update Rules:
 - MERGE valid facts from previous context with new facts from current session

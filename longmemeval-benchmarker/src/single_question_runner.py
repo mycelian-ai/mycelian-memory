@@ -135,6 +135,9 @@ def _derive_question_from_sessions(rec: Dict[str, Any]) -> str:
 
 def _build_qa_context(search_result: Dict[str, Any]) -> str:
     import json
+    import logging
+
+    logger = logging.getLogger("lme.qa_context")
 
     # Get latestContext - handle JSON-encoded strings
     latest_ctx_raw = search_result.get("latestContext") or ""
@@ -157,41 +160,65 @@ def _build_qa_context(search_result: Dict[str, Any]) -> str:
             latest_ctx = str(latest_ctx_raw)
     latest_ctx = latest_ctx.strip()
 
+    # Log latestContext details - FULL CONTENT
+    logger.info("QA_CONTEXT_BUILD latestContext_len=%d latestContext_full='%s'",
+                len(latest_ctx), latest_ctx)
+
     # Get context shards from contexts array (new API format)
     # Use all contexts returned by search (already limited by kc parameter)
     contexts = search_result.get("contexts") or []
     context_texts: list[str] = []
-    for ctx in contexts:  # Use all context shards returned
+    for i, ctx in enumerate(contexts):  # Use all context shards returned
         if isinstance(ctx, dict):
             ctx_text = ctx.get("context", "")
             if ctx_text:
                 context_texts.append(str(ctx_text))
+                # Log each context shard - FULL CONTENT
+                logger.info("QA_CONTEXT_BUILD context_shard=%d len=%d timestamp='%s' score=%f full_text='%s'",
+                           i, len(ctx_text), ctx.get("timestamp", ""), ctx.get("score", 0.0), ctx_text)
 
     # Get entry summaries
     # Use all entries returned by search (already limited by ke parameter)
     entries = search_result.get("entries") or []
     entries_text: list[str] = []
-    for e in entries:  # Use all entries returned
+    for i, e in enumerate(entries):  # Use all entries returned
         if isinstance(e, dict):
             txt = e.get("summary") or ""
             if txt:
                 entries_text.append(str(txt))
+                # Log each entry - FULL CONTENT
+                logger.info("QA_CONTEXT_BUILD entry=%d len=%d full_summary='%s'",
+                           i, len(txt), txt)
 
     # Build final context from all parts
     # Priority: latestContext, then context shards, then entry summaries
     parts = []
     if latest_ctx:
         parts.append(latest_ctx)
+        logger.info("QA_CONTEXT_BUILD added_latestContext=True")
     if context_texts:
         parts.append("\n\n".join(context_texts))
+        logger.info("QA_CONTEXT_BUILD added_context_shards=%d total_shard_chars=%d",
+                   len(context_texts), sum(len(t) for t in context_texts))
     if entries_text:
         parts.append("\n\n".join(entries_text))
+        logger.info("QA_CONTEXT_BUILD added_entries=%d total_entry_chars=%d",
+                   len(entries_text), sum(len(t) for t in entries_text))
 
-    return "\n\n".join(parts) if parts else ""
+    final_context = "\n\n".join(parts) if parts else ""
+
+    # Log the COMPLETE final context that will be sent to LLM
+    logger.info("QA_CONTEXT_BUILD final_context_len=%d final_context_full='%s'",
+                len(final_context), final_context)
+
+    return final_context
 
 
 def _run_qa(model_id: str, question_text: str, context: str) -> str:
     from src.model_providers import get_chat_model
+    import logging
+
+    logger = logging.getLogger("lme.qa_llm")
 
     prompt = (
         "You are a helpful assistant. Answer the question using the provided memory context.\n"
@@ -200,17 +227,36 @@ def _run_qa(model_id: str, question_text: str, context: str) -> str:
         "- Notation like 'X → Y' indicates a value changed from X to Y\n"
         "- Multiple mentions of the same type of information may represent its evolution\n"
         "- Match your answer to what the question is specifically asking about\n\n"
-        "Before answering, carefully consider what the question is asking for.\n"
-        "Evaluate each piece of relevant information in the context to determine if it should be part of your answer.\n\n"
+        "IMPORTANT: Before answering, think step-by-step:\n"
+        "1. What exactly is the question asking for?\n"
+        "2. What relevant information exists in the context?\n"
+        "3. If there are multiple pieces of related information, analyze each one carefully:\n"
+        "   - What does each piece of information represent?\n"
+        "   - When did each occur (check timestamps)?\n"
+        "   - How do they relate to each other?\n"
+        "   - Which one best answers the specific question being asked?\n"
+        "4. Consider the semantic meaning of terms like 'best', 'worst', 'first', 'last', 'current', etc.\n"
+        "5. Synthesize your analysis to provide the most accurate answer.\n\n"
+        "Think through your reasoning, then provide your answer.\n\n"
         + ("Context:\n" + context + "\n\n" if context else "")
         + "Question: "
         + (question_text or "")
     )
 
+    # Log the FULL prompt being sent to LLM
+    logger.info("QA_LLM_CALL model=%s prompt_len=%d full_prompt='%s'",
+                model_id, len(prompt), prompt)
+
     # Use provider-agnostic model with built-in retry
     llm = get_chat_model(model_id)  # max_retries=6 is default
     ans = llm.invoke(prompt)
-    return (getattr(ans, "content", str(ans)) or "").strip()
+    result = (getattr(ans, "content", str(ans)) or "").strip()
+
+    # Log the full response from LLM
+    logger.info("QA_LLM_RESPONSE model=%s response_len=%d full_response='%s'",
+                model_id, len(result), result)
+
+    return result
 
 
 def _two_pass_search(memory_manager: "MemoryManager", memory_id: str, question: str,
@@ -437,6 +483,16 @@ class SingleQuestionRunner:
                 lg.setLevel(logging.INFO)
             lg.addHandler(qhandler)
             lg.propagate = False
+            # Also attach handler to QA loggers so enhanced QA logs are captured
+            for name in ("lme.qa_context", "lme.qa_llm"):
+                ql = logging.getLogger(name)
+                logger_snapshots.append((ql, list(ql.handlers), ql.propagate, ql.level))
+                if logging.getLogger().level <= logging.DEBUG:
+                    ql.setLevel(logging.DEBUG)
+                else:
+                    ql.setLevel(logging.INFO)
+                ql.addHandler(qhandler)
+                ql.propagate = False
             # Defer agent logger handler until memory_id is known
             qhandler_agent = None
         except Exception:
