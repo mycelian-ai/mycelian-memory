@@ -270,7 +270,7 @@ For detailed information about the monorepo structure, versioning, and developme
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow, and contribution guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow, and contribution guidelines. Day-to-day coding expectations and command references live in [AGENTS.md](AGENTS.md).
 
 ---
 
