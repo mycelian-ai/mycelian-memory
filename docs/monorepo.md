@@ -1,5 +1,7 @@
 # Mycelian Monorepo Layout
 
+For contributor workflow, commands, and coding expectations, keep [AGENTS.md](../AGENTS.md) nearby alongside this layout reference.
+
 ## Why we structure it this way
 
 - **Hide server code** – All backend code lives in `internal/`, so nothing outside the repo can import it. This lets us refactor without breaking users.

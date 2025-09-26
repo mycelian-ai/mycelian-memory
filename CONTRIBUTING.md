@@ -23,7 +23,7 @@ This is early-stage software under active development. APIs will change, docs wi
 
 ### Understanding the Project Structure
 
-Before diving in, review our [monorepo documentation](docs/monorepo.md) to understand how the project is organized.
+Before diving in, review our [monorepo documentation](docs/monorepo.md) to understand how the project is organized. Keep [AGENTS.md](AGENTS.md) handy for coding conventions, commands, and testing expectations.
 
 **Key components:**
 - **Go modules**: Server, Client SDK, MCP server, and CLI tools
