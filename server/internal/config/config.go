@@ -48,6 +48,15 @@ type Config struct {
 	// Vector search index endpoint (provider-agnostic)
 	SearchIndexURL string `envconfig:"SEARCH_INDEX_URL" default:""`
 
+	// Outbox worker configuration
+	OutboxBatchSize                  int `envconfig:"OUTBOX_BATCH_SIZE" default:"100"`
+	OutboxIntervalSeconds            int `envconfig:"OUTBOX_INTERVAL_SECONDS" default:"2"`
+	OutboxLeaseSeconds               int `envconfig:"OUTBOX_LEASE_SECONDS" default:"30"`
+	OutboxEmbedTimeoutSeconds        int `envconfig:"OUTBOX_EMBED_TIMEOUT_SECONDS" default:"12"`
+	OutboxIndexTimeoutSeconds        int `envconfig:"OUTBOX_INDEX_TIMEOUT_SECONDS" default:"5"`
+	OutboxStartupEmbedTimeoutSeconds int `envconfig:"OUTBOX_STARTUP_EMBED_TIMEOUT_SECONDS" default:"10"`
+	OutboxBackoffCapSeconds          int `envconfig:"OUTBOX_BACKOFF_CAP_SECONDS" default:"60"`
+
 	// Health checker configuration
 	HealthIntervalSeconds     int `envconfig:"HEALTH_INTERVAL_SECONDS" default:"30"`
 	HealthProbeTimeoutSeconds int `envconfig:"HEALTH_PROBE_TIMEOUT_SECONDS" default:"2"`

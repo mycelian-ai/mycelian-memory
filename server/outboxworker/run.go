@@ -33,6 +33,11 @@ func Run() error {
 	if err := db.Ping(); err != nil {
 		log.Fatal().Err(err).Msg("postgres ping")
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Warn().Err(err).Msg("closing postgres connection")
+		}
+	}()
 
 	var emb interface {
 		Embed(context.Context, string) ([]float32, error)
@@ -45,21 +50,39 @@ func Run() error {
 		log.Fatal().Str("provider", cfg.EmbedProvider).Msg("critical dependency missing: embedder not configured")
 	}
 	// Validate embedder readiness at startup
-	if vec, err := emb.Embed(context.Background(), "worker-startup-check"); err != nil || len(vec) == 0 {
+	startupTimeout := time.Duration(cfg.OutboxStartupEmbedTimeoutSeconds) * time.Second
+	if startupTimeout <= 0 {
+		startupTimeout = 10 * time.Second
+	}
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), startupTimeout)
+	defer cancelStartup()
+	if vec, err := emb.Embed(startupCtx, "worker-startup-check"); err != nil || len(vec) == 0 {
 		return fmt.Errorf("embedder not ready: provider=%s model=%s err=%v len=%d", cfg.EmbedProvider, cfg.EmbedModel, err, len(vec))
 	}
 
 	// Ensure schema exists in dev/e2e; safe to call repeatedly.
-	_ = searchindex.BootstrapWeaviate(context.Background(), cfg.SearchIndexURL)
+	bootstrapTimeout := time.Duration(cfg.BootstrapTimeoutSeconds) * time.Second
+	if bootstrapTimeout <= 0 {
+		bootstrapTimeout = 5 * time.Second
+	}
+	bootstrapCtx, cancelBootstrap := context.WithTimeout(context.Background(), bootstrapTimeout)
+	defer cancelBootstrap()
+	if err := searchindex.BootstrapWeaviate(bootstrapCtx, cfg.SearchIndexURL); err != nil {
+		return fmt.Errorf("bootstrap search index: %w", err)
+	}
 	idx, err := searchindex.NewWeaviateNativeIndex(cfg.SearchIndexURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("search index")
 	}
 
 	w := outbox.NewWorker(db, emb, idx, outbox.Config{
-		PostgresDSN: cfg.PostgresDSN,
-		BatchSize:   100,
-		Interval:    2 * time.Second,
+		PostgresDSN:   cfg.PostgresDSN,
+		BatchSize:     cfg.OutboxBatchSize,
+		Interval:      time.Duration(cfg.OutboxIntervalSeconds) * time.Second,
+		EmbedTimeout:  time.Duration(cfg.OutboxEmbedTimeoutSeconds) * time.Second,
+		IndexTimeout:  time.Duration(cfg.OutboxIndexTimeoutSeconds) * time.Second,
+		LeaseDuration: time.Duration(cfg.OutboxLeaseSeconds) * time.Second,
+		BackoffCap:    time.Duration(cfg.OutboxBackoffCapSeconds) * time.Second,
 	}, log.Logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
