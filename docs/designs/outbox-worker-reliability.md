@@ -5,7 +5,6 @@ This note captures reliability risks observed in the outbox worker implementatio
 
 ## Recent Updates
 - Added configurable timeouts for startup embedding checks (default 10 s), per-job embeds (12 s), and index mutations (5 s) so dependency hangs surface quickly.
-- Introduced lease-based job processing: rows move to `processing` with a configurable lease (default 30 s), work is performed outside the DB transaction, and expired leases reset automatically.
 - Surface Weaviate bootstrap failures and close Postgres connections cleanly to avoid hidden startup issues.
 
 ## Identified Reliability Risks
@@ -30,7 +29,7 @@ This note captures reliability risks observed in the outbox worker implementatio
      - 5 s for search-index writes/deletes; they normally complete in <500 ms, so the timeout catches network stalls while keeping retries fast.
    - Treat deadline or cancellation as retryable errors so jobs requeue quickly without blocking the batch. The existing logging already records these errors as `context deadline exceeded`, but we can add structured fields (e.g., `reason=timeout`) if we want clearer dashboards.
 4. **Decouple DB transactions from external work**
-    - Consider marking rows as `processing` and committing before network calls, or re-queueing per job by committing after each job finishes. This limits lock duration and reduces the blast radius of slow dependencies. (Status: implemented with lease-based processing.)
+    - Current implementation still performs embedding/indexing inside the transaction and relies on row locks to provide at-least-once semantics. If dependency latency becomes an issue, we should either mark rows as `processing` with leases or commit between jobs to shorten the lock window.
 5. **Strengthen verification and observability**
    - Extend `server/internal/outbox` tests beyond the `handle` helper: add coverage for `processOnce`, lease/backoff behaviour, and delete operations (including failure paths) so the state machine is guarded by automated checks.
    - Continue enriching logs (attempt counters, retry schedules, elapsed duration) to speed incident triage; keep debug-only payload logging behind config so sensitive text stays out of production logs.

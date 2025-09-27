@@ -28,34 +28,18 @@ const (
 // SQL statements kept as constants for clarity and reuse
 const (
 	selectReadyRowsSQL = `
-SELECT id, op, payload, aggregate_id, attempt_count, next_attempt_at, leased_until
+SELECT id, op, payload, aggregate_id, attempt_count, next_attempt_at
 FROM outbox
 WHERE status = 'pending' AND next_attempt_at <= now()
 ORDER BY id ASC
 FOR UPDATE SKIP LOCKED
 LIMIT $1`
 
-	resetExpiredLeasesSQL = `
-UPDATE outbox
-SET status='pending',
-	leased_until=NULL,
-	update_time=now()
-WHERE status='processing' AND leased_until IS NOT NULL AND leased_until <= now()`
-
-	markProcessingSQL = `
-UPDATE outbox
-SET status='processing',
-	leased_until = now() + make_interval(secs => $2),
-	update_time = now()
-WHERE id=$1`
-
-	markDoneSQL = `UPDATE outbox SET status='done', leased_until=NULL, update_time=now() WHERE id=$1`
+	markDoneSQL = `UPDATE outbox SET status='done', update_time=now() WHERE id=$1`
 
 	markFailedSQL = `
 UPDATE outbox
 SET attempt_count = attempt_count + 1,
-	status='pending',
-	leased_until=NULL,
 	next_attempt_at = now() + make_interval(secs => LEAST(POWER(2, attempt_count+1), $2)),
 	update_time = now()
 WHERE id=$1`
@@ -63,13 +47,12 @@ WHERE id=$1`
 
 // Config controls batch size and polling cadence.
 type Config struct {
-	PostgresDSN   string        // currently unused here (DB is injected), kept for symmetry with main
-	BatchSize     int           // number of rows to lease per cycle
-	Interval      time.Duration // poll interval
-	EmbedTimeout  time.Duration
-	IndexTimeout  time.Duration
-	LeaseDuration time.Duration
-	BackoffCap    time.Duration
+	PostgresDSN  string        // currently unused here (DB is injected), kept for symmetry with main
+	BatchSize    int           // number of rows to lease per cycle
+	Interval     time.Duration // poll interval
+	EmbedTimeout time.Duration
+	IndexTimeout time.Duration
+	BackoffCap   time.Duration
 }
 
 // Worker processes outbox rows and applies them to the vector store.
@@ -94,9 +77,6 @@ func NewWorker(db *sql.DB, emb emb.EmbeddingProvider, idx searchindex.Index, cfg
 	}
 	if cfg.IndexTimeout <= 0 {
 		cfg.IndexTimeout = 5 * time.Second
-	}
-	if cfg.LeaseDuration <= 0 {
-		cfg.LeaseDuration = 30 * time.Second
 	}
 	if cfg.BackoffCap <= 0 {
 		cfg.BackoffCap = 60 * time.Second
@@ -131,7 +111,6 @@ type job struct {
 	payload      map[string]interface{}
 	attemptCount int
 	nextAttempt  time.Time
-	leasingEnds  time.Time
 }
 
 func (w *Worker) processOnce(ctx context.Context) error {
@@ -141,21 +120,12 @@ func (w *Worker) processOnce(ctx context.Context) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, resetExpiredLeasesSQL); err != nil {
-		return err
-	}
-
-	jobs, err := w.leaseBatch(ctx, tx, w.cfg.BatchSize, w.cfg.LeaseDuration)
+	jobs, err := w.leaseBatch(ctx, tx, w.cfg.BatchSize)
 	if err != nil {
 		return err
 	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
 	if len(jobs) == 0 {
-		return nil
+		return tx.Commit()
 	}
 
 	for _, j := range jobs {
@@ -172,73 +142,48 @@ func (w *Worker) processOnce(ctx context.Context) error {
 				Int("attempt", j.attemptCount+1).
 				Dur("elapsed", time.Since(jobStart)).
 				Dur("next_delay", nextDelay).
-				Time("leased_until", j.leasingEnds).
 				Time("prev_next_attempt_at", j.nextAttempt).
 				Time("next_attempt_at_est", nextETA).
 				Msg("outbox handle error; marking failed")
 
-			if e := w.markFailed(ctx, j.id); e != nil {
+			if e := w.markFailed(ctx, tx, j.id); e != nil {
 				w.log.Error().Err(e).Int64("id", j.id).Msg("markFailed error")
 			}
 			continue
 		}
-		if e := w.markDone(ctx, j.id); e != nil {
+		if e := w.markDone(ctx, tx, j.id); e != nil {
 			w.log.Error().Err(e).Int64("id", j.id).Msg("markDone error")
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 // leaseBatch locks and returns up to batchSize ready outbox rows.
-func (w *Worker) leaseBatch(ctx context.Context, tx *sql.Tx, batchSize int, leaseDuration time.Duration) ([]job, error) {
+func (w *Worker) leaseBatch(ctx context.Context, tx *sql.Tx, batchSize int) ([]job, error) {
 	rows, err := tx.QueryContext(ctx, selectReadyRowsSQL, batchSize)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	if leaseDuration <= 0 {
-		leaseDuration = 30 * time.Second
-	}
-	leaseSeconds := float64(leaseDuration / time.Second)
-	if leaseSeconds <= 0 {
-		leaseSeconds = 30
-	}
-	backoffCapSeconds := float64(w.cfg.BackoffCap / time.Second)
-	if backoffCapSeconds <= 0 {
-		backoffCapSeconds = 60
-	}
-
 	var jobs []job
 	for rows.Next() {
 		var j job
 		var raw []byte
-		var leaseUntil sql.NullTime
-		if err := rows.Scan(&j.id, &j.op, &raw, &j.aggregateID, &j.attemptCount, &j.nextAttempt, &leaseUntil); err != nil {
+		if err := rows.Scan(&j.id, &j.op, &raw, &j.aggregateID, &j.attemptCount, &j.nextAttempt); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(raw, &j.payload); err != nil {
 			// Poison pill: mark failed so it backs off and won’t hot-loop
-			_, _ = tx.ExecContext(ctx, markFailedSQL, j.id, backoffCapSeconds)
+			_, _ = tx.ExecContext(ctx, markFailedSQL, j.id, w.backoffCapSeconds())
 			continue
-		}
-		if leaseUntil.Valid {
-			j.leasingEnds = leaseUntil.Time
 		}
 		jobs = append(jobs, j)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-
-	for i := range jobs {
-		if _, err := tx.ExecContext(ctx, markProcessingSQL, jobs[i].id, leaseSeconds); err != nil {
-			return nil, err
-		}
-		jobs[i].leasingEnds = time.Now().Add(leaseDuration)
-	}
-
 	return jobs, nil
 }
 
@@ -310,17 +255,13 @@ func (w *Worker) handle(ctx context.Context, j job) error {
 	}
 }
 
-func (w *Worker) markDone(ctx context.Context, id int64) error {
-	_, err := w.db.ExecContext(ctx, markDoneSQL, id)
+func (w *Worker) markDone(ctx context.Context, tx *sql.Tx, id int64) error {
+	_, err := tx.ExecContext(ctx, markDoneSQL, id)
 	return err
 }
 
-func (w *Worker) markFailed(ctx context.Context, id int64) error {
-	capSeconds := float64(w.cfg.BackoffCap / time.Second)
-	if capSeconds <= 0 {
-		capSeconds = 60
-	}
-	_, err := w.db.ExecContext(ctx, markFailedSQL, id, capSeconds)
+func (w *Worker) markFailed(ctx context.Context, tx *sql.Tx, id int64) error {
+	_, err := tx.ExecContext(ctx, markFailedSQL, id, w.backoffCapSeconds())
 	return err
 }
 
@@ -416,13 +357,18 @@ func (w *Worker) failureBackoffDuration(nextAttemptCount int) time.Duration {
 	if nextAttemptCount <= 0 {
 		return 0
 	}
-	capSeconds := w.cfg.BackoffCap.Seconds()
-	if capSeconds <= 0 {
-		capSeconds = 60
-	}
+	capSeconds := w.backoffCapSeconds()
 	pow := math.Pow(2, float64(nextAttemptCount))
 	if pow > capSeconds {
 		pow = capSeconds
 	}
 	return time.Duration(pow) * time.Second
+}
+
+func (w *Worker) backoffCapSeconds() float64 {
+	capSeconds := w.cfg.BackoffCap.Seconds()
+	if capSeconds <= 0 {
+		capSeconds = 60
+	}
+	return capSeconds
 }

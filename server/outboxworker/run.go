@@ -76,13 +76,12 @@ func Run() error {
 	}
 
 	w := outbox.NewWorker(db, emb, idx, outbox.Config{
-		PostgresDSN:   cfg.PostgresDSN,
-		BatchSize:     cfg.OutboxBatchSize,
-		Interval:      time.Duration(cfg.OutboxIntervalSeconds) * time.Second,
-		EmbedTimeout:  time.Duration(cfg.OutboxEmbedTimeoutSeconds) * time.Second,
-		IndexTimeout:  time.Duration(cfg.OutboxIndexTimeoutSeconds) * time.Second,
-		LeaseDuration: time.Duration(cfg.OutboxLeaseSeconds) * time.Second,
-		BackoffCap:    time.Duration(cfg.OutboxBackoffCapSeconds) * time.Second,
+		PostgresDSN:  cfg.PostgresDSN,
+		BatchSize:    cfg.OutboxBatchSize,
+		Interval:     time.Duration(cfg.OutboxIntervalSeconds) * time.Second,
+		EmbedTimeout: time.Duration(cfg.OutboxEmbedTimeoutSeconds) * time.Second,
+		IndexTimeout: time.Duration(cfg.OutboxIndexTimeoutSeconds) * time.Second,
+		BackoffCap:   time.Duration(cfg.OutboxBackoffCapSeconds) * time.Second,
 	}, log.Logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

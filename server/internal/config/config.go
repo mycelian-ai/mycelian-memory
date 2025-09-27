@@ -51,7 +51,6 @@ type Config struct {
 	// Outbox worker configuration
 	OutboxBatchSize                  int `envconfig:"OUTBOX_BATCH_SIZE" default:"100"`
 	OutboxIntervalSeconds            int `envconfig:"OUTBOX_INTERVAL_SECONDS" default:"2"`
-	OutboxLeaseSeconds               int `envconfig:"OUTBOX_LEASE_SECONDS" default:"30"`
 	OutboxEmbedTimeoutSeconds        int `envconfig:"OUTBOX_EMBED_TIMEOUT_SECONDS" default:"12"`
 	OutboxIndexTimeoutSeconds        int `envconfig:"OUTBOX_INDEX_TIMEOUT_SECONDS" default:"5"`
 	OutboxStartupEmbedTimeoutSeconds int `envconfig:"OUTBOX_STARTUP_EMBED_TIMEOUT_SECONDS" default:"10"`
