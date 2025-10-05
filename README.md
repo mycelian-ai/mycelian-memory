@@ -279,3 +279,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow,
 
 ## License
 Apache 2.0 — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=mycelian-ai/mycelian-memory&type=Date)](https://star-history.com/#mycelian-ai/mycelian-memory&Date)
