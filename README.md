@@ -9,6 +9,7 @@
   [![License](https://img.shields.io/github/license/mycelian-ai/mycelian-memory)](https://github.com/mycelian-ai/mycelian-memory/blob/main/LICENSE)
   [![Go Version](https://img.shields.io/badge/Go-1.24.6-00ADD8?logo=go&logoColor=white)](https://github.com/mycelian-ai/mycelian-memory)
   [![Discord](https://img.shields.io/discord/1396722077792469104?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
+  [![YouTube](https://img.shields.io/badge/Mycelian_Memory-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/playlist?list=PL45CL__T1vQjpWUHB8yqWq3F_PEYh7LBK)
 </div>
 
 
