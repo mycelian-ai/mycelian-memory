@@ -65,7 +65,7 @@ flowchart TD
 - **Maintains fidelity** by avoiding lossy summarization chains and graph-based memory complexity
 - **Runs locally but designed to run anywhere** with self‑hostable Go backend and pluggable storage/vector database support.
 - **Supports ingestion of past recorded conversations**, which will be useful during onboarding an existing agent to Mycelian.
-- **Tunned using [LongMemEval](https://github.com/xiaowu0162/LongMemEval/tree/main) benchmark** However, I must warn the users to not make the decision of memory product purely based on performance on an industry benchmark. What matters is the performance on your usecase.
+- **Tunned using [LongMemEval](https://github.com/xiaowu0162/LongMemEval/tree/main) benchmark** However, I must warn my fellow developers to not make the decision of memory product purely based on performance on an industry benchmark. What matters is the performance on your usecase.
 
 ### Is Mycelian inspired by Mycelium? - Yes :)
 
