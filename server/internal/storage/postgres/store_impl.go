@@ -639,5 +639,39 @@ func (c *contexts) DeleteByID(ctx context.Context, userID, vaultID, memoryID, co
 	return tx.Commit()
 }
 
-// helpers
-// writeOutbox and nullIfEmpty are provided by adapter.go in the same package.
+// --- Helper functions ---
+
+// Open returns a *sql.DB using the pgx stdlib driver.
+func Open(dsn string) (*sql.DB, error) {
+	if dsn == "" {
+		return nil, fmt.Errorf("postgres DSN is empty")
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// writeOutbox inserts an outbox record for async processing by the outbox worker.
+func writeOutbox(ctx context.Context, tx *sql.Tx, op string, aggregateID string, payload map[string]interface{}) error {
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO outbox (aggregate_id, op, payload) VALUES ($1,$2,$3)`, aggregateID, op, b)
+	return err
+}
+
+// nullIfEmpty returns nil if the byte slice is empty, otherwise returns the slice.
+// Used for optional JSON fields in SQL queries.
+func nullIfEmpty(b []byte) interface{} {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
+}
