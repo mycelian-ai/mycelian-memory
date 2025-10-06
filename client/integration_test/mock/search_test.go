@@ -46,6 +46,8 @@ func TestClient_Search_WithConversationTime(t *testing.T) {
 		}
 
 		// Mock response with ConversationTime
+		creationTime1 := now
+		creationTime2 := now.Add(-time.Hour)
 		resp := client.SearchResponse{
 			Entries: []client.SearchEntry{
 				{
@@ -53,20 +55,20 @@ func TestClient_Search_WithConversationTime(t *testing.T) {
 						ID:               "e1",
 						MemoryID:         "m1",
 						Summary:          "test entry 1",
-						CreationTime:     now,
 						ConversationTime: pastTime,
 					},
-					Score: 0.95,
+					Score:        0.95,
+					CreationTime: &creationTime1,
 				},
 				{
 					Entry: client.Entry{
 						ID:               "e2",
 						MemoryID:         "m1",
 						Summary:          "test entry 2",
-						CreationTime:     now.Add(-time.Hour),
 						ConversationTime: now.Add(-2 * time.Hour),
 					},
-					Score: 0.85,
+					Score:        0.85,
+					CreationTime: &creationTime2,
 				},
 			},
 			Count: 2,
@@ -102,9 +104,9 @@ func TestClient_Search_WithConversationTime(t *testing.T) {
 		}
 
 		// Verify ConversationTime is before or equal to CreationTime
-		if entry.ConversationTime.After(entry.CreationTime) {
+		if entry.CreationTime != nil && entry.ConversationTime.After(*entry.CreationTime) {
 			t.Errorf("entry %d: ConversationTime (%v) is after CreationTime (%v)",
-				i, entry.ConversationTime, entry.CreationTime)
+				i, entry.ConversationTime, *entry.CreationTime)
 		}
 	}
 
