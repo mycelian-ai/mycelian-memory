@@ -8,17 +8,17 @@ import (
 	emb "github.com/mycelian/mycelian-memory/server/internal/embeddings"
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // MemoryService orchestrates memory-related use cases.
 type MemoryService struct {
-	store store.Store
+	store storage.Store
 	idx   searchindex.Index
 	emb   emb.EmbeddingProvider
 }
 
-func NewMemoryService(s store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *MemoryService {
+func NewMemoryService(s storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *MemoryService {
 	return &MemoryService{store: s, idx: idx, emb: embProvider}
 }
 

@@ -1,4 +1,4 @@
-package store
+package storage
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 // It provides typed accessors for each resource area (users, vaults, memories,
 // entries, contexts) and hides concrete database details behind simple
 // method contracts. Drivers (e.g., Postgres) live under
-// internal/store/<driver>/ and implement these interfaces.
+// internal/storage/<driver>/ and implement these interfaces.
 //
 // Goals:
 // - Keep business logic free of SQL/driver specifics

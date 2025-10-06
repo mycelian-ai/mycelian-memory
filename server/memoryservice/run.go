@@ -19,7 +19,7 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/logger"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 	"github.com/mycelian/mycelian-memory/server/internal/services"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 	"github.com/rs/zerolog"
 )
 
@@ -87,7 +87,7 @@ func Run() error {
 }
 
 // initDependencies constructs required components and enforces fail-fast on missing deps.
-func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logger) (store.Store, searchindex.Index, emb.EmbeddingProvider, error) {
+func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logger) (storage.Store, searchindex.Index, emb.EmbeddingProvider, error) {
 	st, err := factory.NewStore(ctx, cfg, log)
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("Store adapter unavailable")
@@ -108,7 +108,7 @@ func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logge
 }
 
 // buildRouter wires HTTP routes to handlers.
-func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
+func buildRouter(st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
 	root := mux.NewRouter()
 	root.Use(api.Recover)
 
@@ -161,12 +161,12 @@ func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.Embeddin
 }
 
 // startHealthCheckers starts component checkers and service-level aggregator; binds health.
-func startHealthCheckers(ctx context.Context, cfg *config.Config, log zerolog.Logger, st store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *health.ServiceHealthChecker {
+func startHealthCheckers(ctx context.Context, cfg *config.Config, log zerolog.Logger, st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *health.ServiceHealthChecker {
 	var checkers []health.HealthChecker
 	probeTimeout := time.Duration(cfg.HealthProbeTimeoutSeconds) * time.Second
 	interval := time.Duration(cfg.HealthIntervalSeconds) * time.Second
 
-	storeChecker := store.NewStoreHealthChecker(st, log, probeTimeout)
+	storeChecker := storage.NewStoreHealthChecker(st, log, probeTimeout)
 	go storeChecker.Start(ctx, interval)
 	checkers = append(checkers, storeChecker)
 

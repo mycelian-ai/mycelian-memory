@@ -4,11 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mycelian/mycelian-memory/server/internal/store"
-	"github.com/mycelian/mycelian-memory/server/internal/store/storetest"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
+	"github.com/mycelian/mycelian-memory/server/internal/storage/storetest"
 )
 
-func makePGStore(t *testing.T) store.Store {
+func makePGStore(t *testing.T) storage.Store {
 	t.Helper()
 	dsn := os.Getenv("MEMORY_SERVER_POSTGRES_DSN")
 	if dsn == "" {

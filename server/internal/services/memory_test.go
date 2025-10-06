@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/mycelian/mycelian-memory/server/internal/model"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // mockStore implements store.Store for testing
@@ -14,13 +14,13 @@ type mockStore struct {
 	entries *mockEntryStore
 }
 
-func (m *mockStore) Users() store.Users       { return nil }
-func (m *mockStore) Vaults() store.Vaults     { return nil }
-func (m *mockStore) Memories() store.Memories { return nil }
-func (m *mockStore) Entries() store.Entries   { return m.entries }
-func (m *mockStore) Contexts() store.Contexts { return nil }
+func (m *mockStore) Users() storage.Users       { return nil }
+func (m *mockStore) Vaults() storage.Vaults     { return nil }
+func (m *mockStore) Memories() storage.Memories { return nil }
+func (m *mockStore) Entries() storage.Entries   { return m.entries }
+func (m *mockStore) Contexts() storage.Contexts { return nil }
 
-// mockEntryStore implements store.Entries
+// mockEntryStore implements storage.Entries
 type mockEntryStore struct {
 	createFunc func(ctx context.Context, e *model.MemoryEntry) (*model.MemoryEntry, error)
 }

@@ -42,11 +42,11 @@ func TestSearchRequestValidateRanges(t *testing.T) {
 		topKC   int
 		wantErr bool
 	}{
-		{"valid max values", 10, 3, false},
+		{"valid max values", 25, 10, false},
 		{"valid min values", 0, 1, false},
-		{"topKE too high", 11, 2, true},
+		{"topKE too high", 26, 2, true},
 		{"topKE negative", -1, 2, true},
-		{"topKC too high", 5, 4, true},
+		{"topKC too high", 5, 11, true},
 		{"topKC zero", 5, 0, true},
 	}
 

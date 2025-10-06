@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mycelian/mycelian-memory/server/internal/storage"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 func setupTestDB(t *testing.T) *PostgresStorage {

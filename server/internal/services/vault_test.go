@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/mycelian/mycelian-memory/server/internal/model"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 // --- Fakes ---
@@ -59,11 +59,11 @@ type fakeStore struct {
 	}
 }
 
-func (f *fakeStore) Users() store.Users       { return fakeUsers{} }
-func (f *fakeStore) Vaults() store.Vaults     { return &fakeVaults{f} }
-func (f *fakeStore) Memories() store.Memories { return &fakeMemories{f} }
-func (f *fakeStore) Entries() store.Entries   { return &fakeEntries{f} }
-func (f *fakeStore) Contexts() store.Contexts { return &fakeContexts{f} }
+func (f *fakeStore) Users() storage.Users       { return fakeUsers{} }
+func (f *fakeStore) Vaults() storage.Vaults     { return &fakeVaults{f} }
+func (f *fakeStore) Memories() storage.Memories { return &fakeMemories{f} }
+func (f *fakeStore) Entries() storage.Entries   { return &fakeEntries{f} }
+func (f *fakeStore) Contexts() storage.Contexts { return &fakeContexts{f} }
 
 type fakeUsers struct{}
 

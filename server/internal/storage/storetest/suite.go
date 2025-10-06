@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/mycelian/mycelian-memory/server/internal/model"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
-// Run exercises a minimal compliance suite against a store.Store implementation.
+// Run exercises a minimal compliance suite against a storage.Store implementation.
 // Implementations should provide a clean, isolated store and return it from makeStore.
-func Run(t *testing.T, makeStore func(t *testing.T) store.Store) {
+func Run(t *testing.T, makeStore func(t *testing.T) storage.Store) {
 	t.Helper()
 
 	s := makeStore(t)
