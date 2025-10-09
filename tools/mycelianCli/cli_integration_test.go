@@ -160,8 +160,8 @@ func TestSearchWithRawEntries(t *testing.T) {
 	cmdSearch3 := exec.Command(binPath, "search",
 		"--memory-id", memoryID,
 		"--query", "test",
-		"--ke", "25",  // Max limit
-		"--kc", "10")  // Max limit
+		"--ke", "25", // Max limit
+		"--kc", "10") // Max limit
 	cmdSearch3.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
 	outSearch3, err := cmdSearch3.CombinedOutput()
 	if err != nil {
@@ -172,7 +172,7 @@ func TestSearchWithRawEntries(t *testing.T) {
 	cmdSearch4 := exec.Command(binPath, "search",
 		"--memory-id", memoryID,
 		"--query", "test",
-		"--ke", "26")  // Over limit
+		"--ke", "26") // Over limit
 	cmdSearch4.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
 	outSearch4, err := cmdSearch4.CombinedOutput()
 	if err == nil {
@@ -186,7 +186,7 @@ func TestSearchWithRawEntries(t *testing.T) {
 	cmdSearch5 := exec.Command(binPath, "search",
 		"--memory-id", memoryID,
 		"--query", "test",
-		"--kc", "11")  // Over limit
+		"--kc", "11") // Over limit
 	cmdSearch5.Env = append(os.Environ(), "MEMORY_SERVICE_URL="+serviceURL)
 	outSearch5, err := cmdSearch5.CombinedOutput()
 	if err == nil {

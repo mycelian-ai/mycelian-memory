@@ -25,7 +25,7 @@ func TestAddEntry_WithConversationTime(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		capturedBody = body
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"status": "enqueued", "memoryId": "m1"}`))
+		_, _ = w.Write([]byte(`{"status": "enqueued", "memoryId": "m1"}`))
 	}))
 	defer srv.Close()
 
@@ -79,7 +79,7 @@ func TestAddEntry_WithoutConversationTime(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		capturedBody = body
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"status": "enqueued", "memoryId": "m1"}`))
+		_, _ = w.Write([]byte(`{"status": "enqueued", "memoryId": "m1"}`))
 	}))
 	defer srv.Close()
 
@@ -160,7 +160,7 @@ func TestAddEntry_ValidatesConversationTimeFormat(t *testing.T) {
 				}
 
 				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"status": "enqueued", "memoryId": "m1"}`))
+				_, _ = w.Write([]byte(`{"status": "enqueued", "memoryId": "m1"}`))
 			}))
 			defer srv.Close()
 
@@ -210,7 +210,7 @@ func TestListEntries_ParsesConversationTime(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer srv.Close()
 
@@ -249,7 +249,7 @@ func TestListEntries_WithTemporalFilters(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedQuery = r.URL.RawQuery
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"entries": [], "count": 0}`))
+		_, _ = w.Write([]byte(`{"entries": [], "count": 0}`))
 	}))
 	defer srv.Close()
 

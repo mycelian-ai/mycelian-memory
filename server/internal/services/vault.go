@@ -5,15 +5,16 @@ import (
 
 	"github.com/mycelian/mycelian-memory/server/internal/model"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
 type VaultService struct {
-	store store.Store
+	store storage.Store
 	idx   searchindex.Index
 }
 
-func NewVaultService(s store.Store, idx searchindex.Index) *VaultService {
+// NewVaultService creates and returns a VaultService configured with the provided storage store and search index.
+func NewVaultService(s storage.Store, idx searchindex.Index) *VaultService {
 	return &VaultService{store: s, idx: idx}
 }
 

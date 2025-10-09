@@ -280,8 +280,8 @@ type mockSearchMultiple struct{}
 func (m *mockSearchMultiple) Search(ctx context.Context, uid, mid, q string, v []float32, kE int, a float32, includeRawEntries bool) ([]model.SearchHit, error) {
 	now := time.Now()
 	return []model.SearchHit{
-		{EntryID: "e1", Summary: "old entry", Score: 0.9, CreationTime: now.Add(-48*time.Hour), ConversationTime: now.Add(-72*time.Hour)},
-		{EntryID: "e2", Summary: "recent entry", Score: 0.8, CreationTime: now.Add(-2*time.Hour), ConversationTime: now.Add(-3*time.Hour)},
+		{EntryID: "e1", Summary: "old entry", Score: 0.9, CreationTime: now.Add(-48 * time.Hour), ConversationTime: now.Add(-72 * time.Hour)},
+		{EntryID: "e2", Summary: "recent entry", Score: 0.8, CreationTime: now.Add(-2 * time.Hour), ConversationTime: now.Add(-3 * time.Hour)},
 		{EntryID: "e3", Summary: "current entry", Score: 0.7, CreationTime: now, ConversationTime: now},
 	}, nil
 }
@@ -302,7 +302,15 @@ func (m *mockSearchMultiple) UpsertContext(ctx context.Context, ctxID string, ve
 	return nil
 }
 
-func (m *mockSearchMultiple) DeleteEntry(ctx context.Context, userID, entryID string) error   { return nil }
-func (m *mockSearchMultiple) DeleteContext(ctx context.Context, userID, contextID string) error { return nil }
-func (m *mockSearchMultiple) DeleteMemory(ctx context.Context, userID, memoryID string) error  { return nil }
-func (m *mockSearchMultiple) DeleteVault(ctx context.Context, userID, vaultID string) error    { return nil }
+func (m *mockSearchMultiple) DeleteEntry(ctx context.Context, userID, entryID string) error {
+	return nil
+}
+func (m *mockSearchMultiple) DeleteContext(ctx context.Context, userID, contextID string) error {
+	return nil
+}
+func (m *mockSearchMultiple) DeleteMemory(ctx context.Context, userID, memoryID string) error {
+	return nil
+}
+func (m *mockSearchMultiple) DeleteVault(ctx context.Context, userID, vaultID string) error {
+	return nil
+}

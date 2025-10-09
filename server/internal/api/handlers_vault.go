@@ -97,7 +97,7 @@ func (h *VaultHandler) GetVault(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	v, err := h.svc.GetVault(r.Context(), actorInfo.ActorID, vars["vaultId"])
 	if err != nil {
-		respond.WriteNotFound(w, err.Error())
+		respond.HandleError(w, err, "vault not found")
 		return
 	}
 	respond.WriteJSON(w, http.StatusOK, v)

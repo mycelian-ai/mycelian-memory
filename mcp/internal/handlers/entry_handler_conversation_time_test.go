@@ -75,14 +75,14 @@ func TestAddEntry_WithConversationTime(t *testing.T) {
 			t.Fatalf("Failed to decode request body: %v", err)
 		}
 
-	if convTime, ok := decoded["conversationTime"].(string); ok {
-		parsedTime, err := time.Parse(time.RFC3339, convTime)
-		if err != nil {
-			t.Errorf("Failed to parse conversationTime from request: %v", err)
-		}
-		if !parsedTime.Equal(pastTime) {
-			t.Errorf("ConversationTime mismatch: got %v, want %v", parsedTime, pastTime)
-		}
+		if convTime, ok := decoded["conversationTime"].(string); ok {
+			parsedTime, err := time.Parse(time.RFC3339, convTime)
+			if err != nil {
+				t.Errorf("Failed to parse conversationTime from request: %v", err)
+			}
+			if !parsedTime.Equal(pastTime) {
+				t.Errorf("ConversationTime mismatch: got %v, want %v", parsedTime, pastTime)
+			}
 		} else {
 			t.Error("Expected conversationTime in request body")
 		}
@@ -165,7 +165,12 @@ func TestAddEntry_InvalidConversationTimeFormat(t *testing.T) {
 			// Check if the request has conversationTime
 			body, _ := io.ReadAll(r.Body)
 			var decoded map[string]interface{}
-			json.Unmarshal(body, &decoded)
+			if err := json.Unmarshal(body, &decoded); err != nil {
+				// If we cannot decode, fail the request to surface issues in test
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"bad json"}`))
+				return
+			}
 
 			// If invalid format, conversationTime should be nil/omitted
 			if _, ok := decoded["conversationTime"]; ok {

@@ -1,3 +1,11 @@
+// Package postgres provides a PostgreSQL implementation of storage.Store.
+//
+// Implementation details:
+//   - Uses pgx/v5 driver via database/sql
+//   - All writes use transactions for atomicity
+//   - Outbox pattern for async search index updates
+//   - IDs are UUIDs stored as TEXT
+//   - Returns storage.ErrNotFound for missing resources
 package postgres
 
 import (
@@ -12,94 +20,42 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/mycelian/mycelian-memory/server/internal/model"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
-// Open opens a PostgreSQL connection using the pgx stdlib driver and verifies connectivity.
-func Open(dsn string) (*sql.DB, error) {
-	if dsn == "" {
-		return nil, fmt.Errorf("postgres DSN is empty")
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return nil, err
-	}
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return db, nil
-}
+// defaultMemoryContext is the initial context created for all new memories.
+// This provides a consistent starting point and instructions for AI agents.
+const defaultMemoryContext = `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
 
-// NewWithDB constructs a native Postgres store backed directly by database/sql.
-func NewWithDB(db *sql.DB) store.Store { return &pgStore{db: db} }
-
-type pgStore struct{ db *sql.DB }
-
-func (s *pgStore) Users() store.Users       { return &users{db: s.db} }
-func (s *pgStore) Vaults() store.Vaults     { return &vaults{db: s.db} }
-func (s *pgStore) Memories() store.Memories { return &memories{db: s.db} }
-func (s *pgStore) Entries() store.Entries   { return &entries{db: s.db} }
-func (s *pgStore) Contexts() store.Contexts { return &contexts{db: s.db} }
-
-// HealthPing implements health.HealthPinger for Postgres-backed store.
-func (s *pgStore) HealthPing(ctx context.Context) error {
-	return s.db.PingContext(ctx)
-}
+// NewWithDB constructs a Postgres-backed storage.Store using the provided *sql.DB.
+// The provided DB is used directly; NewWithDB does not open or ping the database.
+func NewWithDB(db *sql.DB) storage.Store { return &pgStore{db: db} }
 
 // Bootstrap performs a connectivity check to ensure Postgres is reachable.
-// This is a fast ping-only check since compose migrations handle schema setup.
+// Bootstrap verifies connectivity to the PostgreSQL database identified by dsn.
+// If dsn is empty, no connectivity check is performed and nil is returned.
+// For a non-empty dsn it attempts to open a database connection and ping it, returning any error encountered.
 func Bootstrap(ctx context.Context, dsn string) error {
 	if dsn == "" {
-		return nil // No DSN configured, skip bootstrap
+		return nil
 	}
-
 	db, err := Open(dsn)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
-
 	return db.PingContext(ctx)
 }
 
-// --- Users ---
-type users struct{ db *sql.DB }
+type pgStore struct{ db *sql.DB }
 
-func (u *users) Create(ctx context.Context, m *model.User) (*model.User, error) {
-	var created time.Time
-	row := u.db.QueryRowContext(ctx, `
-        INSERT INTO users (user_id, email, display_name, time_zone, status)
-        VALUES ($1,$2,$3,$4,'ACTIVE')
-        RETURNING creation_time
-    `, m.UserID, m.Email, m.DisplayName, m.TimeZone)
-	if err := row.Scan(&created); err != nil {
-		return nil, err
-	}
-	out := *m
-	out.Status = "ACTIVE"
-	out.CreationTime = created
-	return &out, nil
-}
+// HealthPing implements health.HealthPinger for Postgres-backed store.
+func (s *pgStore) HealthPing(ctx context.Context) error { return s.db.PingContext(ctx) }
 
-func (u *users) Get(ctx context.Context, userID string) (*model.User, error) {
-	var out model.User
-	var last *time.Time
-	row := u.db.QueryRowContext(ctx, `
-        SELECT user_id, email, display_name, time_zone, status, creation_time, last_active_time
-        FROM users WHERE user_id=$1
-    `, userID)
-	if err := row.Scan(&out.UserID, &out.Email, &out.DisplayName, &out.TimeZone, &out.Status, &out.CreationTime, &last); err != nil {
-		return nil, err
-	}
-	out.LastActiveTime = last
-	return &out, nil
-}
-
-func (u *users) Delete(ctx context.Context, userID string) error {
-	// Not supported yet (no cascade in schema). Return not implemented.
-	return errors.New("users.Delete not implemented")
-}
+func (s *pgStore) Vaults() storage.Vaults     { return &vaults{db: s.db} }
+func (s *pgStore) Memories() storage.Memories { return &memories{db: s.db} }
+func (s *pgStore) Entries() storage.Entries   { return &entries{db: s.db} }
+func (s *pgStore) Contexts() storage.Contexts { return &contexts{db: s.db} }
 
 // --- Vaults ---
 type vaults struct{ db *sql.DB }
@@ -131,7 +87,10 @@ func (v *vaults) GetByID(ctx context.Context, userID, vaultID string) (*model.Va
 	var created time.Time
 	var desc *string
 	if err := row.Scan(&out.Title, &desc, &created); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get vault by id: %w", err)
 	}
 	out.CreationTime = created
 	return &out, nil
@@ -147,7 +106,10 @@ func (v *vaults) GetByTitle(ctx context.Context, userID, title string) (*model.V
 	var created time.Time
 	var desc *string
 	if err := row.Scan(&out.VaultID, &desc, &created); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get vault by title: %w", err)
 	}
 	out.CreationTime = created
 	return &out, nil
@@ -182,7 +144,6 @@ func (v *vaults) Delete(ctx context.Context, userID, vaultID string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Collect child IDs
 	entryRows, err := tx.QueryContext(ctx, `SELECT entry_id FROM memory_entries WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID)
 	if err != nil {
 		return err
@@ -246,29 +207,30 @@ func (v *vaults) AddMemory(ctx context.Context, userID, vaultID, memoryID string
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Validate target vault exists
 	var exists int
 	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM vaults WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID).Scan(&exists); err != nil {
-		return fmt.Errorf("VAULT_NOT_FOUND: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return storage.ErrNotFound
+		}
+		return fmt.Errorf("check vault: %w", err)
 	}
-
-	// Locate current vault and title for the memory
 	var currentVaultID, title string
 	if err := tx.QueryRowContext(ctx, `SELECT vault_id, title FROM memories WHERE actor_id=$1 AND memory_id=$2`, userID, memoryID).Scan(&currentVaultID, &title); err != nil {
-		return fmt.Errorf("MEMORY_NOT_FOUND: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return storage.ErrNotFound
+		}
+		return fmt.Errorf("check memory: %w", err)
 	}
 	if currentVaultID == vaultID {
 		return tx.Commit()
 	}
-
-	// Enforce unique (vault_id, title) in target
 	var conflict int
 	err = tx.QueryRowContext(ctx, `SELECT 1 FROM memories WHERE actor_id=$1 AND vault_id=$2 AND title=$3`, userID, vaultID, title).Scan(&conflict)
 	if err == nil {
-		return fmt.Errorf("MEMORY_TITLE_CONFLICT: title already exists in target vault")
+		return storage.ErrConflict
 	}
-	if err != sql.ErrNoRows {
-		return err
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check title conflict: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx, `UPDATE memories SET vault_id=$1 WHERE actor_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
@@ -303,15 +265,13 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 		return nil, err
 	}
 
-	// default context snapshot (store JSON-shaped string in TEXT column)
 	ctxID := uuid.New().String()
-	defaultCtx := `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
 	var ctxCreated time.Time
 	if err := tx.QueryRowContext(ctx, `
         INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mm.ActorID, mm.VaultID, memID, ctxID, defaultCtx).Scan(&ctxCreated); err != nil {
+    `, mm.ActorID, mm.VaultID, memID, ctxID, defaultMemoryContext).Scan(&ctxCreated); err != nil {
 		return nil, err
 	}
 
@@ -319,7 +279,7 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 		"actorId":      mm.ActorID,
 		"memoryId":     memID,
 		"contextId":    ctxID,
-		"context":      defaultCtx,
+		"context":      defaultMemoryContext,
 		"creationTime": ctxCreated,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_context", ctxID, payload); err != nil {
@@ -342,7 +302,10 @@ func (m *memories) GetByID(ctx context.Context, userID, vaultID, memoryID string
         FROM memories WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3
     `, userID, vaultID, memoryID)
 	if err := row.Scan(&out.MemoryType, &out.Title, &out.Description, &out.CreationTime); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get memory by id: %w", err)
 	}
 	return &out, nil
 }
@@ -357,7 +320,10 @@ func (m *memories) GetByTitle(ctx context.Context, userID, vaultID, title string
         FROM memories WHERE actor_id=$1 AND vault_id=$2 AND title=$3
     `, userID, vaultID, title)
 	if err := row.Scan(&out.MemoryID, &out.MemoryType, &out.Description, &out.CreationTime); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get memory by title: %w", err)
 	}
 	return &out, nil
 }
@@ -455,12 +421,16 @@ func (e *entries) Create(ctx context.Context, me *model.MemoryEntry) (*model.Mem
 	defer func() { _ = tx.Rollback() }()
 
 	entryID := uuid.New().String()
-	var created time.Time
-	var conversation time.Time
-	metaJSON, _ := json.Marshal(me.Metadata)
-	tagsJSON, _ := json.Marshal(me.Tags)
+	var created, conversation time.Time
+	metaJSON, err := json.Marshal(me.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("marshal metadata: %w", err)
+	}
+	tagsJSON, err := json.Marshal(me.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("marshal tags: %w", err)
+	}
 
-	// Use provided ConversationTime or default to current time
 	var convTime *time.Time
 	if !me.ConversationTime.IsZero() {
 		convTime = &me.ConversationTime
@@ -555,7 +525,10 @@ func (e *entries) GetByID(ctx context.Context, userID, vaultID, memoryID, entryI
     `, userID, vaultID, memoryID, entryID)
 	if err := row.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.ConversationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
 		&corrTime, &corrMemID, &corrEntryTime, &corrMemID, &lastUpd); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get entry by id: %w", err)
 	}
 	if meta.Valid {
 		_ = json.Unmarshal([]byte(meta.String), &m.Metadata)
@@ -645,7 +618,10 @@ func (c *contexts) Latest(ctx context.Context, userID, vaultID, memoryID string)
         ORDER BY creation_time DESC LIMIT 1
     `, userID, vaultID, memoryID)
 	if err := row.Scan(&out.ContextID, &ctxText, &out.CreationTime); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get latest context: %w", err)
 	}
 	out.Context = ctxText
 	return &out, nil
@@ -669,7 +645,27 @@ func (c *contexts) DeleteByID(ctx context.Context, userID, vaultID, memoryID, co
 	return tx.Commit()
 }
 
-// helpers
+// --- Helper functions ---
+
+// Open opens a *sql.DB using the pgx driver for the provided DSN.
+// It returns a connected *sql.DB or an error if the DSN is empty, the driver fails to open, or the database ping fails.
+func Open(dsn string) (*sql.DB, error) {
+	if dsn == "" {
+		return nil, fmt.Errorf("postgres DSN is empty")
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// writeOutbox inserts a row into the outbox table with the given operation, aggregate ID and JSON-encoded payload for asynchronous processing.
+// It returns an error if the payload cannot be JSON-marshaled or if the database insert fails.
 func writeOutbox(ctx context.Context, tx *sql.Tx, op string, aggregateID string, payload map[string]interface{}) error {
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -679,6 +675,9 @@ func writeOutbox(ctx context.Context, tx *sql.Tx, op string, aggregateID string,
 	return err
 }
 
+// nullIfEmpty returns nil if the byte slice is empty, otherwise returns the slice.
+// nullIfEmpty returns nil if b is empty, otherwise returns b.
+// It is intended for passing optional JSON byte slices to SQL statements so empty values become SQL NULL.
 func nullIfEmpty(b []byte) interface{} {
 	if len(b) == 0 {
 		return nil

@@ -19,11 +19,13 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/logger"
 	"github.com/mycelian/mycelian-memory/server/internal/searchindex"
 	"github.com/mycelian/mycelian-memory/server/internal/services"
-	"github.com/mycelian/mycelian-memory/server/internal/store"
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 	"github.com/rs/zerolog"
 )
 
-// Run starts the memory service HTTP server and blocks until shutdown or error.
+// Run starts the memory service HTTP server, initializing configuration and dependencies,
+// waits for their health before accepting requests, and blocks until the server shuts down
+// or an unrecoverable error occurs. It handles graceful shutdown on SIGINT/SIGTERM.
 func Run() error {
 	log := logger.New("memory-service")
 
@@ -86,8 +88,10 @@ func Run() error {
 	}
 }
 
-// initDependencies constructs required components and enforces fail-fast on missing deps.
-func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logger) (store.Store, searchindex.Index, emb.EmbeddingProvider, error) {
+// initDependencies creates and returns the store, search index, and embedding provider.
+// It calls the configured factories to construct each dependency and returns an error
+// if any adapter cannot be created or if no embedding provider is configured.
+func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logger) (storage.Store, searchindex.Index, emb.EmbeddingProvider, error) {
 	st, err := factory.NewStore(ctx, cfg, log)
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("Store adapter unavailable")
@@ -107,8 +111,12 @@ func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logge
 	return st, idx, embProvider, nil
 }
 
-// buildRouter wires HTTP routes to handlers.
-func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
+// buildRouter constructs an HTTP router with routes for vaults, memories, health, and (optionally) search.
+// It binds handlers for vault and memory operations (create, list, get, delete, entries, contexts, tags),
+// configures title-based memory routes, and registers a health check endpoint.
+// If the search handler cannot be created, the search endpoint is skipped.
+// It returns the configured *mux.Router.
+func buildRouter(st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
 	root := mux.NewRouter()
 	root.Use(api.Recover)
 
@@ -160,13 +168,13 @@ func buildRouter(st store.Store, idx searchindex.Index, embProvider emb.Embeddin
 	return root
 }
 
-// startHealthCheckers starts component checkers and service-level aggregator; binds health.
-func startHealthCheckers(ctx context.Context, cfg *config.Config, log zerolog.Logger, st store.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *health.ServiceHealthChecker {
+// health API, and returns the service checker.
+func startHealthCheckers(ctx context.Context, cfg *config.Config, log zerolog.Logger, st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *health.ServiceHealthChecker {
 	var checkers []health.HealthChecker
 	probeTimeout := time.Duration(cfg.HealthProbeTimeoutSeconds) * time.Second
 	interval := time.Duration(cfg.HealthIntervalSeconds) * time.Second
 
-	storeChecker := store.NewStoreHealthChecker(st, log, probeTimeout)
+	storeChecker := storage.NewStoreHealthChecker(st, log, probeTimeout)
 	go storeChecker.Start(ctx, interval)
 	checkers = append(checkers, storeChecker)
 
