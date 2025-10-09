@@ -25,7 +25,7 @@ func (allowAllAuthorizer) Authorize(ctx context.Context, apiKey, operation, reso
 
 type nfMemories struct{}
 
-func (nfMemories) Create(context.Context, *model.Memory) (*model.Memory, error)      { return nil, nil }
+func (nfMemories) Create(context.Context, *model.Memory) (*model.Memory, error) { return nil, nil }
 func (nfMemories) GetByID(context.Context, string, string, string) (*model.Memory, error) {
 	return nil, storage.ErrNotFound
 }
@@ -77,12 +77,12 @@ func TestGetMemory_NotFoundMapsTo404(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	h.GetMemory(rr, req)
-	if rr.Code \!= http.StatusNotFound {
+	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status: got %d, want %d; body=%s", rr.Code, http.StatusNotFound, rr.Body.String())
 	}
 	var er errResp
 	_ = json.Unmarshal(rr.Body.Bytes(), &er)
-	if er.Message \!= "memory not found" {
+	if er.Message != "memory not found" {
 		t.Fatalf("message: got %q, want %q", er.Message, "memory not found")
 	}
 }
@@ -97,12 +97,12 @@ func TestGetMemoryEntryByID_NotFoundMapsTo404(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	h.GetMemoryEntryByID(rr, req)
-	if rr.Code \!= http.StatusNotFound {
+	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status: got %d, want %d; body=%s", rr.Code, http.StatusNotFound, rr.Body.String())
 	}
 	var er errResp
 	_ = json.Unmarshal(rr.Body.Bytes(), &er)
-	if er.Message \!= "entry not found" {
+	if er.Message != "entry not found" {
 		t.Fatalf("message: got %q, want %q", er.Message, "entry not found")
 	}
 }

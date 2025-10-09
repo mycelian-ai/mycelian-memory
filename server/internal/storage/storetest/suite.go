@@ -16,7 +16,6 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -24,7 +23,6 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
-// Run exercises a minimal compliance suite against a storage.Store implementation.
 // Run exercises a storage.Store implementation with a compliance test suite.
 // It creates a test store using makeStore and exercises common behaviors: vault and memory CRUD, entry creation/listing/updating/deletion,
 // memory context put/latest/delete, pagination (Limit), temporal filtering (Before/After), tag updates, and cascading deletes.
@@ -97,9 +95,22 @@ func Run(t *testing.T, makeStore func(t *testing.T) storage.Store) {
 	if err != nil {
 		t.Fatalf("PutContext: %v", err)
 	}
-	time.Sleep(5 * time.Millisecond) // ensure monotonic creation time ordering
-	if latest, err := s.Contexts().Latest(ctx, actorID, v.VaultID, m.MemoryID); err != nil || latest == nil || latest.ContextID == "" {
-		t.Fatalf("LatestContext: got=%v err=%v", latest, err)
+	// Verify Latest() returns the most recent context
+	if latest, err := s.Contexts().Latest(ctx, actorID, v.VaultID, m.MemoryID); err != nil || latest == nil || latest.ContextID != c.ContextID {
+		t.Fatalf("LatestContext: expected ContextID=%s, got=%v err=%v", c.ContextID, latest, err)
+	}
+	// Put a second context and verify Latest() returns it (not the first one)
+	ctxBody2 := `{"foo":"baz","updated":true}`
+	c2, err := s.Contexts().Put(ctx, &model.MemoryContext{ActorID: actorID, VaultID: v.VaultID, MemoryID: m.MemoryID, Context: ctxBody2})
+	if err != nil {
+		t.Fatalf("PutContext c2: %v", err)
+	}
+	if latest2, err := s.Contexts().Latest(ctx, actorID, v.VaultID, m.MemoryID); err != nil || latest2 == nil || latest2.ContextID != c2.ContextID {
+		t.Fatalf("LatestContext after second put: expected ContextID=%s, got=%v err=%v", c2.ContextID, latest2, err)
+	}
+	// Verify timestamp ordering: c2 should be created after c
+	if !c2.CreationTime.After(c.CreationTime) {
+		t.Fatalf("Context timestamp ordering: c2.CreationTime=%v should be after c.CreationTime=%v", c2.CreationTime, c.CreationTime)
 	}
 	if err := s.Contexts().DeleteByID(ctx, actorID, v.VaultID, m.MemoryID, c.ContextID); err != nil {
 		t.Fatalf("DeleteContextByID: %v", err)
@@ -111,13 +122,18 @@ func Run(t *testing.T, makeStore func(t *testing.T) storage.Store) {
 	}
 
 	// Paging and time filters
-	// Create additional entries with spacing
-	if _, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: actorID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "three"}); err != nil {
+	// Create additional entries
+	e3, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: actorID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "three"})
+	if err != nil {
 		t.Fatalf("CreateEntry e3: %v", err)
 	}
-	time.Sleep(5 * time.Millisecond)
-	if _, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: actorID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "four"}); err != nil {
+	e4, err := s.Entries().Create(ctx, &model.MemoryEntry{ActorID: actorID, VaultID: v.VaultID, MemoryID: m.MemoryID, RawEntry: "four"})
+	if err != nil {
 		t.Fatalf("CreateEntry e4: %v", err)
+	}
+	// Verify timestamp ordering
+	if !e4.CreationTime.After(e3.CreationTime) && !e4.CreationTime.Equal(e3.CreationTime) {
+		t.Fatalf("Entry timestamp ordering: e4.CreationTime=%v should be >= e3.CreationTime=%v", e4.CreationTime, e3.CreationTime)
 	}
 
 	// Limit should cap results

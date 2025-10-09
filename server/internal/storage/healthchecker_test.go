@@ -55,7 +55,7 @@ func waitFor(t *testing.T, cond func() bool, timeout time.Duration) {
 
 func TestStoreHealthChecker_Name(t *testing.T) {
 	hc := NewStoreHealthChecker(&fakePingStore{}, zerolog.New(io.Discard), 20*time.Millisecond)
-	if hc.Name() \!= "store" {
+	if hc.Name() != "store" {
 		t.Fatalf("Name: got %q, want %q", hc.Name(), "store")
 	}
 }

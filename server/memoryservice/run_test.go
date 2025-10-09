@@ -15,7 +15,7 @@ func TestCalculateStartupHealthTimeout(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got := calculateStartupHealthTimeout(tt.interval)
-		if got \!= tt.want {
+		if got != tt.want {
 			t.Fatalf("interval=%d: got %d, want %d", tt.interval, got, tt.want)
 		}
 	}

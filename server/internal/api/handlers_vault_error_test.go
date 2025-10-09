@@ -23,12 +23,16 @@ func (allowAllVaultAuthorizer) Authorize(ctx context.Context, apiKey, operation,
 
 type nfVaults struct{}
 
-func (nfVaults) Create(context.Context, *model.Vault) (*model.Vault, error)       { return nil, nil }
-func (nfVaults) GetByID(context.Context, string, string) (*model.Vault, error)   { return nil, storage.ErrNotFound }
-func (nfVaults) GetByTitle(context.Context, string, string) (*model.Vault, error) { return nil, storage.ErrNotFound }
-func (nfVaults) List(context.Context, string) ([]*model.Vault, error)            { return nil, nil }
-func (nfVaults) Delete(context.Context, string, string) error                     { return nil }
-func (nfVaults) AddMemory(context.Context, string, string, string) error          { return nil }
+func (nfVaults) Create(context.Context, *model.Vault) (*model.Vault, error) { return nil, nil }
+func (nfVaults) GetByID(context.Context, string, string) (*model.Vault, error) {
+	return nil, storage.ErrNotFound
+}
+func (nfVaults) GetByTitle(context.Context, string, string) (*model.Vault, error) {
+	return nil, storage.ErrNotFound
+}
+func (nfVaults) List(context.Context, string) ([]*model.Vault, error)    { return nil, nil }
+func (nfVaults) Delete(context.Context, string, string) error            { return nil }
+func (nfVaults) AddMemory(context.Context, string, string, string) error { return nil }
 
 type fakeStoreVault struct{ v nfVaults }
 
@@ -36,12 +40,6 @@ func (f *fakeStoreVault) Vaults() storage.Vaults     { return f.v }
 func (f *fakeStoreVault) Memories() storage.Memories { return nil }
 func (f *fakeStoreVault) Entries() storage.Entries   { return nil }
 func (f *fakeStoreVault) Contexts() storage.Contexts { return nil }
-
-type errResp struct {
-	Error   string `json:"error"`
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
 
 func TestGetVault_NotFoundMapsTo404(t *testing.T) {
 	svc := services.NewVaultService(&fakeStoreVault{}, nil)
@@ -53,12 +51,12 @@ func TestGetVault_NotFoundMapsTo404(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	h.GetVault(rr, req)
-	if rr.Code \!= http.StatusNotFound {
+	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status: got %d, want %d; body=%s", rr.Code, http.StatusNotFound, rr.Body.String())
 	}
 	var er errResp
 	_ = json.Unmarshal(rr.Body.Bytes(), &er)
-	if er.Message \!= "vault not found" {
+	if er.Message != "vault not found" {
 		t.Fatalf("message: got %q, want %q", er.Message, "vault not found")
 	}
 }

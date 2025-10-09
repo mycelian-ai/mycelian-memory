@@ -57,6 +57,7 @@ func WriteInternalError(w http.ResponseWriter, message string) {
 //   - storage.ErrNotFound → 404 Not Found (uses defaultMessage)
 //   - storage.ErrConflict → 409 Conflict (uses defaultMessage)
 //   - storage.ErrNotImplemented → 501 Not Implemented (uses defaultMessage)
+//
 // The `defaultMessage` is used as the client-facing message for mapped responses.
 func HandleError(w http.ResponseWriter, err error, defaultMessage string) {
 	if err == nil {
@@ -72,8 +73,9 @@ func HandleError(w http.ResponseWriter, err error, defaultMessage string) {
 	case errors.Is(err, storage.ErrNotImplemented):
 		WriteError(w, http.StatusNotImplemented, defaultMessage)
 	default:
-		// For genuine internal errors, use a generic message to avoid
-		// exposing internal details or misleading with resource-specific text
+		// For genuine internal errors, log the details for operators
+		// but return a generic message to avoid exposing internals
+		log.Error().Err(err).Msg("Internal server error")
 		WriteInternalError(w, "internal server error")
 	}
 }
