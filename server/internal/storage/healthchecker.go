@@ -61,28 +61,25 @@ func (hc *StoreHealthChecker) Start(ctx context.Context, interval time.Duration)
 	}
 }
 
-// probe executes a simple read to verify database connectivity.
-func (hc *StoreHealthChecker) probe(ctx context.Context) bool {
 // probe checks database connectivity by calling HealthPing on the store.
 // If the store does not implement HealthPing, the probe fails and logs an error.
 func (hc *StoreHealthChecker) probe(ctx context.Context) bool {
-    // Check if the store implements HealthPing
-    if p, ok := any(hc.store).(health.HealthPinger); ok {
-        if err := p.HealthPing(ctx); err != nil {
-            hc.log.Error().
-                Stack().
-                Str("checker", hc.Name()).
-                Err(err).
-                Msg("store health check failed")
-            return false
-        }
-        return true
-    }
+	// Check if the store implements HealthPing
+	if p, ok := any(hc.store).(health.HealthPinger); ok {
+		if err := p.HealthPing(ctx); err != nil {
+			hc.log.Error().
+				Stack().
+				Str("checker", hc.Name()).
+				Err(err).
+				Msg("store health check failed")
+			return false
+		}
+		return true
+	}
 
-    // If HealthPing is not implemented, fail fast
-    hc.log.Error().
-        Str("checker", hc.Name()).
-        Msg("store does not implement HealthPing")
-    return false
-}
+	// If HealthPing is not implemented, fail fast
+	hc.log.Error().
+		Str("checker", hc.Name()).
+		Msg("store does not implement HealthPing")
+	return false
 }
