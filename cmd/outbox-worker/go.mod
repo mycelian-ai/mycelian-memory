@@ -2,8 +2,6 @@ module github.com/mycelian/mycelian-memory/cmd/outbox-worker
 
 go 1.25
 
-toolchain go1.25.2
-
 require (
 	github.com/mycelian/mycelian-memory/server v0.0.0
 	github.com/rs/zerolog v1.34.0

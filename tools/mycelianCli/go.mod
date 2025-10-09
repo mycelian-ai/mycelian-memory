@@ -2,8 +2,6 @@ module github.com/mycelian/mycelian-memory/tools/mycelianCli
 
 go 1.25
 
-toolchain go1.25.2
-
 require (
 	github.com/mycelian/mycelian-memory/client v0.0.0
 	github.com/rs/zerolog v1.34.0

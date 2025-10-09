@@ -2,8 +2,6 @@ module github.com/mycelian/mycelian-memory/tools/invariants
 
 go 1.25
 
-toolchain go1.25.2
-
 require github.com/stretchr/testify v1.10.0
 
 require (

@@ -2,8 +2,6 @@ module github.com/mycelian/mycelian-memory/tools/mycelian-service-tools
 
 go 1.25
 
-toolchain go1.25.2
-
 require github.com/spf13/cobra v1.9.1
 
 require (
