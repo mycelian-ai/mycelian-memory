@@ -14,7 +14,11 @@ import (
 
 // NewStore returns a Postgres-backed store.Store.
 // Requires cfg.DBDriver == "postgres" and a non-empty cfg.PostgresDSN.
-// Launches async bootstrap check; returns store immediately for fast startup.
+// NewStore creates a Postgres-backed storage.Store using the provided configuration.
+// It validates that cfg.DBDriver equals "postgres" and that cfg.PostgresDSN is non-empty,
+// opens the database connection synchronously, and starts an asynchronous bootstrap
+// check that uses cfg.BootstrapTimeoutSeconds without blocking startup.
+// It returns an error if the driver is unsupported, the DSN is missing, or opening the database fails.
 func NewStore(ctx context.Context, cfg *config.Config, log zerolog.Logger) (storagepkg.Store, error) {
 	if cfg.DBDriver != "postgres" {
 		return nil, fmt.Errorf("unknown DB_DRIVER: %s", cfg.DBDriver)
