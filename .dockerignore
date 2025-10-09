@@ -1,0 +1,72 @@
+# .dockerignore for repository root build context
+# This applies to all Docker builds that use context: ../.. (repo root)
+
+# Python benchmarking code (not needed for Go builds)
+longmemeval-benchmarker/
+**/__pycache__/
+**/*.pyc
+*.py[cod]
+venv/
+.pytest_cache/
+pytest.ini
+
+# Database and runtime data
+data/postgres/
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Build artifacts and binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (not needed in containers)
+docs/
+*.md
+!server/internal/storage/postgres/schema.sql
+README.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE
+CITATION.cff
+
+# Logs
+*.log
+huey_orchestrator.log
+
+# CI/CD
+.github/
+
+# Docker files themselves
+docker-compose*.yml
+**/Dockerfile*
+
+# Test files (not needed in production containers)
+**/*_test.go
+**/testdata/
+
+# Logo and assets
+logo/
+
+# Makefile (not needed in containers)
+Makefile
+
+# Go workspace sum (build will regenerate)
+go.work.sum

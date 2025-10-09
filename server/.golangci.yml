@@ -1,5 +1,5 @@
-# .golangci.yml  ── GolangCI-Lint v2 minimal config
-version: "2"
+# .golangci.yml  ── GolangCI-Lint minimal config
+# version: "2"  # Removed for compatibility with golangci-lint v1.x
 
 run:
   tests: true
