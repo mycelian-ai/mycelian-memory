@@ -18,6 +18,8 @@ type MemoryService struct {
 	emb   emb.EmbeddingProvider
 }
 
+// NewMemoryService creates a MemoryService configured with the provided storage, search index, and embedding provider.
+// The returned MemoryService uses the given storage for persistence, the index for optional search-related operations (may be nil), and the embedding provider for generating embeddings.
 func NewMemoryService(s storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *MemoryService {
 	return &MemoryService{store: s, idx: idx, emb: embProvider}
 }

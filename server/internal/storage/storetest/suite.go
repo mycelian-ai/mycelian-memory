@@ -25,7 +25,10 @@ import (
 )
 
 // Run exercises a minimal compliance suite against a storage.Store implementation.
-// Implementations should provide a clean, isolated store and return it from makeStore.
+// Run executes a minimal end-to-end compliance test suite against a storage.Store
+// implementation produced by makeStore. It verifies vaults, memories, entries and
+// contexts for basic CRUD behavior, listing, pagination (limit, before, after),
+// tag updates, and cascading deletes; any failing assertion calls t.Fatalf.
 func Run(t *testing.T, makeStore func(t *testing.T) storage.Store) {
 	t.Helper()
 
