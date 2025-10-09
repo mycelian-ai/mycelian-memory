@@ -1,3 +1,11 @@
+// Package postgres provides a PostgreSQL implementation of storage.Store.
+//
+// Implementation details:
+//   - Uses pgx/v5 driver via database/sql
+//   - All writes use transactions for atomicity
+//   - Outbox pattern for async search index updates
+//   - IDs are UUIDs stored as TEXT
+//   - Returns storage.ErrNotFound for missing resources
 package postgres
 
 import (
@@ -70,14 +78,17 @@ func (u *users) Get(ctx context.Context, userID string) (*model.User, error) {
         FROM users WHERE user_id=$1
     `, userID)
 	if err := row.Scan(&out.UserID, &out.Email, &out.DisplayName, &out.TimeZone, &out.Status, &out.CreationTime, &last); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get user: %w", err)
 	}
 	out.LastActiveTime = last
 	return &out, nil
 }
 
 func (u *users) Delete(ctx context.Context, userID string) error {
-	return errors.New("users.Delete not implemented")
+	return storage.ErrNotImplemented
 }
 
 // --- Vaults ---
@@ -110,7 +121,10 @@ func (v *vaults) GetByID(ctx context.Context, userID, vaultID string) (*model.Va
 	var created time.Time
 	var desc *string
 	if err := row.Scan(&out.Title, &desc, &created); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get vault by id: %w", err)
 	}
 	out.CreationTime = created
 	return &out, nil
@@ -126,7 +140,10 @@ func (v *vaults) GetByTitle(ctx context.Context, userID, title string) (*model.V
 	var created time.Time
 	var desc *string
 	if err := row.Scan(&out.VaultID, &desc, &created); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get vault by title: %w", err)
 	}
 	out.CreationTime = created
 	return &out, nil
@@ -226,11 +243,17 @@ func (v *vaults) AddMemory(ctx context.Context, userID, vaultID, memoryID string
 
 	var exists int
 	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM vaults WHERE actor_id=$1 AND vault_id=$2`, userID, vaultID).Scan(&exists); err != nil {
-		return fmt.Errorf("VAULT_NOT_FOUND: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return storage.ErrNotFound
+		}
+		return fmt.Errorf("check vault: %w", err)
 	}
 	var currentVaultID, title string
 	if err := tx.QueryRowContext(ctx, `SELECT vault_id, title FROM memories WHERE actor_id=$1 AND memory_id=$2`, userID, memoryID).Scan(&currentVaultID, &title); err != nil {
-		return fmt.Errorf("MEMORY_NOT_FOUND: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return storage.ErrNotFound
+		}
+		return fmt.Errorf("check memory: %w", err)
 	}
 	if currentVaultID == vaultID {
 		return tx.Commit()
@@ -238,10 +261,10 @@ func (v *vaults) AddMemory(ctx context.Context, userID, vaultID, memoryID string
 	var conflict int
 	err = tx.QueryRowContext(ctx, `SELECT 1 FROM memories WHERE actor_id=$1 AND vault_id=$2 AND title=$3`, userID, vaultID, title).Scan(&conflict)
 	if err == nil {
-		return fmt.Errorf("MEMORY_TITLE_CONFLICT: title already exists in target vault")
+		return storage.ErrConflict
 	}
-	if err != sql.ErrNoRows {
-		return err
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check title conflict: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx, `UPDATE memories SET vault_id=$1 WHERE actor_id=$2 AND vault_id=$3 AND memory_id=$4`, vaultID, userID, currentVaultID, memoryID); err != nil {
@@ -277,13 +300,13 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 	}
 
 	ctxID := uuid.New().String()
-	defaultCtx := `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
+	const defaultMemoryContext = `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
 	var ctxCreated time.Time
 	if err := tx.QueryRowContext(ctx, `
         INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)
         VALUES ($1,$2,$3,$4,$5)
         RETURNING creation_time
-    `, mm.ActorID, mm.VaultID, memID, ctxID, defaultCtx).Scan(&ctxCreated); err != nil {
+    `, mm.ActorID, mm.VaultID, memID, ctxID, defaultMemoryContext).Scan(&ctxCreated); err != nil {
 		return nil, err
 	}
 
@@ -291,7 +314,7 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 		"actorId":      mm.ActorID,
 		"memoryId":     memID,
 		"contextId":    ctxID,
-		"context":      defaultCtx,
+		"context":      defaultMemoryContext,
 		"creationTime": ctxCreated,
 	}
 	if err := writeOutbox(ctx, tx, "upsert_context", ctxID, payload); err != nil {
@@ -314,7 +337,10 @@ func (m *memories) GetByID(ctx context.Context, userID, vaultID, memoryID string
         FROM memories WHERE actor_id=$1 AND vault_id=$2 AND memory_id=$3
     `, userID, vaultID, memoryID)
 	if err := row.Scan(&out.MemoryType, &out.Title, &out.Description, &out.CreationTime); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get memory by id: %w", err)
 	}
 	return &out, nil
 }
@@ -329,7 +355,10 @@ func (m *memories) GetByTitle(ctx context.Context, userID, vaultID, title string
         FROM memories WHERE actor_id=$1 AND vault_id=$2 AND title=$3
     `, userID, vaultID, title)
 	if err := row.Scan(&out.MemoryID, &out.MemoryType, &out.Description, &out.CreationTime); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get memory by title: %w", err)
 	}
 	return &out, nil
 }
@@ -428,8 +457,14 @@ func (e *entries) Create(ctx context.Context, me *model.MemoryEntry) (*model.Mem
 
 	entryID := uuid.New().String()
 	var created, conversation time.Time
-	metaJSON, _ := json.Marshal(me.Metadata)
-	tagsJSON, _ := json.Marshal(me.Tags)
+	metaJSON, err := json.Marshal(me.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("marshal metadata: %w", err)
+	}
+	tagsJSON, err := json.Marshal(me.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("marshal tags: %w", err)
+	}
 
 	var convTime *time.Time
 	if !me.ConversationTime.IsZero() {
@@ -525,7 +560,10 @@ func (e *entries) GetByID(ctx context.Context, userID, vaultID, memoryID, entryI
     `, userID, vaultID, memoryID, entryID)
 	if err := row.Scan(&m.ActorID, &m.VaultID, &m.MemoryID, &m.CreationTime, &m.ConversationTime, &m.EntryID, &m.RawEntry, &m.Summary, &meta, &tags,
 		&corrTime, &corrMemID, &corrEntryTime, &corrMemID, &lastUpd); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get entry by id: %w", err)
 	}
 	if meta.Valid {
 		_ = json.Unmarshal([]byte(meta.String), &m.Metadata)
@@ -615,7 +653,10 @@ func (c *contexts) Latest(ctx context.Context, userID, vaultID, memoryID string)
         ORDER BY creation_time DESC LIMIT 1
     `, userID, vaultID, memoryID)
 	if err := row.Scan(&out.ContextID, &ctxText, &out.CreationTime); err != nil {
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("get latest context: %w", err)
 	}
 	out.Context = ctxText
 	return &out, nil

@@ -113,7 +113,7 @@ func (h *MemoryHandler) GetMemory(w http.ResponseWriter, r *http.Request) {
 	v := mux.Vars(r)
 	out, err := h.svc.GetMemory(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"])
 	if err != nil {
-		respond.WriteNotFound(w, err.Error())
+		respond.HandleError(w, err, "memory not found")
 		return
 	}
 	respond.WriteJSON(w, http.StatusOK, out)
@@ -266,7 +266,7 @@ func (h *MemoryHandler) GetMemoryEntryByID(w http.ResponseWriter, r *http.Reques
 	v := mux.Vars(r)
 	out, err := h.svc.GetEntryByID(r.Context(), actorInfo.ActorID, v["vaultId"], v["memoryId"], v["entryId"])
 	if err != nil {
-		respond.WriteNotFound(w, err.Error())
+		respond.HandleError(w, err, "entry not found")
 		return
 	}
 	respond.WriteJSON(w, http.StatusOK, out)

@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/mycelian/mycelian-memory/server/internal/health"
@@ -13,7 +13,7 @@ import (
 // StoreHealthChecker monitors store health via periodic probes.
 type StoreHealthChecker struct {
 	store        Store
-	healthy      int32
+	healthy      atomic.Int32
 	log          zerolog.Logger
 	probeTimeout time.Duration
 }
@@ -27,7 +27,7 @@ func NewStoreHealthChecker(store Store, log zerolog.Logger, probeTimeout time.Du
 func (hc *StoreHealthChecker) Name() string { return "store" }
 
 // IsHealthy returns the cached health status (non-blocking).
-func (hc *StoreHealthChecker) IsHealthy() bool { return hc.healthy == 1 }
+func (hc *StoreHealthChecker) IsHealthy() bool { return hc.healthy.Load() == 1 }
 
 // Start begins periodic health checking.
 func (hc *StoreHealthChecker) Start(ctx context.Context, interval time.Duration) {
@@ -42,9 +42,9 @@ func (hc *StoreHealthChecker) Start(ctx context.Context, interval time.Duration)
 		checkCtx, cancel := context.WithTimeout(ctx, to)
 		defer cancel()
 		if hc.probe(checkCtx) {
-			hc.healthy = 1
+			hc.healthy.Store(1)
 		} else {
-			hc.healthy = 0
+			hc.healthy.Store(0)
 		}
 	}
 
@@ -73,8 +73,8 @@ func (hc *StoreHealthChecker) probe(ctx context.Context) bool {
 	// Fallback: try a simple read operation using Users().Get
 	_, err := hc.store.Users().Get(ctx, "__health_check__")
 	if err != nil {
-		// ErrNoRows is acceptable - means DB is responsive
-		if errors.Is(err, sql.ErrNoRows) {
+		// ErrNotFound is acceptable - means DB is responsive
+		if errors.Is(err, ErrNotFound) {
 			return true
 		}
 		hc.log.Error().Stack().Str("checker", hc.Name()).Err(err).Msg("store health check failed")

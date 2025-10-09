@@ -1,3 +1,15 @@
+// Package storetest provides a compliance test suite for storage.Store implementations.
+//
+// Usage:
+//
+//	func TestMyStore(t *testing.T) {
+//	    storetest.Run(t, func(t *testing.T) storage.Store {
+//	        return setupTestStore(t)
+//	    })
+//	}
+//
+// The suite exercises all storage operations including CRUD, pagination,
+// filtering, and cascading deletes.
 package storetest
 
 import (

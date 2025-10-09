@@ -2,8 +2,10 @@ package respond
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	"github.com/mycelian/mycelian-memory/server/internal/storage"
 	"github.com/rs/zerolog/log"
 )
 
@@ -48,4 +50,28 @@ func WriteNotFound(w http.ResponseWriter, message string) {
 // WriteInternalError writes a 500 Internal Server Error response
 func WriteInternalError(w http.ResponseWriter, message string) {
 	WriteError(w, http.StatusInternalServerError, message)
+}
+
+// HandleError writes an appropriate HTTP response based on the error type.
+// It inspects the error and maps storage layer errors to appropriate HTTP status codes:
+//   - storage.ErrNotFound → 404 Not Found
+//   - storage.ErrConflict → 409 Conflict
+//   - storage.ErrNotImplemented → 501 Not Implemented
+//   - all other errors → 500 Internal Server Error
+func HandleError(w http.ResponseWriter, err error, defaultMessage string) {
+	if err == nil {
+		WriteInternalError(w, "unexpected nil error")
+		return
+	}
+
+	switch {
+	case errors.Is(err, storage.ErrNotFound):
+		WriteNotFound(w, defaultMessage)
+	case errors.Is(err, storage.ErrConflict):
+		WriteError(w, http.StatusConflict, defaultMessage)
+	case errors.Is(err, storage.ErrNotImplemented):
+		WriteError(w, http.StatusNotImplemented, defaultMessage)
+	default:
+		WriteInternalError(w, defaultMessage)
+	}
 }
