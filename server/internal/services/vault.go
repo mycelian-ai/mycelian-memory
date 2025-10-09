@@ -13,6 +13,7 @@ type VaultService struct {
 	idx   searchindex.Index
 }
 
+// NewVaultService creates a VaultService configured with the provided storage.Store and searchindex.Index.
 func NewVaultService(s storage.Store, idx searchindex.Index) *VaultService {
 	return &VaultService{store: s, idx: idx}
 }

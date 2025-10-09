@@ -27,11 +27,13 @@ import (
 // This provides a consistent starting point and instructions for AI agents.
 const defaultMemoryContext = `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
 
-// NewWithDB constructs a Postgres-backed storage.Store using database/sql.
+// NewWithDB constructs a Postgres-backed storage.Store using the provided *sql.DB.
 func NewWithDB(db *sql.DB) storage.Store { return &pgStore{db: db} }
 
 // Bootstrap performs a connectivity check to ensure Postgres is reachable.
-// This is a fast ping-only check since compose migrations handle schema setup.
+// Bootstrap verifies connectivity to the PostgreSQL instance identified by dsn.
+// If dsn is empty, it does nothing and returns nil. It opens a connection and
+// performs a ping using ctx; any error opening the database or pinging it is returned.
 func Bootstrap(ctx context.Context, dsn string) error {
 	if dsn == "" {
 		return nil
@@ -644,7 +646,9 @@ func (c *contexts) DeleteByID(ctx context.Context, userID, vaultID, memoryID, co
 
 // --- Helper functions ---
 
-// Open returns a *sql.DB using the pgx stdlib driver.
+// Open opens a *sql.DB to Postgres using the pgx stdlib driver and verifies connectivity.
+// It returns an error if the DSN is empty, if the driver fails to open, or if the database
+// cannot be reached via Ping. On a failed ping the opened DB is closed before returning the error.
 func Open(dsn string) (*sql.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("postgres DSN is empty")
@@ -660,7 +664,8 @@ func Open(dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
-// writeOutbox inserts an outbox record for async processing by the outbox worker.
+// writeOutbox serializes payload to JSON and inserts an outbox record with the given aggregate ID and operation into the provided transaction.
+// It returns an error if JSON marshaling fails or the database insert fails.
 func writeOutbox(ctx context.Context, tx *sql.Tx, op string, aggregateID string, payload map[string]interface{}) error {
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -671,7 +676,7 @@ func writeOutbox(ctx context.Context, tx *sql.Tx, op string, aggregateID string,
 }
 
 // nullIfEmpty returns nil if the byte slice is empty, otherwise returns the slice.
-// Used for optional JSON fields in SQL queries.
+// nullIfEmpty returns nil if b is empty, otherwise it returns b as an interface{} for use as an optional JSON field in SQL queries.
 func nullIfEmpty(b []byte) interface{} {
 	if len(b) == 0 {
 		return nil
