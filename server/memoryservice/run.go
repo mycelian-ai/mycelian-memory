@@ -86,7 +86,8 @@ func Run() error {
 	}
 }
 
-// initDependencies constructs required components and enforces fail-fast on missing deps.
+// initDependencies creates and returns the storage Store, search index, and embedding provider required by the service.
+// It returns an error if any component cannot be constructed or if no embedding provider is configured.
 func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logger) (storage.Store, searchindex.Index, emb.EmbeddingProvider, error) {
 	st, err := factory.NewStore(ctx, cfg, log)
 	if err != nil {
@@ -107,7 +108,8 @@ func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logge
 	return st, idx, embProvider, nil
 }
 
-// buildRouter wires HTTP routes to handlers.
+// buildRouter configures and returns an HTTP router with application routes and middleware.
+// It registers vault, memory, title-based, and health endpoints, and conditionally registers the search endpoint when a search handler can be created using the provided store, index, embedding provider, config, and logger.
 func buildRouter(st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
 	root := mux.NewRouter()
 	root.Use(api.Recover)
@@ -160,7 +162,11 @@ func buildRouter(st storage.Store, idx searchindex.Index, embProvider emb.Embedd
 	return root
 }
 
-// startHealthCheckers starts component checkers and service-level aggregator; binds health.
+// startHealthCheckers starts health checkers for the storage, search index, and embedding provider,
+// aggregates them into a service-level health checker, binds the service health probe to the API
+// health endpoint, and returns the resulting *health.ServiceHealthChecker.
+// The individual probe timeout and polling interval are derived from cfg.HealthProbeTimeoutSeconds
+// and cfg.HealthIntervalSeconds respectively.
 func startHealthCheckers(ctx context.Context, cfg *config.Config, log zerolog.Logger, st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *health.ServiceHealthChecker {
 	var checkers []health.HealthChecker
 	probeTimeout := time.Duration(cfg.HealthProbeTimeoutSeconds) * time.Second

@@ -17,7 +17,8 @@ type StoreHealthChecker struct {
 	probeTimeout time.Duration
 }
 
-// NewStoreHealthChecker creates a new store health checker.
+// NewStoreHealthChecker returns a new StoreHealthChecker that probes the given store's health using the provided logger and per-probe timeout.
+// The probeTimeout sets the duration used for individual health probes; a non-positive value will cause the checker to fall back to a default probe timeout when running.
 func NewStoreHealthChecker(store Store, log zerolog.Logger, probeTimeout time.Duration) *StoreHealthChecker {
 	return &StoreHealthChecker{store: store, log: log, probeTimeout: probeTimeout}
 }
