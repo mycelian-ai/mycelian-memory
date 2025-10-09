@@ -1,6 +1,6 @@
 module github.com/mycelian/mycelian-memory/cmd/memory-service
 
-go 1.24.6
+go 1.25
 
 require (
 	github.com/mycelian/mycelian-memory/server v0.0.0
