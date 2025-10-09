@@ -2,17 +2,6 @@ package model
 
 import "time"
 
-// User represents an account in the system.
-type User struct {
-	UserID         string     `json:"userId"`
-	Email          string     `json:"email"`
-	DisplayName    *string    `json:"displayName,omitempty"`
-	TimeZone       string     `json:"timeZone"`
-	Status         string     `json:"status"`
-	CreationTime   time.Time  `json:"creationTime"`
-	LastActiveTime *time.Time `json:"lastActiveTime,omitempty"`
-}
-
 // Vault groups memories under an actor.
 type Vault struct {
 	VaultID      string    `json:"vaultId"`

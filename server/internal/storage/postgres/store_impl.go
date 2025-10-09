@@ -23,6 +23,10 @@ import (
 	"github.com/mycelian/mycelian-memory/server/internal/storage"
 )
 
+// defaultMemoryContext is the initial context created for all new memories.
+// This provides a consistent starting point and instructions for AI agents.
+const defaultMemoryContext = `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
+
 // NewWithDB constructs a Postgres-backed storage.Store using database/sql.
 func NewWithDB(db *sql.DB) storage.Store { return &pgStore{db: db} }
 
@@ -45,51 +49,10 @@ type pgStore struct{ db *sql.DB }
 // HealthPing implements health.HealthPinger for Postgres-backed store.
 func (s *pgStore) HealthPing(ctx context.Context) error { return s.db.PingContext(ctx) }
 
-func (s *pgStore) Users() storage.Users       { return &users{db: s.db} }
 func (s *pgStore) Vaults() storage.Vaults     { return &vaults{db: s.db} }
 func (s *pgStore) Memories() storage.Memories { return &memories{db: s.db} }
 func (s *pgStore) Entries() storage.Entries   { return &entries{db: s.db} }
 func (s *pgStore) Contexts() storage.Contexts { return &contexts{db: s.db} }
-
-// --- Users ---
-type users struct{ db *sql.DB }
-
-func (u *users) Create(ctx context.Context, m *model.User) (*model.User, error) {
-	var created time.Time
-	row := u.db.QueryRowContext(ctx, `
-        INSERT INTO users (user_id, email, display_name, time_zone, status)
-        VALUES ($1,$2,$3,$4,'ACTIVE')
-        RETURNING creation_time
-    `, m.UserID, m.Email, m.DisplayName, m.TimeZone)
-	if err := row.Scan(&created); err != nil {
-		return nil, err
-	}
-	out := *m
-	out.Status = "ACTIVE"
-	out.CreationTime = created
-	return &out, nil
-}
-
-func (u *users) Get(ctx context.Context, userID string) (*model.User, error) {
-	var out model.User
-	var last *time.Time
-	row := u.db.QueryRowContext(ctx, `
-        SELECT user_id, email, display_name, time_zone, status, creation_time, last_active_time
-        FROM users WHERE user_id=$1
-    `, userID)
-	if err := row.Scan(&out.UserID, &out.Email, &out.DisplayName, &out.TimeZone, &out.Status, &out.CreationTime, &last); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, storage.ErrNotFound
-		}
-		return nil, fmt.Errorf("get user: %w", err)
-	}
-	out.LastActiveTime = last
-	return &out, nil
-}
-
-func (u *users) Delete(ctx context.Context, userID string) error {
-	return storage.ErrNotImplemented
-}
 
 // --- Vaults ---
 type vaults struct{ db *sql.DB }
@@ -300,7 +263,6 @@ func (m *memories) Create(ctx context.Context, mm *model.Memory) (*model.Memory,
 	}
 
 	ctxID := uuid.New().String()
-	const defaultMemoryContext = `{"activeContext":"This is default context that's created with the memory. Instructions for AI Agent: Provide relevant context as soon as it's available."}`
 	var ctxCreated time.Time
 	if err := tx.QueryRowContext(ctx, `
         INSERT INTO memory_contexts (actor_id, vault_id, memory_id, context_id, context)

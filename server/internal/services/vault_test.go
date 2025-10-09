@@ -59,17 +59,10 @@ type fakeStore struct {
 	}
 }
 
-func (f *fakeStore) Users() storage.Users       { return fakeUsers{} }
 func (f *fakeStore) Vaults() storage.Vaults     { return &fakeVaults{f} }
 func (f *fakeStore) Memories() storage.Memories { return &fakeMemories{f} }
 func (f *fakeStore) Entries() storage.Entries   { return &fakeEntries{f} }
 func (f *fakeStore) Contexts() storage.Contexts { return &fakeContexts{f} }
-
-type fakeUsers struct{}
-
-func (fakeUsers) Create(context.Context, *model.User) (*model.User, error) { panic("unused") }
-func (fakeUsers) Get(context.Context, string) (*model.User, error)         { panic("unused") }
-func (fakeUsers) Delete(context.Context, string) error                     { panic("unused") }
 
 type fakeVaults struct{ p *fakeStore }
 

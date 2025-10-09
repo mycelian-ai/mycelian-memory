@@ -14,7 +14,6 @@ type mockStore struct {
 	entries *mockEntryStore
 }
 
-func (m *mockStore) Users() storage.Users       { return nil }
 func (m *mockStore) Vaults() storage.Vaults     { return nil }
 func (m *mockStore) Memories() storage.Memories { return nil }
 func (m *mockStore) Entries() storage.Entries   { return m.entries }

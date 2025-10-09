@@ -7,7 +7,7 @@ import (
 )
 
 // Store defines the persistence surface used by the application services.
-// It provides typed accessors for each resource area (users, vaults, memories,
+// It provides typed accessors for each resource area (vaults, memories,
 // entries, contexts) and hides concrete database details behind simple
 // method contracts. Drivers (e.g., Postgres) live under
 // internal/storage/<driver>/ and implement these interfaces.
@@ -17,18 +17,13 @@ import (
 // - Centralize data validation and not-found handling
 // - Provide clear, minimal methods for the operations the app needs
 // - Make it straightforward to test services using mocks
+//
+// Note: Users were removed in favor of opaque actor_id strings from API keys.
 type Store interface {
-	Users() Users
 	Vaults() Vaults
 	Memories() Memories
 	Entries() Entries
 	Contexts() Contexts
-}
-
-type Users interface {
-	Create(ctx context.Context, u *model.User) (*model.User, error)
-	Get(ctx context.Context, userID string) (*model.User, error)
-	Delete(ctx context.Context, userID string) error
 }
 
 type Vaults interface {
