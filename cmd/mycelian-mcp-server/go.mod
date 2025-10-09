@@ -1,6 +1,8 @@
 module github.com/mycelian/mycelian-memory/cmd/mycelian-mcp-server
 
-go 1.25.2
+go 1.25
+
+toolchain go1.25.2
 
 require (
 	github.com/mycelian/mycelian-memory/mcp v0.0.0
