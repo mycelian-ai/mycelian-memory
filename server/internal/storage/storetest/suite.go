@@ -25,7 +25,7 @@ import (
 )
 
 // Run exercises a minimal compliance suite against a storage.Store implementation.
-// Implementations should provide a clean, isolated store and return it from makeStore.
+// the test (it may use t for setup/cleanup).
 func Run(t *testing.T, makeStore func(t *testing.T) storage.Store) {
 	t.Helper()
 

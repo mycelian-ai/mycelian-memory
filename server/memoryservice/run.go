@@ -23,7 +23,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Run starts the memory service HTTP server and blocks until shutdown or error.
+// Run starts the memory service HTTP server, initializes dependencies and health checkers, waits until dependencies report healthy, and blocks until the service shuts down or a fatal error occurs.
+// It listens for SIGINT/SIGTERM and performs a graceful shutdown, returning any initialization or server error encountered.
 func Run() error {
 	log := logger.New("memory-service")
 
@@ -86,7 +87,8 @@ func Run() error {
 	}
 }
 
-// initDependencies constructs required components and enforces fail-fast on missing deps.
+// initDependencies initializes and returns the storage.Store, searchindex.Index, and emb.EmbeddingProvider required by the service.
+// It fails fast and returns an error if any adapter cannot be created or if no embedding provider is configured.
 func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logger) (storage.Store, searchindex.Index, emb.EmbeddingProvider, error) {
 	st, err := factory.NewStore(ctx, cfg, log)
 	if err != nil {
@@ -107,7 +109,8 @@ func initDependencies(ctx context.Context, cfg *config.Config, log zerolog.Logge
 	return st, idx, embProvider, nil
 }
 
-// buildRouter wires HTTP routes to handlers.
+// buildRouter constructs an HTTP router wired with handlers for vaults, memories, health, and search using the provided storage, search index, embedding provider, and configuration.
+// The router is configured with recovery middleware and an authorizer derived from cfg; the /v0/search endpoint is omitted if the search handler cannot be created.
 func buildRouter(st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider, cfg *config.Config, log zerolog.Logger) *mux.Router {
 	root := mux.NewRouter()
 	root.Use(api.Recover)
@@ -160,7 +163,9 @@ func buildRouter(st storage.Store, idx searchindex.Index, embProvider emb.Embedd
 	return root
 }
 
-// startHealthCheckers starts component checkers and service-level aggregator; binds health.
+// startHealthCheckers starts health checkers for the store, search index, and embedding provider,
+// aggregates them into a service-level health checker, binds the service health to the API, and
+// returns the created ServiceHealthChecker configured with the service's probe timeout and interval.
 func startHealthCheckers(ctx context.Context, cfg *config.Config, log zerolog.Logger, st storage.Store, idx searchindex.Index, embProvider emb.EmbeddingProvider) *health.ServiceHealthChecker {
 	var checkers []health.HealthChecker
 	probeTimeout := time.Duration(cfg.HealthProbeTimeoutSeconds) * time.Second
