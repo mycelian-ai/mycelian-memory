@@ -47,7 +47,7 @@ func WriteNotFound(w http.ResponseWriter, message string) {
 	WriteError(w, http.StatusNotFound, message)
 }
 
-// WriteInternalError writes a 500 Internal Server Error response
+// WriteInternalError sends a 500 Internal Server Error response with the provided message encoded as JSON.
 func WriteInternalError(w http.ResponseWriter, message string) {
 	WriteError(w, http.StatusInternalServerError, message)
 }
@@ -57,7 +57,11 @@ func WriteInternalError(w http.ResponseWriter, message string) {
 //   - storage.ErrNotFound → 404 Not Found
 //   - storage.ErrConflict → 409 Conflict
 //   - storage.ErrNotImplemented → 501 Not Implemented
-//   - all other errors → 500 Internal Server Error
+// HandleError maps a storage-layer error to an appropriate HTTP response and writes it to w.
+// If err is nil, it responds with 500 and the message "unexpected nil error".
+// If err matches storage.ErrNotFound it responds with 404; storage.ErrConflict -> 409;
+// storage.ErrNotImplemented -> 501; any other error results in a 500 response.
+// The provided defaultMessage is used as the response message for mapped errors.
 func HandleError(w http.ResponseWriter, err error, defaultMessage string) {
 	if err == nil {
 		WriteInternalError(w, "unexpected nil error")
