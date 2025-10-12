@@ -38,6 +38,12 @@ The architecture is inspired by distributed systems principles, treating memory 
 
 GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-c)
 
+### Is Mycelian inspired by Mycelium? - Yes :)
+
+In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
+
+Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim is to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
+
 ### Architecture (high-level design)
 
 NOTE: The architecture now also supports Observer Agent based memory ingestion. I developed it as a part of developing the LongMemEval benchmarker using LangGraph. Will take an AI to create a cookbook for integrating Mycelian with LangGraph agents. 
@@ -81,12 +87,6 @@ flowchart TD
 - **Runs locally but designed to run anywhere** with self‑hostable Go backend and pluggable storage/vector database support.
 - **Supports ingestion of past recorded conversations**, which will be useful during onboarding an existing agent to Mycelian.
 - **Tunned using [LongMemEval](https://github.com/xiaowu0162/LongMemEval/tree/main) benchmark** However, I must warn my fellow developers to not make the decision of memory product purely based on performance on an industry benchmark. What matters is the performance on your usecase.
-
-### Is Mycelian inspired by Mycelium? - Yes :)
-
-In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
-
-Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim is to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
 
 ---
 
