@@ -31,6 +31,11 @@ At a more fundamental level, I’ve learned that building an AI memory product t
 
 Throughout the build my focus had been to maximize learnings. Hence, I leaned heavily on AI coding tools for rapid experimentation. That was great for exploration, but it also means this code is not production‑grade. 
 
+### TLDR Setup
+1. Checkout the project and install the dependencies
+2. Run `make start-dev-mycelian-server && make start-mcp-streamable-server`
+3. Connect to the MCP server and start tinkering.
+
 ### What **NOT** to use it for
 
 Below list is not exclusive, please use your judgement: 
