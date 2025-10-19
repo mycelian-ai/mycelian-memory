@@ -45,10 +45,6 @@ Below list is not exclusive, please use your judgement:
 
 _Tip: Make frequent snapshots/backups of your storage database so you can roll back when you break things._
 
-
-
-GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-c)
-
 ## How?
 The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections.
 
