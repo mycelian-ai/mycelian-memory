@@ -25,7 +25,7 @@ GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-
 
 ## Intent & Scope
 
-I started this project because I was curious about AI Memory space and wanted to dive deep by building. The journey so far has been very rewarding. I started with an initial design but was proven wrong very quickly, dove deeper into the nitty-grittes, worked with real developers and understood thier pain, and lastly talked to a few real businesess and was able to guide them through these insights.
+I started this project because I was curious about AI Memory space and wanted to dive deep by building. The journey so far has been very rewarding. I started with an initial design but was proven wrong very quickly, dove deeper into the nitty-grittes, worked with real developers and understood thier pain, and lastly talked to a few real businesess and was able to guide them through making one-way door decisions that will have lasting impact on thier companies. This last one was very rewarding where I was able to generate real positive value through a few months of focused effort.
 
 At a more fundamental level, I’ve learned that building an AI memory product that solves real business problems is a deep, multidisciplinary challenge. It demands reliable distributed storage, careful data modeling, and serious research into memory management. Real progress requires going deep on a few core problems rather than spreading effort across shallow features.
 
