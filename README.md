@@ -9,12 +9,19 @@
 
 ---
 
-## Why Mycelian
+## Why?
 
-Mycelian aims to provide AI agents with persistent memory through a simple, reliable, log‑structured architecture.
+I started this github project is to learn about AI Memory through building. I heavily used AI tools to get to a functional basic memory. So far, I learned that building an AI Memory Product that solves real business problems, will require investments in both reliable distributed storage systems and deep research. It will require focus to solve a few core problems deeply rather than spreading thin over trivial shallow features. 
 
-When an agent interacts with users, it builds deep contextual understanding within a session, but forgets everything when the session ends. Mycelian provides a framework for agents to directly persist their working context and memories, capturing high‑fidelity information as they process it during conversations.
+What are some good uses of this project:
+1. For non-critical personal use: use it to tinker and learn. Make changes, break stuff and see how it changes the memory's behavior. Do make frequent snapshots of atleast the storage db so that you can recover data if you want to.
+2. Use AI Agents to understand the architecture. More specifically, the pros and cons of it.
 
+What to not use it for:
+1. Production or Critical Project Use: I heavily used vibe coding to materialize my ideas into a functional prototype. I strongly believe that vibe coding is not the way to build reliable software. Specially, software that owns customer data. Please DO NOT use this project for production use.
+
+
+## How?
 The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections.
 
 The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [the architecture document](docs/designs/001_mycelian_memory_architecture.md).
@@ -26,6 +33,8 @@ GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-
 In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
 
 Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim is to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
+
+Please note that this project is not owned or affiliated with Mycelian AI, Inc. This is my personal project that I would like to be used as a learning resource. 
 
 ### Architecture (high-level design)
 
@@ -71,22 +80,6 @@ flowchart TD
 - **Supports ingestion of past recorded conversations**, which will be useful during onboarding an existing agent to Mycelian.
 - **Tunned using [LongMemEval](https://github.com/xiaowu0162/LongMemEval/tree/main) benchmark** However, I must warn my fellow developers to not make the decision of memory product purely based on performance on an industry benchmark. What matters is the performance on your usecase.
 
----
-
-## Disclaimer
-
-🚨 🚧 🏗️ **This project is under active development and not yet production‑ready.**
-
-🤖 **AI-Assisted Development**: I (@sam33rch) have created this codebase using AI development tools, specifically **Cursor**, **Claude Code**, and **Codex**. Part of the motivation is learning to build production-level code with AI while exploring what techniques work best.
-
-As of 09-25-2025, I worked on problem disambiguation, architecture, specs, designs and provided oversight to the models for producing functional and good quality code. I did one quick pass and one round of tune-ups to get it ready for this early open source release to gather developer feedback. 
-
- Majority of the code was written by o3 and gpt5-high models, followed by Claude Opus 4.1
-📚 **Learning Journey**: This is my first Go project, so I'm learning idiomatic Go patterns as I build. The code is functional but far from perfect, I'm currently focused on improving reliability. I invite the Gopher community to help make this project better through feedback, contributions, and guidance.
-
-You'll find detailed AI development methodologies and techniques that have worked well documented in [docs/coding-stds/ai-coding-best-practices.md](docs/coding-stds/ai-coding-best-practices.md), and I'll continue updating these insights as the project evolves.
-
----
 
 ## Quickstart
 
