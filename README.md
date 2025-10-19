@@ -17,6 +17,8 @@
 
 *Click the image above to watch a demo of Mycelian Memory in action.*
 
+GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-c)
+
 </div>
 
 ---
@@ -51,8 +53,6 @@ GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-
 The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections.
 
 The architecture is inspired by distributed systems principles, treating memory as an append‑only log that accumulates knowledge over time rather than constantly mutating core state. To learn more about the architecture, see [the architecture document](docs/designs/001_mycelian_memory_architecture.md).
-
-GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-c)
 
 ### Is Mycelian inspired by Mycelium? - Yes :)
 
