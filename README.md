@@ -17,8 +17,6 @@
 
 *Click the image above to watch a demo of Mycelian Memory in action.*
 
-**More Videos:** Check out the [Mycelian Memory YouTube Playlist](https://www.youtube.com/playlist?list=PL45CL__T1vQjpWUHB8yqWq3F_PEYh7LBK) for tutorials, demos, and deep dives.
-
 </div>
 
 ---
