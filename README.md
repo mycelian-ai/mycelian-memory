@@ -5,6 +5,20 @@
   [![GitHub Stars](https://img.shields.io/github/stars/mycelian-ai/mycelian-memory?style=social)](https://github.com/mycelian-ai/mycelian-memory/stargazers)
   [![License](https://img.shields.io/github/license/mycelian-ai/mycelian-memory)](https://github.com/mycelian-ai/mycelian-memory/blob/main/LICENSE)
   [![Go Version](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://github.com/mycelian-ai/mycelian-memory)
+  [![Discord](https://img.shields.io/discord/1396722077792469104?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
+  [![YouTube](https://img.shields.io/badge/Mycelian_Memory-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/playlist?list=PL45CL__T1vQjpWUHB8yqWq3F_PEYh7LBK)
+</div>
+
+---
+
+<div align="center">
+
+[![Mycelian Memory Demo](https://img.youtube.com/vi/Hb6zQgh6ZdU/0.jpg)](https://www.youtube.com/watch?v=Hb6zQgh6ZdU)
+
+*Click the image above to watch a demo of Mycelian Memory in action.*
+
+**More Videos:** Check out the [Mycelian Memory YouTube Playlist](https://www.youtube.com/playlist?list=PL45CL__T1vQjpWUHB8yqWq3F_PEYh7LBK) for tutorials, demos, and deep dives.
+
 </div>
 
 ---
@@ -15,6 +29,13 @@ I started this project to learn AI memory by building. I leaned heavily on AI co
 
 Over the past months I’ve learned that building an AI memory product that solves real business problems is a deep, multidisciplinary challenge. It demands reliable distributed storage, careful data modeling, and serious research into memory management. Real progress requires going deep on a few core problems rather than spreading effort across shallow features.
 
+### What **NOT** to use it for
+
+Below list is not exclusive, please use your judgement: 
+* Production or critical workloads.
+* Storing customer data, secrets, or regulated information.
+* Long‑lived deployments where durability, correctness, and security are requirements.
+
 ### What this project is good for
 
 * Non‑critical personal use & tinkering: Fork it, change things, break things, and observe how behavior changes.
@@ -24,11 +45,9 @@ Over the past months I’ve learned that building an AI memory product that solv
 
 _Tip: Make frequent snapshots/backups of your storage database so you can roll back when you break things._
 
-### What not to use it for
 
-* Production or critical workloads.
-* Storing customer data, secrets, or regulated information.
-* Long‑lived deployments where durability, correctness, and security are requirements.
+
+GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-c)
 
 ## How?
 The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections.
@@ -42,8 +61,6 @@ GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-
 In nature, mycelium creates vast underground networks connecting trees, allowing them to exchange nutrients, communicate, manage resources, and maintain ecosystem resilience.
 
 Mycelian takes inspiration from this natural interconnectedness for AI agents. The aim is to build core AI primitives, starting with long-term AI memory and context management, that enable intelligent systems to work seamlessly together, enhancing their capabilities and reliability.
-
-Please note that this project is not owned or affiliated with Mycelian AI, Inc. This is my personal project that I would like to be used as a learning resource. 
 
 ### Architecture (high-level design)
 
