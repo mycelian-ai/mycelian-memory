@@ -14,18 +14,6 @@
 
 ---
 
-<div align="center">
-
-[![Mycelian Memory Demo](https://img.youtube.com/vi/Hb6zQgh6ZdU/0.jpg)](https://www.youtube.com/watch?v=Hb6zQgh6ZdU)
-
-*Click the image above to watch a demo of Mycelian Memory in action.*
-
-**More Videos:** Check out the [Mycelian Memory YouTube Playlist](https://www.youtube.com/playlist?list=PL45CL__T1vQjpWUHB8yqWq3F_PEYh7LBK) for tutorials, demos, and deep dives.
-
-</div>
-
----
-
 ## Why Mycelian
 
 Mycelian aims to provide AI agents with persistent memory through a simple, reliable, log‑structured architecture.
