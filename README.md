@@ -9,17 +9,26 @@
 
 ---
 
-## Why?
+## Intent & Scope
 
-I started this github project is to learn about AI Memory through building. I heavily used AI tools to get to a functional basic memory. So far, I learned that building an AI Memory Product that solves real business problems, will require investments in both reliable distributed storage systems and deep research. It will require focus to solve a few core problems deeply rather than spreading thin over trivial shallow features. 
+I started this project to learn AI memory by building. I leaned heavily on AI coding tools to get to a basic, functional prototype. That was great for exploration, but it also means this code is not production‑grade.
 
-What are some good uses of this project:
-1. For non-critical personal use: use it to tinker and learn. Make changes, break stuff and see how it changes the memory's behavior. Do make frequent snapshots of atleast the storage db so that you can recover data if you want to.
-2. Use AI Agents to understand the architecture. More specifically, the pros and cons of it.
+Over the past months I’ve learned that building an AI memory product that solves real business problems is a deep, multidisciplinary challenge. It demands reliable distributed storage, careful data modeling, and serious research into memory management. Real progress requires going deep on a few core problems rather than spreading effort across shallow features.
 
-What to not use it for:
-1. Production or Critical Project Use: I heavily used vibe coding to materialize my ideas into a functional prototype. I strongly believe that vibe coding is not the way to build reliable software. Specially, software that owns customer data. Please DO NOT use this project for production use.
+### What this project is good for
 
+* Non‑critical personal use & tinkering: Fork it, change things, break things, and observe how behavior changes.
+* Architecture exploration with AI agents: Use agents to read the code, draw diagrams, and critique the design, understand the tradeoffs.
+* Prototyping eval harnesses: Try retrieval/eval ideas on small, disposable datasets.
+* Teaching & demos: Share concepts with teammates or a class, using mock/synthetic data.
+
+_Tip: Make frequent snapshots/backups of your storage database so you can roll back when you break things._
+
+### What not to use it for
+
+* Production or critical workloads.
+* Storing customer data, secrets, or regulated information.
+* Long‑lived deployments where durability, correctness, and security are requirements.
 
 ## How?
 The framework organizes information in immutable timelines that preserve memory and context fidelity, enabling high precision recall without expensive inference costs during retrieval. Users maintain full control over their memory data, including deletions and corrections.
