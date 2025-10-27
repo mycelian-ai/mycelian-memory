@@ -2,7 +2,7 @@
 
   # sameerch's AI Memory Experiments
 
-  [![License](https://img.shields.io/github/license/mycelian-ai/mycelian-memory)](https://github.com/mycelian-ai/mycelian-memory/blob/main/LICENSE)
+  [![License](https://img.shields.io/github/license/sam33rch/ai-memory-experiments)](https://github.com/sam33rch/ai-memory-experiments/blob/main/LICENSE)
   [![Discord](https://img.shields.io/discord/1396722077792469104?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
   [![YouTube](https://img.shields.io/badge/Mycelian_Memory-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/playlist?list=PL45CL__T1vQjpWUHB8yqWq3F_PEYh7LBK)
 </div>
