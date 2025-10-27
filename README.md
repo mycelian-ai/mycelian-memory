@@ -13,8 +13,6 @@
 
 <div align="center">
 
-[![Mycelian Memory Demo](https://img.youtube.com/vi/Hb6zQgh6ZdU/0.jpg)](https://www.youtube.com/watch?v=Hb6zQgh6ZdU)
-
 *Click the image above to watch a demo of Mycelian Memory in action.*
 
 GitHub Hackday 2025: [Project Presentation and Demo](https://youtu.be/3UptmBLvU-c)
