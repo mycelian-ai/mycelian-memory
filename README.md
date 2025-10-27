@@ -271,11 +271,6 @@ docs/                     # ADRs, designs, API reference
 
 For detailed information about the monorepo structure, versioning, and development workflow, see [docs/monorepo.md](docs/monorepo.md).
 
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development setup, workflow, and contribution guidelines. Day-to-day coding expectations and command references live in [AGENTS.md](AGENTS.md).
 
 ---
 
