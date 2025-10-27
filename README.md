@@ -1,6 +1,6 @@
 <div align="center">
 
-  # sameerch's AI Memory Experiments
+  # sameerch's AI Memory Experiments [Archived]
 
   [![License](https://img.shields.io/github/license/sam33rch/ai-memory-experiments)](https://github.com/sam33rch/ai-memory-experiments/blob/main/LICENSE)
   [![Discord](https://img.shields.io/discord/1396722077792469104?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/mEqsYcDcAj)
